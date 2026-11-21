@@ -1,0 +1,514 @@
+[
+ {
+  "action": "bearhug",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You give {target} a bearhug!",
+  "you_as_target": "{source} gives you a bone-crushing bearhug!",
+  "target_to_target": ""
+ },
+ {
+  "action": "bleed",
+  "no_target": "You bleed all over the place!",
+  "other_no_target": "{source} is bleeding all over the place!",
+  "target_other": "You bleed all over {target}!",
+  "you_as_target": "{source} is bleeding all over you!",
+  "target_to_target": "{source} is bleeding all over {target}!"
+ },
+ {
+  "action": "blink",
+  "no_target": "You blink in disbelief!",
+  "other_no_target": "{source} blinks in disbelief!",
+  "target_other": "You blink at {target} in disbelief!",
+  "you_as_target": "{source} blinks at you in disbelief!",
+  "target_to_target": "{source} blinks at {target} in disbelief!"
+ },
+ {
+  "action": "blush",
+  "no_target": "You blush.",
+  "other_no_target": "{source} blushes a lovely shade of red.",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "bow",
+  "no_target": "You bow deeply.",
+  "other_no_target": "{source} bows deeply.",
+  "target_other": "You bow to {target}.",
+  "you_as_target": "{source} bows to you.",
+  "target_to_target": "{source} bows to {target}."
+ },
+ {
+  "action": "burp",
+  "no_target": "You burp loudly!",
+  "other_no_target": "{source} burps loudly!",
+  "target_other": "You burp at {target}!",
+  "you_as_target": "{source} burps loudly at you!",
+  "target_to_target": "{source} burps loudly at {target}!"
+ },
+ {
+  "action": "cackle",
+  "no_target": "You lean your head back and cackle with insane glee!",
+  "other_no_target": "{source} leans their head back and cackles with insane glee!",
+  "target_other": "You cackle at {target} insanely!",
+  "you_as_target": "{source} cackles insanely at you!",
+  "target_to_target": "{source} cackles insanely at {target}!"
+ },
+ {
+  "action": "caress",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You caress {target} gently.",
+  "you_as_target": "{source} caresses you gently.",
+  "target_to_target": "{source} caresses {target} gently."
+ },
+ {
+  "action": "cheer",
+  "no_target": "You cheer loudly!",
+  "other_no_target": "{source} cheers loudly!",
+  "target_other": "You cheer {target} on!",
+  "you_as_target": "{source} cheers you on!",
+  "target_to_target": "{source} cheers {target} on!"
+ },
+ {
+  "action": "chuckle",
+  "no_target": "You chuckle softly.",
+  "other_no_target": "{source} is chuckling under his breath.",
+  "target_other": "You chuckle at {target}.",
+  "you_as_target": "{source} chuckles softly at you.",
+  "target_to_target": "{source} chuckles softly at {target}."
+ },
+ {
+  "action": "clap",
+  "no_target": "You clap wildly!",
+  "other_no_target": "{source} claps wildly!",
+  "target_other": "You clap wildly for {target}!",
+  "you_as_target": "{source} is clapping wildly for you!",
+  "target_to_target": "{source} is clapping wildly for {target}!"
+ },
+ {
+  "action": "comfort",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You comfort {target}.",
+  "you_as_target": "{source} comforts you.",
+  "target_to_target": "{source} comforts {target}."
+ },
+ {
+  "action": "cough",
+  "no_target": "You cough your lungs out.",
+  "other_no_target": "{source} coughs quietly.",
+  "target_other": "You cough towards {target}.",
+  "you_as_target": "{source} coughs at you.",
+  "target_to_target": "{source} coughs at {target}."
+ },
+ {
+  "action": "cuff",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You cuff {target}!",
+  "you_as_target": "{source} cuffs you!",
+  "target_to_target": "{source} cuffs {target}!"
+ },
+ {
+  "action": "curtsy",
+  "no_target": "You curtsy gracefully.",
+  "other_no_target": "{source} curtsies gracefully.",
+  "target_other": "You curtsy to {target}.",
+  "you_as_target": "{source} curtsies to you.",
+  "target_to_target": "{source} curtsies to {target}."
+ },
+ {
+  "action": "dance",
+  "no_target": "You dance a little jig!",
+  "other_no_target": "{source} dances a little jig!",
+  "target_other": "You dance with {target}.",
+  "you_as_target": "{source} dances with you!",
+  "target_to_target": "{source} dances with {target}!"
+ },
+ {
+  "action": "egrin",
+  "no_target": "You grin evilly.",
+  "other_no_target": "{source} grins evilly.",
+  "target_other": "You grin evilly at {target}!",
+  "you_as_target": "{source} grins evilly at you!",
+  "target_to_target": "{source} grins evilly at {target}!"
+ },
+ {
+  "action": "elaugh",
+  "no_target": "You laugh ominously.",
+  "other_no_target": "{source} laughs ominously.",
+  "target_other": "You laugh ominously at {target}.",
+  "you_as_target": "{source} looks at you with an evil eye and laughs ominously!",
+  "target_to_target": "{source} gives {target} an evil eye and laughs ominously!"
+ },
+ {
+  "action": "embrace",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You give {target} a warm embrace.",
+  "you_as_target": "{source} gives you a warm embrace.",
+  "target_to_target": "{source} gives {target} a warm embrace."
+ },
+ {
+  "action": "flex",
+  "no_target": "You flex your muscles proudly! You're soooo strong!",
+  "other_no_target": "{source} flexes their muscles proudly! What a panzy!",
+  "target_other": "You flex your muscles at {target}! You're soooo strong!",
+  "you_as_target": "{source} flexes their muscles at you! What a panzy!",
+  "target_to_target": "{source} flexes their muscles at {target}! What a panzy!"
+ },
+ {
+  "action": "frown",
+  "no_target": "You frown darkly.",
+  "other_no_target": "{source} frowns darkly.",
+  "target_other": "You frown darkly at {target}.",
+  "you_as_target": "{source} frowns darkly at you.",
+  "target_to_target": "{source} frowns darkly at {target}."
+ },
+ {
+  "action": "gasp",
+  "no_target": "You gasp loudly!",
+  "other_no_target": "{source} is gasping with his mouth wide open!",
+  "target_other": "You gasp at {target}!",
+  "you_as_target": "{source} gasps at you in amazement!",
+  "target_to_target": "{source} gasps at {target} in amazement!"
+ },
+ {
+  "action": "giggle",
+  "no_target": "You giggle loudly!",
+  "other_no_target": "{source} giggles loudly!",
+  "target_other": "You giggle at {target}!",
+  "you_as_target": "{source} giggles loudly at you!",
+  "target_to_target": "{source} giggles loudly at {target}!"
+ },
+ {
+  "action": "girn",
+  "no_target": "You girn stupidly, drooling on yourself.",
+  "other_no_target": "{source} breaks into a stupid girn.",
+  "target_other": "You girn at {target} stupidly.",
+  "you_as_target": "{source}  girns dumbly at you.",
+  "target_to_target": "{source} girns dumbly at {target}."
+ },
+ {
+  "action": "glare",
+  "no_target": "You glare angrily.",
+  "other_no_target": "{source} is glaring around angrily.",
+  "target_other": "You glare at {target} angrily.",
+  "you_as_target": "{source} glares at you angrily.",
+  "target_to_target": "{source} glares at {target} angrily."
+ },
+ {
+  "action": "greet",
+  "no_target": "You greet everyone.",
+  "other_no_target": "{source} greets everyone.",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "grin",
+  "no_target": "You grin slyly.",
+  "other_no_target": "{source} breaks into a wide grin.",
+  "target_other": "You grin at {target}.",
+  "you_as_target": "{source} grins slyly at you.",
+  "target_to_target": "{source} grins slyly at {target}."
+ },
+ {
+  "action": "groan",
+  "no_target": "You groan miserably.",
+  "other_no_target": "{source} groans miserably.",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "growl",
+  "no_target": "You growl.",
+  "other_no_target": "{source} growls ominously.",
+  "target_other": "You growl at {target}!",
+  "you_as_target": "{source} growls angrily at you!",
+  "target_to_target": "{source} growls angrily at {target}!"
+ },
+ {
+  "action": "grumble",
+  "no_target": "You grumble unhappily.",
+  "other_no_target": "{source} grumbles unhappily.",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "handshake",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You give {target} a hearty handshake.",
+  "you_as_target": "{source} gives you a hearty handshake.",
+  "target_to_target": "{source} gives {target} a hearty handshake."
+ },
+ {
+  "action": "highfive",
+  "no_target": "You leap in the air!",
+  "other_no_target": "{source} leaps in the air foolishly!",
+  "target_other": "You highfive {target}!",
+  "you_as_target": "{source} highfives you!",
+  "target_to_target": "{source} highfives {target}!"
+ },
+ {
+  "action": "howl",
+  "no_target": "You howl in utter frustration!",
+  "other_no_target": "{source} howls in frustration!",
+  "target_other": "You let your inner animal out and howl at {target}.",
+  "you_as_target": "{source} howls at you like an animal. What a weirdo.",
+  "target_to_target": "{source} howls at {target} like an animal. What a weirdo."
+ },
+ {
+  "action": "hug",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You hug {target} close!",
+  "you_as_target": "{source} hugs you close!",
+  "target_to_target": "{source} hugs {target}!"
+ },
+ {
+  "action": "hum",
+  "no_target": "You hum a little tune.",
+  "other_no_target": "{source} hums a little tune.",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "kiss",
+  "no_target": "You pucker up looking for a kiss.",
+  "other_no_target": "{source} is puckering up, looking for a kiss.",
+  "target_other": "You kiss {target}.",
+  "you_as_target": "{source} kisses you!",
+  "target_to_target": "{source} kisses {target}!"
+ },
+ {
+  "action": "laugh",
+  "no_target": "You laugh!",
+  "other_no_target": "{source} laughs!",
+  "target_other": "You laugh at {target}!",
+  "you_as_target": "{source} laughs at you!",
+  "target_to_target": "{source} laughs at {target}!"
+ },
+ {
+  "action": "moan",
+  "no_target": "You moan softly.",
+  "other_no_target": "{source} moans softly.",
+  "target_other": "You moan at {target}.",
+  "you_as_target": "{source} moans at you.",
+  "target_to_target": "{source} moans at {target}."
+ },
+ {
+  "action": "nod",
+  "no_target": "You nod affirmatively.",
+  "other_no_target": "{source} nods affirmatively.",
+  "target_other": "You nod to {target}.",
+  "you_as_target": "{source} nods to you.",
+  "target_to_target": "{source} nods to {target}."
+ },
+ {
+  "action": "nudge",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You nudge {target}.",
+  "you_as_target": "{source} nudges you.",
+  "target_to_target": "{source} nudges {target}."
+ },
+ {
+  "action": "pinch",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You pinch {target}.",
+  "you_as_target": "{source} pinches you!",
+  "target_to_target": "{source} pinches {target}!"
+ },
+ {
+  "action": "pout",
+  "no_target": "You pout.",
+  "other_no_target": "{source} pouts.",
+  "target_other": "You pout at {target}.",
+  "you_as_target": "{source} pouts at you.",
+  "target_to_target": "{source} pouts at {target}."
+ },
+ {
+  "action": "roll",
+  "no_target": "You shake your dice and roll a {value}!",
+  "other_no_target": "{source} shakes a dice and rolls a {value}!",
+  "target_other": "",
+  "you_as_target": "",
+  "target_to_target": ""
+ },
+ {
+  "action": "shake",
+  "no_target": "You shake your head.",
+  "other_no_target": "{source} shakes his head.",
+  "target_other": "You shake your head at {target}.",
+  "you_as_target": "{source} shakes his head at you.",
+  "target_to_target": "{source} shakes his head at {target}."
+ },
+ {
+  "action": "shrug",
+  "no_target": "You shrug your shoulders.",
+  "other_no_target": "{source} is shrugging his shoulders.",
+  "target_other": "You shrug at {target}.",
+  "you_as_target": "{source} shrugs at you.",
+  "target_to_target": "{source} shrugs at {target}."
+ },
+ {
+  "action": "sigh",
+  "no_target": "You sigh wistfully.",
+  "other_no_target": "{source} sighs wistfully.",
+  "target_other": "You sigh at {target}.",
+  "you_as_target": "{source} sighs at you.",
+  "target_to_target": "{source} sighs at {target}."
+ },
+ {
+  "action": "slap",
+  "no_target": "You slap yourself!",
+  "other_no_target": "{source} slaps his face!",
+  "target_other": "You slap {target}!",
+  "you_as_target": "{source} slaps you!",
+  "target_to_target": "{source} slaps {target}!"
+ },
+ {
+  "action": "smack",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You smack {target} across the face!",
+  "you_as_target": "{source} smacks you across the face!",
+  "target_to_target": "{source} smacks {target} across the face!"
+ },
+ {
+  "action": "smile",
+  "no_target": "You smile happily!",
+  "other_no_target": "{source} smiles happily!",
+  "target_other": "You smile happily at {target}!",
+  "you_as_target": "{source} smiles happily at you!",
+  "target_to_target": "{source} smiles happily at {target}!"
+ },
+ {
+  "action": "smirk",
+  "no_target": "You smirk wryly.",
+  "other_no_target": "{source} smirks wryly.",
+  "target_other": "You smirk at {target}.",
+  "you_as_target": "{source} smirks at you.",
+  "target_to_target": "{source} smirks at {target}."
+ },
+ {
+  "action": "smooch",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You smooch with {target}!",
+  "you_as_target": "{source} smooches with you!",
+  "target_to_target": "{source} smooches with {target}!"
+ },
+ {
+  "action": "sneeze",
+  "no_target": "You sneeze.",
+  "other_no_target": "{source} sneezes.",
+  "target_other": "You sneeze on {target}.",
+  "you_as_target": "{source} sneezes on you.",
+  "target_to_target": "{source} sneezes on {target}."
+ },
+ {
+  "action": "snicker",
+  "no_target": "You snicker.",
+  "other_no_target": "{source} snickers.",
+  "target_other": "You snicker at {target}.",
+  "you_as_target": "{source} snickers at you.",
+  "target_to_target": "{source} snickers at {target}."
+ },
+ {
+  "action": "sniff",
+  "no_target": "You sniff the air.",
+  "other_no_target": "{source} sniffs the air.",
+  "target_other": "You sniff {target}.",
+  "you_as_target": "{source} sniffs you.",
+  "target_to_target": "{source} sniffs {target}."
+ },
+ {
+  "action": "sob",
+  "no_target": "You sob quietly.",
+  "other_no_target": "{source} sobs quietly.",
+  "target_other": "You sob quietly at {target}.",
+  "you_as_target": "{source} sobs quietly at you.",
+  "target_to_target": "{source} sobs quietly at {target}."
+ },
+ {
+  "action": "spit",
+  "no_target": "You spit.",
+  "other_no_target": "{source} spits.",
+  "target_other": "You spit at {target}!",
+  "you_as_target": "{source} spits at you!",
+  "target_to_target": "{source} spits at {target}!"
+ },
+ {
+  "action": "squeeze",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You squeeze {target} with all your might.",
+  "you_as_target": "{source} squeezes you mightily!",
+  "target_to_target": "{source} squeezes {target} mightily!"
+ },
+ {
+  "action": "tease",
+  "no_target": "",
+  "other_no_target": "",
+  "target_other": "You tease {target}!",
+  "you_as_target": "{source} teases you!",
+  "target_to_target": "{source} teases {target}!"
+ },
+ {
+  "action": "tickle",
+  "no_target": "You look around looking for someone to tickle.",
+  "other_no_target": "{source} is looking for someone to tickle, you may be next!",
+  "target_other": "You tickle {target}, and they laugh hysterically!",
+  "you_as_target": "{source} tickles you, you suddenly can't stop laughing!",
+  "target_to_target": "{source} tickles {target} making them laugh hysterically!"
+ },
+ {
+  "action": "wave",
+  "no_target": "You wave farewell!",
+  "other_no_target": "{source} waves!",
+  "target_other": "You wave to {target}!",
+  "you_as_target": "{source} waves to you!",
+  "target_to_target": "{source} waves to {target}!"
+ },
+ {
+  "action": "whimper",
+  "no_target": "You whimper softly.",
+  "other_no_target": "{source} whimpers softly.",
+  "target_other": "You whimper to {target}.",
+  "you_as_target": "{source} whimpers to you.",
+  "target_to_target": "{source} whimpers to {target}."
+ },
+ {
+  "action": "whistle",
+  "no_target": "You whistle a little tune.",
+  "other_no_target": "{source} whistles a little tune.",
+  "target_other": "You whistle at {target} appreciatively!",
+  "you_as_target": "{source} whistles at you appreciatively!",
+  "target_to_target": "{source} whistles at {target} appreciatively!"
+ },
+ {
+  "action": "wink",
+  "no_target": "You wink.",
+  "other_no_target": "{source} winks slyly.",
+  "target_other": "You wink at {target}.",
+  "you_as_target": "{source} winks at you!",
+  "target_to_target": "{source} winks at {target}!"
+ },
+ {
+  "action": "yawn",
+  "no_target": "You yawn.",
+  "other_no_target": "{source} yawns loudly.",
+  "target_other": "You yawn at {target}.",
+  "you_as_target": "{source} yawns at you.",
+  "target_to_target": "{source} yawns at {target}."
+ }
+]

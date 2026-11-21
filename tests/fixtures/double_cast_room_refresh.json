@@ -1,0 +1,87 @@
+{
+ "note": "0.8.37: esto sent twice when the room list refreshed mid-fight (Revolution walked in)",
+ "head": {
+  "t": 1761520000.0,
+  "k": "head",
+  "n": 0,
+  "d": {
+   "version": "test",
+   "board": "Paradigm",
+   "char": "Miserable",
+   "world": "/home/claude/MudPilot/mudpilot/bundled/Paradigm.db",
+   "settings": {
+    "my_name": "Miserable",
+    "auto_combat": true,
+    "auto_nuke": true,
+    "auto_spells": false,
+    "attack_spells": [
+     "esto"
+    ],
+    "char_level": 47,
+    "auto_rest": false,
+    "auto_bless": false,
+    "party_check_secs": 0,
+    "aoe_safety": false,
+    "auto_loot": false,
+    "loot_cash": false,
+    "party_sync": false,
+    "known_spells": [
+     "esto"
+    ],
+    "min_mobs": 1,
+    "max_mobs": 9
+   }
+  }
+ },
+ "records": [
+  {
+   "t": 1761520000.2,
+   "k": "rx",
+   "n": 0,
+   "d": "[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520001.0,
+   "k": "rx",
+   "n": 0,
+   "d": "\r\nRotting Glade, Trail\r\nAlso here: fat nightshade, small drooling geist, fat nightshade, nasty drooling geist.\r\nObvious exits: southeast\r\n[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520002.5,
+   "k": "rx",
+   "n": 0,
+   "d": "*Combat Engaged*\r\n[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520002.8,
+   "k": "rx",
+   "n": 0,
+   "d": "Revolution moves to attack everyone in the room.\r\n[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520003.5,
+   "k": "rx",
+   "n": 0,
+   "d": "\r\nRotting Glade, Trail\r\nAlso here: Revolution, fat nightshade, small drooling geist, fat nightshade, nasty drooling geist.\r\nObvious exits: southeast\r\n[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520005.0,
+   "k": "rx",
+   "n": 0,
+   "d": "Your elemental storm hits the fat nightshade for 140 damage!\r\n[HP=684/MA=473]:"
+  },
+  {
+   "t": 1761520007.5,
+   "k": "rx",
+   "n": 0,
+   "d": "[HP=684/MA=473]:"
+  }
+ ],
+ "expect": [
+  "esto"
+ ],
+ "expect_max": {
+  "esto": 1
+ },
+ "settings": {}
+}

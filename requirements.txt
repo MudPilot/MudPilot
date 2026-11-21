@@ -1,0 +1,2 @@
+access-parser>=0.0.6
+keyring>=24

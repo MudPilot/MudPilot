@@ -1,0 +1,1580 @@
+Spectral Knight sweep (0.8.192) — Go to 6/994 Ornate Tomb, practice server with gates, Druid 47 (PvP Revolution)
+and Priest 55 (PVEREV), solo, Combat on
+==============================================================================================================
+- 0.8.188 code: 10 of 10 reachable starts stop at 6/861 "no exit d" — the walk round the alcove levers gave up and
+  typed 'd' into the wall without pulling a lever (what Revolution saw: "didn't even try the required commands").
+- 0.8.191 code: 66 of 72 arrive (Druid + Priest, 3 x 12 starts each); every non-arrival is Delanon (no way out on
+  MME's map). At 1-1.5 s a room (the real game's pace) 8 of 9 arrive; the one stop is the case below.
+- The case fixed in 0.8.192: an iron door to a tomb lever (6/885 E) misses its bashes, the Go to 'goes round' it, the
+  lever behind it is out of reach and the walk types 'd' into 6/861 again. Stress round (bash 8%, search 35%), 72
+  walks per side: 6/861 dead ends 2 before, 0 after; the rest are the harsh dice (60 missed bashes at 6/849 W, 20 missed
+  searches at 6/992 E) and Delanon, on both sides.
+- Revolution's own attempt isn't in R:'s logs, traces or chats (back to 2026-10-31); the MegaMUD paths on M:
+  (TOMBOPEN.mp, TOMBSPEC.mp) pull the same eight levers in the same order MME lists.
+
+MudPilot realm walk sweep — whole Go tos on the practice server with honest gates (simserver.Gates)
+==============================================================================================================
+
+How: tests/e2e_realm_walk.py starts the practice server with gates on (its own copy of the map) and a real
+Session, puts the character in the start room and runs Go to, the way you would. Character: Human Mage,
+level 55 (one worker 30), Good, strength 75, picklocks 0, 5,000,000 copper; carries the golden idol and rope
+and grapple (two workers also every key/item an exit needs: 'keyring', and quest flags DaoLordQuest 9 +
+GuildmasterQuest 1). Combat on in the final round; a boss stop is answered with Alt+R after the harness
+takes the boss out of its room (a walk isn't decided by a boss fight it wasn't asked for). A monster drop an
+errand waits for is handed over by the harness (no lairs / drop rolls on the practice server).
+Walks: fixed (Lost City through the Earthen Catacombs with the idol, Kingsport and round it, Tidepool's south
+entrance, the Volcano / Undermountain, Dark-Elf City, the Great Pyramid), every bank to the far places,
+Kingsport-area pairs, random far-apart rooms (60+ rooms apart), Rooms.md places.
+
+Walks run in all: round 1 (first practice-server version, old code) 197, discovery rounds 2-4 1759,
+final round before 292 + after 292, darkness check 22 — 2562 walks.
+
+0.8.190 round, same walks with the 0.8.189 code ('before') and 0.8.190 ('after'): 292 walks
+  outcome                                                         before   after
+  ok                                                                 209     203
+  reached, but flagged: stuck                                          4      13
+  reached, but flagged: loop                                           8       8
+  reached, but flagged: loop/wrong way                                 6       6
+  reached, but flagged: wrong way                                      5       4
+  reached, but flagged: loop/stuck                                     1       3
+  no route: only way is through an avoided area (by design)           28      28
+  no route: gate / quest item / fare (character can't)                22      22
+  hung up: HP below 25% (traps / boss fight)                           5       1
+  stopped short                                                        2       2
+  setup                                                                1       1
+  stalled                                                              1       1
+  rooms walked                                                     99562  100713
+
+  walks whose outcome changed:
+    kings  14/9111 -> 14/1923  [Coldspring River, Fork → Lower Albion River,]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 130 s at 14/2489 Albion River, Waterfall
+    lab    2/10935 -> 6/1243  [Lava Fields: Efreeti]  hung up: HP below 25% (traps / boss fight)  ->  reached, but flagged: stuck
+           before: stopped short: at 6/1220 Lava Tube (status: Hung up (HP 175/715 below 25%)) 
+           after:  stuck: no move for 73 s at 7/982 Lava Fields
+    lab    8/531 -> 16/9549  [Volcano: Molten River (lower level)]  hung up: HP below 25% (traps / boss fight)  ->  reached, but flagged: loop/stuck
+           before: stopped short: at 16/9507 Volcano, Smoldering Tunnel (status: Hung up (HP 178/715 below 25%)) 08:19:41  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; unt
+           after:  stuck: no move for 79 s at 16/1918 Volcano, Chiseled Tunnels
+    lab    15/2330 -> 16/10240  [Volcano: Infernal Cavern, Jagged Path]  hung up: HP below 25% (traps / boss fight)  ->  reached, but flagged: loop/stuck
+           before: stopped short: at 16/2699 Volcano, Cramped Tunnels (status: Hung up (HP 171/715 below 25%)) 08:18:58  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untic
+           after:  stuck: no move for 81 s at 16/2071 Volcano, Red Tunnels
+    randA  9/331 -> 7/477  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 30 s at 8/758 Building Rooftop
+    randA  13/2211 -> 14/9999  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 85 s at 14/8979 Lorthan, Lowland Road
+    randA  13/12812 -> 14/676  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 84 s at 14/542 Shadowy Marsh, Path
+    randK  2/2699 -> 17/3426  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 68 s at 17/3439 Large Cave, Tunnel
+    randL30 13/962 -> 15/10062  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 26 s at 1/1403 Darkwood Forest, Main Road
+    randL30 14/9785 -> 6/1154  [random]  hung up: HP below 25% (traps / boss fight)  ->  reached, but flagged: stuck
+           before: stopped short: at 14/9020 The Quagmire (status: Hung up (HP 97/390 below 25%)) 
+           after:  stuck: no move for 119 s at 14/9458 The Quagmire, Old Trail
+    randL30 14/10159 -> 14/10406  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 124 s at 14/9789 Arched Stone Structure
+    towns2 14/1 -> 16/356  [Bank of Albion → Lost City / Deranged Priest]  reached, but flagged: wrong way  ->  ok
+           before: wrong way: walked 1411 rooms for 995 planned (errand legs included)
+
+Darkness check (rooms with MME light <= -150 dark, no light / 'light torch'): 18/22 Lost City walks ok — the catacombs (light -175) walk fine by dead reckoning plus 'pro'.
+
+
+0.8.190 (Dan's picks from the 0.8.189 list: 1 traps, 2 damaging rooms, 3 doors, 4 lever costs, 7 guarded portals,
+10 idol for each follower). Reached the target: before 233, after 237 of 292. Hung up below 25% HP: 5 -> 1. The
+extra 'stuck' flags are the new rest-to-full stops before a trap or a hurting stretch (25+ s standing still while
+resting), not failures: the Volcano walks (Molten River, Infernal Cavern), the Lava Fields Efreeti and the Quagmire now
+arrive instead of hanging up. The darkness check's 4 misses below were the guarded 'go hole' at 16/356 with Combat off
+(fixed by 7). Still open after 0.8.190:
+- A walk that starts inside a hurting stretch keeps going rather than resting in it (16/9925 in the Volcano's magma
+  tunnels, 857 rooms to go: hung up). Resting in magma hurts too, so it walks out; if you'd rather it rest anyway in
+  some rooms, that's a call for you.
+- Traps / damaging rooms use MME's largest figure (a 400 trap counts as 400). Traps fire only sometimes and roll lower;
+  the walk will sometimes rest when it didn't need to.
+- Remote-action walls whose lever rooms are behind other such walls (Treetops, 6/861) count as a flat 100 rooms, not
+  their exact tour.
+- The idol rule needs the followers on 0.8.190 (party sync 'kit=') or an '@have' answer; with neither, the leader
+  takes another way (into the Lost City: the Negative Power Plane + rope way, only if avoid mode allows it — with the
+  default avoid list there is no other way, so it's the idol way and the '@have' round, as in 0.8.189).
+- Combat off: guarded portals are not planned at all, so a Go to whose only way is one says "no route" (Dan's pick).
+- Dark-Elf Castle gate (8/559 S) only opens from inside; Delanon and the Fiery Lair are map facts (unchanged).
+
+==============================================================================================================
+0.8.190 round, after — every walk
+==============================================================================================================
+MudPilot realm walk sweep (practice server, honest gates) — 2026-11-13 08:51
+292 walks: 237 reached the target (some flagged below: loop / stuck / wrong way), 55 didn't
+first issue per walk: ok 203, no route 28, stopped short 25, stuck 16, loop 14, wrong way 4, stalled 1, setup 1
+all issues: no route 28, stopped short 25, stuck 19, loop 17, wrong way 10, stalled 1, setup 1
+rooms walked / planned: 100713 / 74009
+
+  fixed level 55: 30/32 ok
+  kingsport level 55: 30/30 ok
+  labelled level 55: 32/40 ok
+  random level 30: 29/30 ok
+  random level 55: 59/80 ok
+  town level 55: 57/80 ok
+
+Problems:
+- [r8fixed] 1/1 Town Gates → 13/503 Rugged Shoreline, Tidepool  [Tidepool south entrance from Silvermere]  walked None/None in 0 s, ended -
+    no route: The only way to 13/503 Rugged Shoreline, Tidepool goes through Black Wasteland, which you're avoiding.
+    log: 08:18:24  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 08:18:25  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:18:25  Not going to 13/503 Rugged Shoreline, Tidepool: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8fixed] 1/1 Town Gates → 8/560 Dark-Elf Castle, Gatehouse  [Dark-Elf Castle Gatehouse from Silvermere]  walked 406/9 in 99.8 s, ended 8/559 Dark-Elf City, Moatside
+    stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 08:29:31  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    stuck: no move for 81 s at 8/559 Dark-Elf City, Moatside
+    note: monster drop handed over: black star key (drop: dark cultist 10% (its lair)) at 1/1128 Slum Street
+    note: monster drop handed over: gate key (drop: obsidian statue 100%) at 8/461 Black Steel Gate
+    note: 1 detours: 08:29:31  the door south never opened — going round it
+    note: sim: search missed 7/148 S; search missed 7/148 S
+    log: 08:28:09  Have everything — on to 'Go to 8/560 Dark-Elf Castle, Gatehouse'
+    log: 08:28:09  Go to 8/560 — started by errands.tick
+    log: 08:28:09  Walking path: Go to 8/560 Dark-Elf Castle, Gatehouse (9 steps)
+    log: 08:29:31  the door south never opened — going round it
+    log: 08:29:31  …but the south exit is the only way to 8/560 — staying with it
+    log: 08:29:31  Stopped: the door south never opened (tried 'open' for 2 minutes)
+- [r8lab] 9/905 Rancid Sewer → 14/267 Bank of Albion, Blackwater Branch  [Port Blackwater: Bank of Albion, Blackwater Branch]  walked None/None in 0 s, ended -
+    no route: The only way to 14/267 Bank of Albion, Blackwater Branch goes through Black Wasteland, which you're avoiding.
+    log: 08:16:47  Go to 14/267 — started by e2e_realm_walk.walk_one
+    log: 08:16:50  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:16:50  Not going to 14/267 Bank of Albion, Blackwater Branch: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8lab] 1/1139 Slum Street, Bend → 16/4947 Ocean Floor, Sunken Ship  [Ocean: Ocean Floor, Sunken Ship, Kraken]  walked 337/340 in 183.4 s, ended 16/4947 Ocean Floor, Sunken Ship
+    stalled: no move for 150 s at 16/4947 Ocean Floor, Sunken Ship (status: Fighting kraken)
+    stuck: no move for 159 s at 16/4947 Ocean Floor, Sunken Ship
+    log: 08:35:39  Go to: about to 'go path' in 1/1403, which looks like other rooms — asking the board (pro)
+    log: 08:35:39  Location confirmed by 'pro': 1/1403 Darkwood Forest, Main Road
+    log: 08:35:45  Go to: about to 'go hole' in 1/1694, which looks like other rooms — asking the board (pro)
+    log: 08:35:45  Location confirmed by 'pro': 1/1694 Darkwood Forest
+    log: 08:35:51  Go to: about to 'go path' in 17/143, which looks like other rooms — asking the board (pro)
+    log: 08:35:51  Location confirmed by 'pro': 17/143 Forest Trail
+- [r8lab] 17/2175 Mausoleum, Stone Hallway → 14/5634 Alba Rock, Cliffside Path  [Tagesh Highlands: Alba Rock, Cliffside Path]  walked None/None in 0 s, ended -
+    no route: The only way to 14/5634 Alba Rock, Cliffside Path goes through Black Wasteland, which you're avoiding.
+    log: 08:45:42  Go to 14/5634 — started by e2e_realm_walk.walk_one
+    log: 08:45:43  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:45:43  Not going to 14/5634 Alba Rock, Cliffside Path: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8lab] 16/2712 Volcano, Magma Tunnels → 14/1772 Bobbin and Weaving Clothiers, Front Room  [Kingsport: Bobbin and Weaving Clothiers]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1772 Bobbin and Weaving Clothiers, Front Room goes through Negative Power Plane, which you're avoiding.
+    log: 08:46:19  Go to 14/1772 — started by e2e_realm_walk.walk_one
+    log: 08:46:20  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:46:20  Not going to 14/1772 Bobbin and Weaving Clothiers, Front Room: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8lab] 6/2492 Silver Mine Tunnel → 14/1725 The Bitter End Tavern  [Kingsport: The Bitter End Tavern]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1725 The Bitter End Tavern goes through Negative Power Plane, which you're avoiding.
+    log: 08:46:22  Go to 14/1725 — started by e2e_realm_walk.walk_one
+    log: 08:46:24  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:46:24  Not going to 14/1725 The Bitter End Tavern: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8lab] 17/734 Blackwood Forest → 14/4445 Grey Stone Cliffs  [Tagesh Highlands: Grey Stone Cliffs, Fork]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4445 Grey Stone Cliffs goes through Black Wasteland, which you're avoiding.
+    log: 08:46:26  Go to 14/4445 — started by e2e_realm_walk.walk_one
+    log: 08:46:27  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:46:27  Not going to 14/4445 Grey Stone Cliffs: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8lab] 16/4208 Ocean Floor, Deep Water → 2/11978 Arcane Study  [Rugged Plateau: Archmage Valduin]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11978 Arcane Study goes through Negative Power Plane, which you're avoiding.
+    note: cleared a fight left over from the last walk
+    log: 08:47:28  Go to 2/11978 — started by e2e_realm_walk.walk_one
+    log: 08:47:29  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:47:29  Not going to 2/11978 Arcane Study: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8lab] 8/705 Royal Throne Room → 14/4143 Bristlewood Forest, Grassy Landing  [Bristlewood Forest: Bristlewood Forest, Grassy Lndng]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4143 Bristlewood Forest, Grassy Landing goes through Negative Power Plane, which you're avoiding.
+    log: 08:49:11  Go to 14/4143 — started by e2e_realm_walk.walk_one
+    log: 08:49:12  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:49:12  Not going to 14/4143 Bristlewood Forest, Grassy Landing: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randA] 16/3109 Underground Passage → 2/11685 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11685 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 08:18:00  Go to 2/11685 — started by e2e_realm_walk.walk_one
+    log: 08:18:01  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:18:01  Not going to 2/11685 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randA] 12/2014 Great Pyramid → 14/4543 Jagged Cliff  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4543 Jagged Cliff goes through Negative Power Plane, which you're avoiding.
+    log: 08:18:04  Go to 14/4543 — started by e2e_realm_walk.walk_one
+    log: 08:18:06  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:18:06  Not going to 14/4543 Jagged Cliff: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randA] 1/1952 Ancient Crypt, Tomb → 14/8325 Caer Fenwyn, Stables  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/8325 Caer Fenwyn, Stables goes through Black Wasteland, which you're avoiding.
+    log: 08:26:06  Go to 14/8325 — started by e2e_realm_walk.walk_one
+    log: 08:26:08  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:26:08  Not going to 14/8325 Caer Fenwyn, Stables: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randA] 16/2326 Earthen Catacombs → 13/599 Shoreline, Sandy Beach  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 13/599 Shoreline, Sandy Beach goes through Negative Power Plane, which you're avoiding.
+    log: 08:26:57  Go to 13/599 — started by e2e_realm_walk.walk_one
+    log: 08:26:58  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:26:58  Not going to 13/599 Shoreline, Sandy Beach: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randA] 15/141 Orc Barracks → 3/608 Unholy Altar  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 3/608 Unholy Altar goes through Black Wasteland, which you're avoiding.
+    log: 08:28:00  Go to 3/608 — started by e2e_realm_walk.walk_one
+    log: 08:28:01  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:28:01  Not going to 3/608 Unholy Altar: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randA] 8/1658 Lower Caverns, Underground Lake → 14/6441 Carnaugh Plain  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/6441 Carnaugh Plain goes through Black Wasteland, which you're avoiding.
+    log: 08:28:44  Go to 14/6441 — started by e2e_realm_walk.walk_one
+    log: 08:28:46  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:28:46  Not going to 14/6441 Carnaugh Plain: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randA] 2/971 Dragon's Teeth Hills → 14/4410 Shabby Hovel  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4410 Shabby Hovel goes through Black Wasteland, which you're avoiding.
+    log: 08:28:55  Go to 14/4410 — started by e2e_realm_walk.walk_one
+    log: 08:28:57  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:28:57  Not going to 14/4410 Shabby Hovel: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randA] 17/2101 Mausoleum, Stone Hallway → 8/677 Castle, Dark Hallway  [random]  walked 577/33 in 190.6 s, ended 8/559 Dark-Elf City, Moatside
+    stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 08:35:05  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    stuck: no move for 81 s at 8/559 Dark-Elf City, Moatside
+    note: monster drop handed over: black star key (drop: dark cultist 10% (its lair)) at 1/1522 Dark Cavern
+    note: monster drop handed over: gate key (drop: obsidian statue 100%) at 8/461 Black Steel Gate
+    note: 1 detours: 08:35:05  the door south never opened — going round it
+    note: sim: bash failed 17/247 N; bash failed 8/712 E; bash failed 8/712 E; bash failed 8/712 E; command refused 8/720 jump north (testskill agility -10 601)
+    log: 08:33:43  Have everything — on to 'Go to 8/677 Castle, Dark Hallway'
+    log: 08:33:43  Go to 8/677 — started by errands.tick
+    log: 08:33:43  Walking path: Go to 8/677 Castle, Dark Hallway (33 steps)
+    log: 08:35:05  the door south never opened — going round it
+    log: 08:35:05  …but the south exit is the only way to 8/677 — staying with it
+    log: 08:35:05  Stopped: the door south never opened (tried 'open' for 2 minutes)
+- [r8randA] 2/186 Dragon's Teeth Hills → 14/3883 Lake Alba  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/3883 Lake Alba goes through Black Wasteland, which you're avoiding.
+    log: 08:37:56  Go to 14/3883 — started by e2e_realm_walk.walk_one
+    log: 08:37:57  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:37:57  Not going to 14/3883 Lake Alba: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randA] 17/702 Blackwood Forest → 14/6949 Upper Mine Tunnel, Cart Track  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/6949 Upper Mine Tunnel, Cart Track goes through Black Wasteland, which you're avoiding.
+    log: 08:41:50  Go to 14/6949 — started by e2e_realm_walk.walk_one
+    log: 08:41:51  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:41:51  Not going to 14/6949 Upper Mine Tunnel, Cart Track: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randK] 7/880 Cracked Plain → 14/7807 Verdant Meadow  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/7807 Verdant Meadow goes through Black Wasteland, which you're avoiding.
+    log: 08:16:48  Go to 14/7807 — started by e2e_realm_walk.walk_one
+    log: 08:16:50  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:16:50  Not going to 14/7807 Verdant Meadow: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randK] 16/875 Storm Mountain, Rocky Path → 2/11296 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11296 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 08:20:02  Go to 2/11296 — started by e2e_realm_walk.walk_one
+    log: 08:20:03  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:20:03  Not going to 2/11296 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 14/7568 Vale Of Durand, The Kingsroad → 8/1265 Negative Power Plane  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 8/1265 Negative Power Plane goes through Negative Power Plane, which you're avoiding.
+    log: 08:21:00  Go to 8/1265 — started by e2e_realm_walk.walk_one
+    log: 08:21:01  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:21:01  Not going to 8/1265 Negative Power Plane: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 13/4133 Crimson Keep, Barracks → 2/11231 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11231 Rugged Plateau goes through Black Wasteland, which you're avoiding.
+    log: 08:22:37  Go to 2/11231 — started by e2e_realm_walk.walk_one
+    log: 08:22:38  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:22:38  Not going to 2/11231 Rugged Plateau: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randK] 12/1667 Limestone Caverns → 14/1091 Harbor Square  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1091 Harbor Square goes through Negative Power Plane, which you're avoiding.
+    log: 08:22:55  Go to 14/1091 — started by e2e_realm_walk.walk_one
+    log: 08:22:56  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:22:56  Not going to 14/1091 Harbor Square: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 6/2720 Gold Mine, Cart Track → 14/4776 Brynafon River  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4776 Brynafon River goes through Negative Power Plane, which you're avoiding.
+    log: 08:22:59  Go to 14/4776 — started by e2e_realm_walk.walk_one
+    log: 08:23:01  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:23:01  Not going to 14/4776 Brynafon River: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 16/3519 Ocean Floor, Shallows → 2/10589 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/10589 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 08:23:20  Go to 2/10589 — started by e2e_realm_walk.walk_one
+    log: 08:23:21  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:23:21  Not going to 2/10589 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 16/9925 Infernal Cavern, Wall → 13/3823 Swamp of Tharollok, Overgrown Path  [random]  walked 36/857 in 74.1 s, ended 16/2868 Volcano, Magma Tunnels
+    stopped short: at 16/2868 Volcano, Magma Tunnels (status: Hung up (HP 169/715 below 25%)) 
+    log: 08:27:45  Go to: 16/9925 looks like other rooms — asking the board (pro)
+    log: 08:27:45  Location confirmed by 'pro': 16/9925 Infernal Cavern, Wall
+    log: 08:28:53  Go to: about to 'go crack' in 16/9831, which looks like other rooms — asking the board (pro)
+    log: 08:28:53  Location confirmed by 'pro': 16/9831 Volcano, Magma Tunnels
+    log: 08:28:57  HANGING UP — HP 169/715 below 25%
+    log: 08:28:57  Hung up (HP 169/715 below 25%)
+- [r8randK] 3/428 Copperwood Forest → 14/3023 Lower Bristlewood  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/3023 Lower Bristlewood goes through Black Wasteland, which you're avoiding.
+    note: reconnected (the last walk ended hung up)
+    log: 08:29:10  Go to 14/3023 — started by e2e_realm_walk.walk_one
+    log: 08:29:11  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:29:11  Not going to 14/3023 Lower Bristlewood: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8randK] 16/4998 Sunken Ship, Hold → 13/305 Jungle Trail  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 13/305 Jungle Trail goes through Negative Power Plane, which you're avoiding.
+    log: 08:30:39  Go to 13/305 — started by e2e_realm_walk.walk_one
+    log: 08:30:40  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:30:40  Not going to 13/305 Jungle Trail: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randK] 16/2801 Volcano, Magma Tunnels → 14/7577 Vale Of Durand, The Kingsroad  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/7577 Vale Of Durand, The Kingsroad goes through Negative Power Plane, which you're avoiding.
+    log: 08:30:43  Go to 14/7577 — started by e2e_realm_walk.walk_one
+    log: 08:30:44  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 08:30:44  Not going to 14/7577 Vale Of Durand, The Kingsroad: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r8randL30] 17/2249 mausoleum Labyrinth                                   → 1/398 Magic Shoppe  [random]  walked None/None in None s, ended -
+    setup: bot thinks it's in 17/2191 Mausoleum Labyrinth
+- [r8towns] 5/245 Bank of Delanon → 13/503 Rugged Shoreline, Tidepool  [Bank of Delanon → Tidepool south entrance]  walked 0/None in 8.1 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:21:54  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:21:46  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 08:21:47  Go to: checking abil 204 (exits need them)
+    log: 08:21:50  Go to 13/503 — started by automation.<lambda>
+    log: 08:21:51  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:21:54  Go to 13/503 — started by automation.<lambda>
+    log: 08:21:54  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns] 6/1334 Bank of Khazarad → 16/2118 Volcano, Fiery Lair  [Bank of Khazarad → Volcano / Fiery Lair]  walked 0/None in 4.7 s, ended 6/1334 Bank of Khazarad
+    stopped short: at 6/1334 Bank of Khazarad (status: Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)) 08:23:43  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (que
+    log: 08:23:38  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:23:43  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r8towns] 5/245 Bank of Delanon → 16/320 Bank  [Bank of Delanon → Lost City bank]  walked 0/None in 4.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:23:54  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:23:50  Go to 16/320 — started by e2e_realm_walk.walk_one
+    log: 08:23:51  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:23:54  Go to 16/320 — started by automation.<lambda>
+    log: 08:23:54  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r8towns] 14/1 Bank of Albion → 16/2118 Volcano, Fiery Lair  [Bank of Albion → Volcano / Fiery Lair]  walked 0/None in 4.8 s, ended 14/1 Bank of Albion
+    stopped short: at 14/1 Bank of Albion (status: Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)) 08:24:01  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled ke
+    log: 08:23:57  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:24:01  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r8towns] 5/245 Bank of Delanon → 16/356 Guarded Hut  [Bank of Delanon → Lost City / Deranged Priest]  walked 0/None in 4.2 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:27:14  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:27:09  Go to 16/356 — started by e2e_realm_walk.walk_one
+    log: 08:27:10  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:27:13  Go to 16/356 — started by automation.<lambda>
+    log: 08:27:14  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r8towns] 5/245 Bank of Delanon → 16/1522 Undermountain Caverns  [Bank of Delanon → Undermountain Caverns]  walked 0/None in 4.8 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:27:53  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:27:48  Go to 16/1522 — started by e2e_realm_walk.walk_one
+    log: 08:27:50  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:27:53  Go to 16/1522 — started by automation.<lambda>
+    log: 08:27:53  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r8towns] 5/245 Bank of Delanon → 16/2118 Volcano, Fiery Lair  [Bank of Delanon → Volcano / Fiery Lair]  walked 0/None in 4.2 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:28:24  No walkable route from 5/245 to 16/2118 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else; the northeast exit of Volcano, Darken
+    log: 08:28:19  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:28:20  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:28:23  Go to 16/2118 — started by automation.<lambda>
+    log: 08:28:24  No walkable route from 5/245 to 16/2118 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r8towns] 5/245 Bank of Delanon → 12/1800 Great Pyramid  [Bank of Delanon → Great Pyramid]  walked 0/None in 4.4 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:29:12  No walkable route from 5/245 to 12/1800 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:29:07  Go to 12/1800 — started by e2e_realm_walk.walk_one
+    log: 08:29:09  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:29:12  Go to 12/1800 — started by automation.<lambda>
+    log: 08:29:12  No walkable route from 5/245 to 12/1800 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns] 14/267 Bank of Albion, Blackwater Branch → 16/2118 Volcano, Fiery Lair  [Bank of Albion, Blackwater Branch → Volcano / Fiery Lair]  walked 0/None in 3.4 s, ended 14/267 Bank of Albion, Blackwater Branch
+    stopped short: at 14/267 Bank of Albion, Blackwater Branch (status: Idle) 08:30:22  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 08:30:19  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:30:22  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r8towns] 2/2568 Bank of Rhudaur → 16/2118 Volcano, Fiery Lair  [Bank of Rhudaur → Volcano / Fiery Lair]  walked 0/None in 3.2 s, ended 2/2568 Bank of Rhudaur
+    stopped short: at 2/2568 Bank of Rhudaur (status: Idle) 08:30:53  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 08:30:49  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:30:53  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r8towns] 5/245 Bank of Delanon → 14/1290 Throne of Albion  [Bank of Delanon → Kingsport Throne of Albion]  walked 0/None in 3.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:41:02  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:40:58  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 08:40:59  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:41:02  Go to 14/1290 — started by automation.<lambda>
+    log: 08:41:02  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns2] 5/245 Bank of Delanon → 16/320 Bank  [Bank of Delanon → Lost City bank]  walked 0/None in 3.9 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:19:51  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:19:47  Go to 16/320 — started by e2e_realm_walk.walk_one
+    log: 08:19:48  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:19:51  Go to 16/320 — started by automation.<lambda>
+    log: 08:19:51  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r8towns2] 2/2568 Bank of Rhudaur → 14/1290 Throne of Albion  [Bank of Rhudaur → Kingsport Throne of Albion]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1290 Throne of Albion goes through Black Wasteland, which you're avoiding.
+    log: 08:20:43  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 08:20:44  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 08:20:44  Not going to 14/1290 Throne of Albion: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r8towns2] 5/245 Bank of Delanon → 16/1522 Undermountain Caverns  [Bank of Delanon → Undermountain Caverns]  walked 0/None in 4.6 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:22:48  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:22:44  Go to 16/1522 — started by e2e_realm_walk.walk_one
+    log: 08:22:45  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:22:48  Go to 16/1522 — started by automation.<lambda>
+    log: 08:22:48  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r8towns2] 5/245 Bank of Delanon → 16/356 Guarded Hut  [Bank of Delanon → Lost City / Deranged Priest]  walked 0/None in 4.2 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:22:55  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 08:22:51  Go to 16/356 — started by e2e_realm_walk.walk_one
+    log: 08:22:52  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:22:55  Go to 16/356 — started by automation.<lambda>
+    log: 08:22:55  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r8towns2] 5/245 Bank of Delanon → 14/1 Bank of Albion  [Bank of Delanon → Kingsport / Bank of Albion]  walked 0/None in 7.2 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:23:05  No walkable route from 5/245 to 14/1 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:22:58  Go to 14/1 — started by e2e_realm_walk.walk_one
+    log: 08:22:58  Go to: checking abil 204 (exits need them)
+    log: 08:23:01  Go to 14/1 — started by automation.<lambda>
+    log: 08:23:01  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:23:04  Go to 14/1 — started by automation.<lambda>
+    log: 08:23:05  No walkable route from 5/245 to 14/1 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns2] 17/2435 Bank of Arlysia → 16/2118 Volcano, Fiery Lair  [Bank of Arlysia → Volcano / Fiery Lair]  walked 0/None in 4.8 s, ended 17/2435 Bank of Arlysia
+    stopped short: at 17/2435 Bank of Arlysia (status: Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)) 08:23:28  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (que
+    log: 08:23:23  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:23:28  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r8towns2] 5/245 Bank of Delanon → 13/503 Rugged Shoreline, Tidepool  [Bank of Delanon → Tidepool south entrance]  walked 0/None in 4.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:26:56  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:26:52  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 08:26:52  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:26:55  Go to 13/503 — started by automation.<lambda>
+    log: 08:26:56  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns2] 2/2568 Bank of Rhudaur → 16/2118 Volcano, Fiery Lair  [Bank of Rhudaur → Volcano / Fiery Lair]  walked 0/None in 3.3 s, ended 2/2568 Bank of Rhudaur
+    stopped short: at 2/2568 Bank of Rhudaur (status: Idle) 08:27:02  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 08:26:58  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:27:02  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r8towns2] 6/1334 Bank of Khazarad → 16/2118 Volcano, Fiery Lair  [Bank of Khazarad → Volcano / Fiery Lair]  walked 0/None in 3.3 s, ended 6/1334 Bank of Khazarad
+    stopped short: at 6/1334 Bank of Khazarad (status: Idle) 08:27:07  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 08:27:04  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:27:07  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r8towns2] 14/267 Bank of Albion, Blackwater Branch → 16/2118 Volcano, Fiery Lair  [Bank of Albion, Blackwater Branch → Volcano / Fiery Lair]  walked 0/None in 3.5 s, ended 14/267 Bank of Albion, Blackwater Branch
+    stopped short: at 14/267 Bank of Albion, Blackwater Branch (status: Idle) 08:31:49  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 08:31:46  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:31:49  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r8towns2] 5/245 Bank of Delanon → 14/1290 Throne of Albion  [Bank of Delanon → Kingsport Throne of Albion]  walked 0/None in 3.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 08:36:25  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 08:36:21  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 08:36:22  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 08:36:25  Go to 14/1290 — started by automation.<lambda>
+    log: 08:36:25  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r8towns2] 1/297 Bank of Godfrey → 16/2118 Volcano, Fiery Lair  [Bank of Godfrey → Volcano / Fiery Lair]  walked 0/None in 4.7 s, ended 1/297 Bank of Godfrey
+    stopped short: at 1/297 Bank of Godfrey (status: Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)) 08:40:08  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest
+    log: 08:40:03  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 08:40:08  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+
+All walks:
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/356 Guarded Hut                       84/87     17.7 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/320 Bank                              74/76      2.4 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/311 Temple Stairs                     66/69      3.2 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/2268 Earthen Catacombs                40/40      2.0 s  fixed
+  ok L55 1/1 Town Gates                         → 16/356 Guarded Hut                      412/400    39.5 s  fixed
+  ok L55 14/1 Bank of Albion                    → 16/320 Bank                            1075/1069   80.5 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/541 Training Grounds                  82/87      3.8 s  fixed
+  ok L55 16/356 Guarded Hut                     → 16/1412 Deep Jungle, Abandoned Temple    70/74     12.4 s  fixed
+  ok L55 16/2268 Earthen Catacombs              → 16/320 Bank                              40/42      6.9 s  fixed
+  ok L55 13/337 Shoreline, Bayside              → 13/503 Rugged Shoreline, Tidepool        30/32      3.4 s  fixed
+  !! L55 1/1 Town Gates                         → 13/503 Rugged Shoreline, Tidepool      None/None      0 s  fixed  (no route)
+  ok L55 14/1 Bank of Albion                    → 13/503 Rugged Shoreline, Tidepool        97/97     43.7 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1290 Throne of Albion                  9/9       2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/987 Kingsport, North Gate             32/33      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/815 Kingsport, Harbor Ramp            15/16      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1145 Kingsport, Castle Gates           3/3       2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/805 Kingsport Harbor, North Pier      31/32      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1077 Burial Vault                     27/28      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1667 City Sewers, Ladder              18/19      2.0 s  fixed
+  ok L55 14/1290 Throne of Albion               → 14/1 Bank of Albion                       9/9       2.0 s  fixed
+  ok L55 14/702 Kingsport Harbor, Wharf         → 14/1015 Kingsport, King's Gate           62/64      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2415 Northwick Village, Entrance      68/70      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1895 Southwick Village                56/57      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2814 Command Tent                     41/41      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2489 Albion River, Waterfall          85/14      3.5 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1818 Crownlands, Eastern Crossroads   32/34      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/267 Bank of Albion, Blackwater Bran   66/66     28.1 s  fixed
+  ok L55 16/320 Bank                            → 16/2118 Volcano, Fiery Lair             272/26    382.7 s  fixed  (stuck)
+  ok L55 16/320 Bank                            → 16/1522 Undermountain Caverns           249/204    10.8 s  fixed  (loop)
+  ok L55 1/1 Town Gates                         → 8/559 Dark-Elf City, Moatside           400/8      19.8 s  fixed
+  !! L55 1/1 Town Gates                         → 8/560 Dark-Elf Castle, Gatehouse        406/9      99.8 s  fixed  (stopped short)
+  ok L55 1/1 Town Gates                         → 12/1800 Great Pyramid                   356/222    27.3 s  fixed
+  ok L55 14/2415 Northwick Village, Entrance    → 14/1 Bank of Albion                      70/70      2.4 s  kingsport
+  ok L55 14/8175 The River Lorian, Alba Conflue → 14/1091 Harbor Square                   189/193    97.5 s  kingsport
+  ok L55 14/815 Kingsport, Harbor Ramp          → 14/7332 The River Lorian, Waterfall     326/33     16.4 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/8177 Lorian Middle Course, Near Doc  170/176     7.1 s  kingsport
+  ok L55 14/2462 Albion River, Fork             → 14/1766 Hraldin's House of Protection    62/66      2.0 s  kingsport
+  ok L55 14/1875 Stone Chamber, Ladder          → 14/1777 Arcane Rarities                  30/31      2.0 s  kingsport
+  ok L55 14/9111 Coldspring River, Fork         → 14/1923 Lower Albion River, Southern D  127/87    133.8 s  kingsport  (stuck)
+  ok L55 14/1787 Phaedra's Natural Pharmacy     → 14/1778 Runic Inscriptions, First Floo    2/2       2.0 s  kingsport
+  ok L55 14/1774 Fwyren's Bow and Fletchery     → 14/1906 Wagon Trail, Junction            59/60      2.0 s  kingsport
+  ok L55 14/2489 Albion River, Waterfall        → 14/8175 The River Lorian, Alba Conflue  119/3     153.6 s  kingsport  (stuck)
+  ok L55 14/1895 Southwick Village              → 14/2340 Lower Albion River, Northern D   73/76      2.0 s  kingsport
+  ok L55 14/2476 Albion River, Near Docks       → 14/1895 Southwick Village                88/92      2.3 s  kingsport
+  ok L55 14/2575 Upper Albion River, Eastern Do → 14/2048 Cramped General Store           116/118     3.1 s  kingsport
+  ok L55 14/2453 Albion River, Northwick Docks  → 14/1254 Bard's Square                    63/64      2.0 s  kingsport
+  ok L55 14/1777 Arcane Rarities                → 14/1793 General Store                     7/7       2.0 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/1484 Troubadour's Guild, Supply Cou   80/80      2.4 s  kingsport
+  ok L55 14/1667 City Sewers, Ladder            → 14/1770 Gwyned's Tannery, Front Room     13/13      2.0 s  kingsport
+  ok L55 14/1286 Inner Keep, Office             → 14/2377 Old Mill Crossroad               56/59      2.0 s  kingsport
+  ok L55 14/2489 Albion River, Waterfall        → 14/2377 Old Mill Crossroad               36/5       2.0 s  kingsport
+  ok L55 14/1145 Kingsport, Castle Gates        → 14/1906 Wagon Trail, Junction            49/52      2.0 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/1875 Stone Chamber, Ladder            39/40      2.0 s  kingsport
+  ok L55 14/1 Bank of Albion                    → 14/5714 Alba River Bottoms, Decline     249/259     6.7 s  kingsport
+  ok L55 14/1777 Arcane Rarities                → 14/1058 Temple Square                    15/15      2.0 s  kingsport
+  ok L55 14/1254 Bard's Square                  → 14/1780 Nedric's Bespoke Ornaments       29/29      2.0 s  kingsport
+  ok L55 14/2048 Cramped General Store          → 14/1769 Hraldin's House of Protection    64/64      2.0 s  kingsport
+  ok L55 14/1768 Hraldin's House of Protection  → 14/1725 The Bitter End Tavern            53/56      2.0 s  kingsport
+  ok L55 14/1776 Arcane Rarities                → 14/1290 Throne of Albion                 20/20      2.0 s  kingsport
+  ok L55 14/1723 Black Market                   → 14/2548 Upper Albion River, Near Docks   63/1       2.2 s  kingsport
+  ok L55 14/2441 Northwick Mill                 → 14/1254 Bard's Square                    57/60      2.0 s  kingsport
+  ok L55 14/1895 Southwick Village              → 14/9163 The River Lorian, Coldspring C  142/109     4.7 s  kingsport
+  ok L55 13/1237 Icy Mountain, Large Cavern     → 17/580 Arlysia, City Docks              920/956    53.7 s  labelled
+  ok L55 9/76 Slimy Sewer Tunnel                → 6/924 Marble Stairwell                  207/61      9.0 s  labelled  (loop)
+  !! L55 9/905 Rancid Sewer                     → 14/267 Bank of Albion, Blackwater Bran None/None      0 s  labelled  (no route)
+  ok L55 14/3093 Bristlewood Forest Trail       → 14/8441 Corpse-ridden Field             159/166     4.4 s  labelled
+  ok L55 2/9212 Stonework Tunnel                → 7/11 Stone Chamber, Throne Room         180/186    13.3 s  labelled
+  ok L55 14/3966 Alba River                     → 14/8684 Farnmill Landing, Docks          99/105     5.1 s  labelled
+  ok L55 14/326 The Crusty Barnacle Inn         → 14/9789 Arched Stone Structure          196/203    26.5 s  labelled
+  ok L55 2/1797 Dark Grey Stone Tunnel          → 15/1405 Old Mine Tunnel, Hole Up        368/381    16.3 s  labelled
+  ok L55 15/2330 Huge Cavern, Training Area     → 16/10240 Infernal Cavern, Jagged Path   917/896   580.7 s  labelled  (stuck)
+  ok L55 8/531 Dark Tower, Entrance             → 16/9549 Molten River                    784/437   178.9 s  labelled  (stuck)
+  ok L55 7/1395 Obsidian Plateau, Platform Edge → 7/1222 Small Path, Dead End             210/225     5.9 s  labelled
+  ok L55 13/3613 Crumbling Mausoleum, Vault     → 8/689 Guest Quarters                    701/98     45.9 s  labelled
+  ok L55 7/1787 Cracked Tunnel                  → 12/1090 Sandstone Mine Tunnel           502/143    35.1 s  labelled
+  ok L55 14/7355 The River Lorian, Rapids       → 1/598 Sewer Tunnel                      916/923    49.5 s  labelled
+  ok L55 14/3830 Lake Alba, Opening             → 2/2567 Armour Shop                      726/735    43.8 s  labelled
+  ok L55 16/3622 Ocean Floor, Shallows          → 3/681 Black Wasteland                   158/162    19.8 s  labelled
+  ok L55 13/3691 Swamp of Tharollok, Wetlands   → 1/852 Bard's Room                       233/235    16.5 s  labelled
+  ok L55 8/512 Torture Chamber                  → 1/2420 Bronzewood Forest                257/265    10.0 s  labelled
+  ok L55 3/618 Rotting Mansion, Bedroom         → 1/1098 Slum Street, Western Door        124/126     3.4 s  labelled
+  ok L55 12/2099 Entrance Hall                  → 17/1641 White Forest, Landing           478/288    20.7 s  labelled
+  !! L55 1/1139 Slum Street, Bend               → 16/4947 Ocean Floor, Sunken Ship        337/340   183.4 s  labelled  (stalled)
+  ok L55 15/720 Darkened Tunnels                → 6/568 Entrance Copper House Room        367/374    19.0 s  labelled
+  ok L55 2/388 Dragon's Teeth Hills             → 13/3138 Swamp of Tharollok, Boggy Trai  270/276    25.1 s  labelled
+  ok L55 2/1902 Stone Tunnel, Hole Down         → 16/1160 Storm Fortress                 1199/744    70.1 s  labelled  (loop)
+  ok L55 1/2519 Arena Practice Room             → 6/1406 Spiral Stairwell, Cave-In        177/179     5.1 s  labelled
+  ok L55 1/2236 Large Tomb                      → 1/1765 Huge Cave, Refuse Pit             73/74      6.9 s  labelled
+  ok L55 14/8882 Cypress Swamp                  → 7/1406 Cracked Tunnel                   893/908    48.1 s  labelled
+  ok L55 6/754 Cramped Tunnel, Intersection     → 8/530 Officer's Quarters                505/71     40.6 s  labelled
+  ok L55 2/10935 Cave Den                       → 6/1243 Blazing Cavern                   621/630   175.5 s  labelled  (stuck)
+  ok L55 16/1200 Massive Wooden Gateway         → 15/1458 Old Mine Tunnel, Hole Up        337/351    11.2 s  labelled
+  !! L55 17/2175 Mausoleum, Stone Hallway       → 14/5634 Alba Rock, Cliffside Path      None/None      0 s  labelled  (no route)
+  ok L55 16/2674 Lagoon, Reef                   → 17/3359 Large Cave, Tunnel              171/173    30.9 s  labelled
+  !! L55 16/2712 Volcano, Magma Tunnels         → 14/1772 Bobbin and Weaving Clothiers,  None/None      0 s  labelled  (no route)
+  !! L55 6/2492 Silver Mine Tunnel              → 14/1725 The Bitter End Tavern          None/None      0 s  labelled  (no route)
+  !! L55 17/734 Blackwood Forest                → 14/4445 Grey Stone Cliffs              None/None      0 s  labelled  (no route)
+  ok L55 14/3851 Lake Alba, Near Shore          → 1/1765 Huge Cave, Refuse Pit            803/822    55.5 s  labelled
+  !! L55 16/4208 Ocean Floor, Deep Water        → 2/11978 Arcane Study                   None/None      0 s  labelled  (no route)
+  ok L55 13/3395 Abandoned Cemetary             → 15/319 White Corridor                   387/390    36.6 s  labelled
+  ok L55 14/1847 Dirt Track Junction            → 1/2682 Misty Bog                        769/784    57.4 s  labelled
+  !! L55 8/705 Royal Throne Room                → 14/4143 Bristlewood Forest, Grassy Lan None/None      0 s  labelled  (no route)
+  ok L55 6/3140 Mountain Trail                  → 3/582 Stone Stair                       345/111    15.3 s  random
+  ok L55 16/3510 Ocean Floor, Shallows          → 10/279 Frozen Cavern, Dark Hole         171/180    25.7 s  random
+  ok L55 14/3893 Lake Alba                      → 2/90 Western Road                       695/726    47.5 s  random
+  ok L55 2/11751 Rugged Plateau                 → 14/2506 Coldspring Lake, Outlet         221/37     31.8 s  random
+  ok L55 7/1091 Smooth Crystal Tunnel           → 8/873 Central Keep, Passageway          177/182     5.1 s  random
+  !! L55 16/3109 Underground Passage            → 2/11685 Rugged Plateau                 None/None      0 s  random  (no route)
+  !! L55 12/2014 Great Pyramid                  → 14/4543 Jagged Cliff                   None/None      0 s  random  (no route)
+  ok L55 13/12812 Opulent Villa, Courtyard      → 14/676 Shadowy Marsh                    875/167   135.5 s  random  (stuck)
+  ok L55 13/1078 Icy Mountain Path              → 16/4451 Ocean Surface, Drop Off        1136/306    59.9 s  random
+  ok L55 2/9548 Black Foothills, Western Road   → 15/48 Huge Cavern, Training Area        274/279    22.2 s  random
+  ok L55 14/5748 Alba River                     → 2/10110 Hilltop Encampment              492/503    43.0 s  random
+  ok L55 1/273 Stone Street                     → 17/717 Blackwood Forest, Garden         218/224    22.2 s  random
+  ok L55 17/179 Eastern Road                    → 15/1450 Old Mine Tunnel                 424/436    98.4 s  random
+  ok L55 15/10147 Diamond Mine Tunnel           → 10/120 Narrow Plateau                   528/538    39.8 s  random
+  ok L55 16/10990 Abyssal Island                → 16/13048 Cracked Plateau                 94/98      9.3 s  random
+  ok L55 12/1279 Limestone Caverns              → 6/2532 Silver Mine Tunnel               223/83     12.0 s  random
+  ok L55 14/3714 Bristledeep, Ancient Growth    → 14/8632 Smoldering Fields               145/149    10.3 s  random
+  !! L55 1/1952 Ancient Crypt, Tomb             → 14/8325 Caer Fenwyn, Stables           None/None      0 s  random  (no route)
+  ok L55 17/10256 Mountain Valley, Dark Gorge   → 2/2210 Gouged Tunnel                    439/443    44.7 s  random
+  !! L55 16/2326 Earthen Catacombs              → 13/599 Shoreline, Sandy Beach          None/None      0 s  random  (no route)
+  ok L55 14/1815 Crownlands, The Kingsroad      → 7/427 Fungus Forest                     712/725    57.1 s  random
+  !! L55 15/141 Orc Barracks                    → 3/608 Unholy Altar                     None/None      0 s  random  (no route)
+  ok L55 14/1735 Underground Passage            → 1/3045 Darkwood Forest                  635/647    37.7 s  random
+  !! L55 8/1658 Lower Caverns, Underground Lake → 14/6441 Carnaugh Plain                 None/None      0 s  random  (no route)
+  ok L55 14/5739 Alba River Bottoms             → 14/7201 Alba Keep, Courtyard            182/182     4.8 s  random
+  !! L55 2/971 Dragon's Teeth Hills             → 14/4410 Shabby Hovel                   None/None      0 s  random  (no route)
+  ok L55 2/1267 Stone Tunnel                    → 6/1362 Ornate Passageway, Stairwell     274/278    22.1 s  random
+  ok L55 1/554 Sewer Tunnel                     → 9/270 Crumbling Tunnel                  133/134     8.6 s  random
+  ok L55 16/4536 Ocean Surface                  → 1/2611 Graveyard, Western Edge           94/94      9.0 s  random
+  ok L55 12/385 Scorching Desert                → 7/1698 Cracked Tunnel                   542/549    69.4 s  random
+  ok L55 14/10461 Abandoned Mine Tunnel         → 6/284 Misty Bog                        1097/1119   53.1 s  random
+  !! L55 17/2101 Mausoleum, Stone Hallway       → 8/677 Castle, Dark Hallway              577/33    190.6 s  random  (stopped short)
+  ok L55 13/2211 Frozen Wasteland, Tundra       → 14/9999 Blackstone Chair                299/302   165.8 s  random  (stuck)
+  !! L55 2/186 Dragon's Teeth Hills             → 14/3883 Lake Alba                      None/None      0 s  random  (no route)
+  ok L55 7/189 Fungus Forest, Waterfall         → 16/1888 Lagoon, Reef                    513/528    38.7 s  random
+  ok L55 14/8607 Smoldering Fields, Cart Path   → 13/3583 Crumbling Mausoleum, Vault     1106/1129   71.4 s  random
+  ok L55 5/1100 Gigas Forest, Rope Bridge       → 5/150 Twisting Alley                     77/80      4.4 s  random
+  ok L55 12/1499 Limestone Caverns              → 11/28 Golden Passage                    332/158    19.7 s  random
+  ok L55 9/331 Crumbling Tunnel                 → 7/477 Fungus Forest                     171/174    83.7 s  random  (stuck)
+  !! L55 17/702 Blackwood Forest                → 14/6949 Upper Mine Tunnel, Cart Track  None/None      0 s  random  (no route)
+  ok L55 16/1051 Storm Mountain, Rocky Path     → 15/1844 Diamond Mine Tunnel             918/957    35.8 s  random
+  ok L55 6/1874 Crumbling City Street, Dead End → 17/562 Arlysia, Outer Wall              429/447    14.6 s  random
+  !! L55 7/880 Cracked Plain                    → 14/7807 Verdant Meadow                 None/None      0 s  random  (no route)
+  ok L55 6/184 Swamp Ridge Path                 → 17/369 Farmstead, Entry                 197/206     9.6 s  random
+  ok L55 17/10640 Clock Tower, Eighth Floor     → 1/2793 Darkwood Forest                  391/139    21.0 s  random
+  ok L55 16/4604 Ocean Surface                  → 8/117 Black Cave, Glowing Tunnel        265/277    15.7 s  random
+  ok L55 16/2388 Earthen Catacombs              → 16/1970 Volcano, Chiseled Tunnels       289/257    12.2 s  random  (loop)
+  ok L55 2/2699 Stone Tunnel                    → 17/3426 Large Cave, Tunnel              383/401   118.5 s  random  (stuck)
+  !! L55 16/875 Storm Mountain, Rocky Path      → 2/11296 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 16/2050 Volcano, Red Tunnels           → 8/390 Lower Caverns, Underground Lake   709/735    20.8 s  random
+  ok L55 14/9839 Brackenfen                     → 14/68 Barley Fields                     254/262    28.0 s  random
+  !! L55 14/7568 Vale Of Durand, The Kingsroad  → 8/1265 Negative Power Plane            None/None      0 s  random  (no route)
+  ok L55 14/9051 The Quagmire, Old Trail        → 15/503 Darkened Tunnels                 971/985    55.0 s  random
+  ok L55 16/268 Underground Lake                → 17/1943 Library                         247/227    32.8 s  random
+  !! L55 13/4133 Crimson Keep, Barracks         → 2/11231 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 6/1885 Crumbling City Street           → 12/475 Scorching Desert                 353/122    12.0 s  random
+  !! L55 12/1667 Limestone Caverns              → 14/1091 Harbor Square                  None/None      0 s  random  (no route)
+  !! L55 6/2720 Gold Mine, Cart Track           → 14/4776 Brynafon River                 None/None      0 s  random  (no route)
+  ok L55 13/2879 Cultivated Fields              → 17/954 Blackwood Forest                 191/198    14.2 s  random
+  !! L55 16/3519 Ocean Floor, Shallows          → 2/10589 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 2/637 Dragon's Teeth Hills             → 16/3911 Ocean Floor, Deep Chasm         311/320    26.1 s  random
+  ok L55 12/156 Scorching Desert                → 13/2648 Swamp of Tharollok, Raised Pat  490/520    17.8 s  random
+  ok L55 14/7611 Vale Of Durand, Wooded Trail   → 1/884 Secret Passage, Bend              663/688    49.6 s  random
+  ok L55 14/9213 The River Lorian, Lower Course → 17/3556 Bloodwood Weald                 993/1022   80.2 s  random
+  ok L55 13/12616 Aurean Hills                  → 16/2204 Earthen Catacombs              1254/847    72.8 s  random  (wrong way)
+  !! L55 16/9925 Infernal Cavern, Wall          → 13/3823 Swamp of Tharollok, Overgrown    36/857    74.1 s  random  (stopped short)
+  !! L55 3/428 Copperwood Forest                → 14/3023 Lower Bristlewood              None/None      0 s  random  (no route)
+  ok L55 14/7632 Meadowlands, Country Trail     → 2/1769 Dark Grey Stone Tunnel           673/689    39.6 s  random
+  ok L55 5/4213 Murky Swamp                     → 5/903 Gigas Forest, Wooden Platform     165/168     9.0 s  random
+  ok L55 6/1494 Redstone Tunnel                 → 12/674 Scorching Desert                 143/41      5.7 s  random
+  ok L55 1/1359 Darkwood Forest                 → 2/2821 Stone Tunnel                     180/186    20.3 s  random
+  !! L55 16/4998 Sunken Ship, Hold              → 13/305 Jungle Trail                    None/None      0 s  random  (no route)
+  !! L55 16/2801 Volcano, Magma Tunnels         → 14/7577 Vale Of Durand, The Kingsroad  None/None      0 s  random  (no route)
+  ok L55 1/1699 Darkwood Forest                 → 12/1142 Sandstone Mine Tunnel           276/157    12.4 s  random
+  ok L55 15/1265 Old Mine Tunnel, Hole Down     → 2/132 Southwestern Road                 259/263    10.2 s  random
+  ok L55 16/2186 Earthen Catacombs              → 16/1200 Massive Wooden Gateway           98/99      2.7 s  random
+  ok L55 14/1883 Riverside Trail                → 15/1433 Old Mine Tunnel, Hole Down      871/884    50.5 s  random
+  ok L55 2/11544 Boulder-strewn Clearing        → 14/7845 Meadowlands                     283/286    30.3 s  random
+  ok L55 6/2144 Redstone Tunnel                 → 7/792 Cracked Plain, Black Chasm        433/441    17.6 s  random
+  ok L55 3/146 Ironwood Forest                  → 2/924 Dragon's Teeth Hills              105/108     2.8 s  random
+  ok L30 17/9556 Burning Plains                 → 6/1777 Copper Mine Tunnel               277/78     14.5 s  random
+  ok L30 16/4833 Ocean Surface, Green Kelp Padd → 1/3007 Darkwood Forest                  202/210    16.2 s  random
+  ok L30 14/111 Barley Fields, City Wall        → 2/11943 Red Granite Mesa                123/127     8.4 s  random
+  ok L30 12/2480 Collapsed Passage              → 15/10093 Diamond Mine Tunnel            490/345    35.7 s  random
+  ok L30 10/219 Tower, Foyer                    → 1/706 Sewer Tunnel                      117/121    13.6 s  random
+  ok L30 16/1156 Mountain Plateau, Flat Ledge   → 1/1907 Labyrinth Passage                548/555    14.2 s  random
+  ok L30 17/3135 Grand Hallway                  → 9/448 Torchlit Tunnels                  445/224    26.3 s  random
+  ok L30 16/89 Tasloi Village, Massive Web      → 2/9287 Stonework Tunnel                 270/281    22.8 s  random
+  ok L30 17/307 Graveyard                       → 6/621 Gnome Village                     200/207    16.1 s  random
+  ok L30 13/590 Shoreline, Sandy Beach          → 11/7 Crimson Passage                    699/717    32.7 s  random
+  ok L30 13/13304 Tal'kiran Shore, Shallows     → 3/21 Mossy Tunnel                       750/41     37.2 s  random
+  ok L30 13/962 Icy Mountain Path               → 15/10062 Diamond Mine Tunnel           1301/348   168.3 s  random  (stuck)
+  ok L30 3/751 Black Wasteland                  → 9/1385 Ancient Darkwood Tree, Spiral S  170/115    48.7 s  random
+  ok L30 16/1791 Undermountain Caverns          → 2/2131 Dark Grey Stone Tunnel           527/545    23.1 s  random
+  ok L30 7/1249 Black Fortress, Gaol            → 15/277 White Corridor                   110/116     7.9 s  random
+  ok L30 13/1631 Frozen Wasteland, Tundra       → 7/1451 Cracked Tunnel                   757/778    41.6 s  random
+  ok L30 13/281 Shoreline, Sandy Beach          → 6/1501 Redstone Cave                    835/856    45.1 s  random
+  ok L30 8/796 Building Rooftop                 → 3/242 Bronzewood Forest, Small Path     197/110    54.7 s  random
+  ok L30 14/9785 Rotting Morass                 → 6/1154 Underwater Passage               917/943   261.5 s  random  (stuck)
+  ok L30 2/2460 Black Mountains                 → 2/477 Dragon's Teeth Hills              224/225     8.4 s  random
+  ok L30 14/10159 Ruined General Store          → 14/10406 Flooded Passage                 78/80    141.2 s  random  (stuck)
+  ok L30 2/1420 Stone Tunnel                    → 16/152 Underground River                360/126    15.4 s  random
+  !! L30 17/2249 mausoleum Labyrinth            → 1/398 Magic Shoppe                     None/None   None s  random  (setup)
+  ok L30 16/1675 Undermountain Caverns          → 15/1312 Old Mine Tunnel                 637/645    77.7 s  random
+  ok L30 16/4274 Sunken Ship, Hold              → 12/668 Scorching Desert                 444/141   175.5 s  random  (stuck)
+  ok L30 14/8784 Cypress Swamp                  → 14/6912 Bannock Quarry, Cart Track      256/84    250.6 s  random  (stuck)
+  ok L30 7/1497 Cracked Tunnel                  → 1/2613 Graveyard, Western Edge          334/337    15.0 s  random
+  ok L30 2/205 Dragon's Teeth Hills             → 3/350 Copperwood Forest                 285/131     8.6 s  random
+  ok L30 17/2071 Mausoleum, Stone Hallway       → 2/124 Southwestern Road                 222/226    26.7 s  random
+  ok L30 14/3701 Bristledeep, Ancient Growth    → 1/1697 Darkwood Forest                  786/793    65.7 s  random
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/1522 Undermountain Caverns          1486/577   141.9 s  town  (loop)
+  ok L55 6/1334 Bank of Khazarad                → 16/1522 Undermountain Caverns           734/554    36.7 s  town  (loop)
+  ok L55 14/1 Bank of Albion                    → 8/559 Dark-Elf City, Moatside           927/8      63.6 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/356 Guarded Hut                      937/363    61.5 s  town  (wrong way)
+  ok L55 2/2568 Bank of Rhudaur                 → 12/1800 Great Pyramid                   547/222    41.4 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/1522 Undermountain Caverns           477/426    22.5 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 12/1800 Great Pyramid                   370/370    12.3 s  town
+  !! L55 5/245 Bank of Delanon                  → 13/503 Rugged Shoreline, Tidepool         0/None    8.1 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 16/356 Guarded Hut                     1367/943    98.9 s  town
+  !! L55 6/1334 Bank of Khazarad                → 16/2118 Volcano, Fiery Lair               0/None    4.7 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 14/1290 Throne of Albion                  9/9       2.0 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/320 Bank                               0/None    4.0 s  town  (stopped short)
+  !! L55 14/1 Bank of Albion                    → 16/2118 Volcano, Fiery Lair               0/None    4.8 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 13/503 Rugged Shoreline, Tidepool       821/843    53.7 s  town
+  ok L55 1/297 Bank of Godfrey                  → 16/320 Bank                             781/352    56.9 s  town  (wrong way)
+  ok L55 1/297 Bank of Godfrey                  → 16/1522 Undermountain Caverns          1017/554    67.1 s  town  (loop)
+  !! L55 5/245 Bank of Delanon                  → 16/356 Guarded Hut                        0/None    4.2 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 16/320 Bank                             511/352    29.7 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/1522 Undermountain Caverns             0/None    4.8 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 16/356 Guarded Hut                      377/363    21.0 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/2118 Volcano, Fiery Lair               0/None    4.2 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 14/1290 Throne of Albion                618/638    38.7 s  town
+  !! L55 5/245 Bank of Delanon                  → 12/1800 Great Pyramid                     0/None    4.4 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 12/1800 Great Pyramid                   222/222     8.3 s  town
+  ok L55 17/2435 Bank of Arlysia                → 13/503 Rugged Shoreline, Tidepool       882/881    51.0 s  town
+  !! L55 14/267 Bank of Albion, Blackwater Bran → 16/2118 Volcano, Fiery Lair               0/None    3.4 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1 Bank of Albion                      67/66     22.0 s  town
+  !! L55 2/2568 Bank of Rhudaur                 → 16/2118 Volcano, Fiery Lair               0/None    3.2 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 8/559 Dark-Elf City, Moatside           895/8      40.1 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 8/559 Dark-Elf City, Moatside           367/8      42.0 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 13/503 Rugged Shoreline, Tidepool       846/683    45.3 s  town
+  ok L55 1/297 Bank of Godfrey                  → 14/1 Bank of Albion                     625/630    38.8 s  town
+  ok L55 14/1 Bank of Albion                    → 16/320 Bank                             976/932    66.8 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/320 Bank                             521/352    24.1 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/356 Guarded Hut                     1252/943   172.3 s  town  (stuck)
+  ok L55 6/1334 Bank of Khazarad                → 14/1 Bank of Albion                     760/774    51.7 s  town
+  ok L55 6/1334 Bank of Khazarad                → 14/1290 Throne of Albion                771/782    51.9 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/320 Bank                             233/224    11.8 s  town
+  ok L55 6/1334 Bank of Khazarad                → 8/559 Dark-Elf City, Moatside           516/8      30.1 s  town
+  !! L55 5/245 Bank of Delanon                  → 14/1290 Throne of Albion                  0/None    3.7 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/1522 Undermountain Caverns          1472/577   144.9 s  town  (loop)
+  ok L55 6/1334 Bank of Khazarad                → 12/1800 Great Pyramid                   219/222    25.8 s  town
+  ok L55 17/2435 Bank of Arlysia                → 8/559 Dark-Elf City, Moatside           599/8      85.0 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/320 Bank                               0/None    3.9 s  town  (stopped short)
+  ok L55 2/2568 Bank of Rhudaur                 → 8/559 Dark-Elf City, Moatside           360/8      42.0 s  town
+  ok L55 14/1 Bank of Albion                    → 14/1 Bank of Albion                       0/None    2.0 s  town
+  !! L55 2/2568 Bank of Rhudaur                 → 14/1290 Throne of Albion               None/None      0 s  town  (no route)
+  ok L55 6/1334 Bank of Khazarad                → 16/1522 Undermountain Caverns          1155/554    71.4 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 12/1800 Great Pyramid                   913/222    40.4 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/1522 Undermountain Caverns             0/None    4.6 s  town  (stopped short)
+  !! L55 5/245 Bank of Delanon                  → 16/356 Guarded Hut                        0/None    4.2 s  town  (stopped short)
+  !! L55 5/245 Bank of Delanon                  → 14/1 Bank of Albion                       0/None    7.2 s  town  (stopped short)
+  ok L55 17/2435 Bank of Arlysia                → 16/356 Guarded Hut                      243/235    13.4 s  town
+  !! L55 17/2435 Bank of Arlysia                → 16/2118 Volcano, Fiery Lair               0/None    4.8 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 16/1522 Undermountain Caverns          1603/541   114.5 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 14/1 Bank of Albion                     616/630    39.3 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 8/559 Dark-Elf City, Moatside           887/8      39.7 s  town
+  !! L55 5/245 Bank of Delanon                  → 13/503 Rugged Shoreline, Tidepool         0/None    4.0 s  town  (stopped short)
+  !! L55 2/2568 Bank of Rhudaur                 → 16/2118 Volcano, Fiery Lair               0/None    3.3 s  town  (stopped short)
+  !! L55 6/1334 Bank of Khazarad                → 16/2118 Volcano, Fiery Lair               0/None    3.3 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 14/1290 Throne of Albion                762/782    52.2 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/356 Guarded Hut                     1455/943   119.7 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/1522 Undermountain Caverns          1190/554    70.7 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 13/503 Rugged Shoreline, Tidepool        92/93     23.2 s  town
+  !! L55 14/267 Bank of Albion, Blackwater Bran → 16/2118 Volcano, Fiery Lair               0/None    3.5 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 12/1800 Great Pyramid                   368/370    12.8 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/356 Guarded Hut                      956/363    62.1 s  town  (wrong way)
+  ok L55 14/1 Bank of Albion                    → 16/356 Guarded Hut                     1401/943    97.9 s  town
+  ok L55 14/1 Bank of Albion                    → 8/559 Dark-Elf City, Moatside           942/8      61.3 s  town
+  ok L55 17/2435 Bank of Arlysia                → 12/1800 Great Pyramid                   513/222    22.4 s  town
+  !! L55 5/245 Bank of Delanon                  → 14/1290 Throne of Albion                  0/None    3.7 s  town  (stopped short)
+  ok L55 17/2435 Bank of Arlysia                → 13/503 Rugged Shoreline, Tidepool       878/881    51.3 s  town
+  ok L55 1/297 Bank of Godfrey                  → 16/1522 Undermountain Caverns          1011/554    67.5 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1290 Throne of Albion                 59/58     22.5 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/1522 Undermountain Caverns           474/426    22.8 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 14/1290 Throne of Albion                628/638    38.3 s  town
+  !! L55 1/297 Bank of Godfrey                  → 16/2118 Volcano, Fiery Lair               0/None    4.7 s  town  (stopped short)
+  ok L55 2/2568 Bank of Rhudaur                 → 12/1800 Great Pyramid                   555/222    26.9 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1 Bank of Albion                      66/66     22.2 s  town
+  ok L55 14/1 Bank of Albion                    → 12/1800 Great Pyramid                   975/222    61.2 s  town
+
+
+##############################################################################################################
+# The 0.8.189 sweep
+##############################################################################################################
+
+MudPilot realm walk sweep — whole Go tos on the practice server with honest gates (simserver.Gates)
+==============================================================================================================
+
+How: tests/e2e_realm_walk.py starts the practice server with gates on (its own copy of the map) and a real
+Session, puts the character in the start room and runs Go to, the way you would. Character: Human Mage,
+level 55 (one worker 30), Good, strength 75, picklocks 0, 5,000,000 copper; carries the golden idol and rope
+and grapple (two workers also every key/item an exit needs: 'keyring', and quest flags DaoLordQuest 9 +
+GuildmasterQuest 1). Combat on in the final round; a boss stop is answered with Alt+R after the harness
+takes the boss out of its room (a walk isn't decided by a boss fight it wasn't asked for). A monster drop an
+errand waits for is handed over by the harness (no lairs / drop rolls on the practice server).
+Walks: fixed (Lost City through the Earthen Catacombs with the idol, Kingsport and round it, Tidepool's south
+entrance, the Volcano / Undermountain, Dark-Elf City, the Great Pyramid), every bank to the far places,
+Kingsport-area pairs, random far-apart rooms (60+ rooms apart), Rooms.md places.
+
+Walks run in all: round 1 (first practice-server version, old code) 197, discovery rounds 2-4 1175,
+final round before 292 + after 292, darkness check 22 — 1978 walks.
+
+Final round, same walks with the 0.8.188 code ('before') and with the fixes ('after'): 291 walks
+  outcome                                                         before   after
+  ok                                                                 199     207
+  reached, but flagged: loop                                           0       8
+  reached, but flagged: stuck                                          3       5
+  reached, but flagged: wrong way                                      2       5
+  reached, but flagged: loop/wrong way                                 0       6
+  reached, but flagged: loop/stuck                                     0       1
+  no route: only way is through an avoided area (by design)           41      28
+  no route: gate / quest item / fare (character can't)                22      22
+  stopped: no exit where the plan had one                             17       0
+  hung up: HP below 25% (traps / boss fight)                           4       5
+  stalled                                                              1       1
+  setup                                                                1       1
+  stopped short                                                        0       2
+  stopped: door locked                                                 1       0
+  rooms walked                                                     86951  100037
+
+  walks whose outcome changed:
+    fixed  1/1 -> 8/559  [Dark-Elf City Moatside from Silvermere]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Black Wasteland, which you're avoiding.
+    fixed  1/1 -> 8/560  [Dark-Elf Castle Gatehouse from Silvermere]  no route: only way is through an avoided area (by design)  ->  stopped short
+           before: no route: The only way to 8/560 Dark-Elf Castle, Gatehouse goes through Black Wasteland, which you're avoiding.
+           after:  stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 00:07:57  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    fixed  16/320 -> 16/1522  [Undermountain from Lost City bank]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:59:39  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    fixed  16/320 -> 16/2118  [Volcano: Fiery Lair from Lost City bank]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/stuck
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/2118) 23:59:35  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  stuck: no move for 367 s at 16/2118 Volcano, Fiery Lair
+    lab    2/1902 -> 16/1160  [Barren Hills: Storm Fortress (inside gate)]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1160) 00:06:41  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    lab    6/754 -> 8/530  [Dark-Elf City: Captain of the Guard]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/530 Officer's Quarters goes through Negative Power Plane, which you're avoiding.
+    lab    8/531 -> 16/9549  [Volcano: Molten River (lower level)]  stopped: no exit where the plan had one  ->  hung up: HP below 25% (traps / boss fight)
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/9549) 23:57:47  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  stopped short: at 16/9507 Volcano, Smoldering Tunnel (status: Hung up (HP 178/715 below 25%)) 23:57:49  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; unt
+    lab    9/76 -> 6/924  [Graveyard: White Marble Corridors, Stairwell]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 6/861 Tomb Vaults, Stairwell (status: Stopped (stopped) — Rego carries on to 6/924) 23:55:21  Stopped: no exit d from 6/861 and no other way on MME's map
+           after:  loop: 6/861 Tomb Vaults, Stairwell 11 times
+    lab    13/3613 -> 8/689  [Dark-Elf City: Wererat Emissary]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/689 Guest Quarters goes through Black Wasteland, which you're avoiding.
+    lab    15/2330 -> 16/10240  [Volcano: Infernal Cavern, Jagged Path]  stopped: no exit where the plan had one  ->  hung up: HP below 25% (traps / boss fight)
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/10240) 23:57:14  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  stopped short: at 16/2699 Volcano, Cramped Tunnels (status: Hung up (HP 171/715 below 25%)) 23:57:06  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untic
+    randA  13/2211 -> 14/9999  [random]  hung up: HP below 25% (traps / boss fight)  ->  ok
+           before: stopped short: at 14/9064 The Quagmire, Old Trail (status: Hung up (HP 1/715 below 25%)) 
+    randA  17/2101 -> 8/677  [random]  no route: only way is through an avoided area (by design)  ->  stopped short
+           before: no route: The only way to 8/677 Castle, Dark Hallway goes through Black Wasteland, which you're avoiding.
+           after:  stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 00:12:00  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    randK  13/12616 -> 16/2204  [random]  ok  ->  reached, but flagged: wrong way
+           after:  wrong way: walked 1259 rooms for 847 planned
+    randK  16/268 -> 17/1943  [random]  stopped: door locked  ->  ok
+           before: stopped short: at 17/1791 Library Steps (status: Stopped: the door north is locked) 00:01:02  Stopped: the door north is locked
+    randK  16/2388 -> 16/1970  [random]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1970) 23:57:25  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    randL30 13/962 -> 15/10062  [random]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 26 s at 1/1403 Darkwood Forest, Main Road
+    towns  1/297 -> 16/320  [Bank of Godfrey → Lost City bank]  ok  ->  reached, but flagged: wrong way
+           after:  wrong way: walked 789 rooms for 373 planned (errand legs included)
+    towns  1/297 -> 16/356  [Bank of Godfrey → Lost City / Deranged Pries]  reached, but flagged: wrong way  ->  ok
+           before: wrong way: walked 804 rooms for 384 planned (errand legs included)
+    towns  1/297 -> 16/1522  [Bank of Godfrey → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 00:03:10  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns  2/2568 -> 8/559  [Bank of Rhudaur → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Black Wasteland, which you're avoiding.
+    towns  2/2568 -> 16/356  [Bank of Rhudaur → Lost City / Deranged Pries]  ok  ->  reached, but flagged: wrong way
+           after:  wrong way: walked 951 rooms for 540 planned (errand legs included)
+    towns  6/1334 -> 8/559  [Bank of Khazarad → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns  6/1334 -> 16/1522  [Bank of Khazarad → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:56:43  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns  14/1 -> 8/559  [Bank of Albion → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns  14/1 -> 16/356  [Bank of Albion → Lost City / Deranged Priest]  ok  ->  reached, but flagged: wrong way
+           after:  wrong way: walked 1413 rooms for 995 planned (errand legs included)
+    towns  14/267 -> 8/559  [Bank of Albion, Blackwater Branch → Dark-Elf]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns  14/267 -> 16/356  [Bank of Albion, Blackwater Branch → Lost Cit]  ok  ->  reached, but flagged: stuck
+           after:  stuck: no move for 71 s at 16/2666 Sandstone Room
+    towns  14/267 -> 16/1522  [Bank of Albion, Blackwater Branch → Undermou]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:56:13  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns  17/2435 -> 16/1522  [Bank of Arlysia → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:58:10  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns2 1/297 -> 16/1522  [Bank of Godfrey → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 00:12:19  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns2 2/2568 -> 8/559  [Bank of Rhudaur → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Black Wasteland, which you're avoiding.
+    towns2 2/2568 -> 16/1522  [Bank of Rhudaur → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 00:06:37  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns2 6/1334 -> 16/1522  [Bank of Khazarad → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop/wrong way
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:58:18  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns2 14/1 -> 8/559  [Bank of Albion → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns2 14/1 -> 16/1522  [Bank of Albion → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 00:01:31  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 7 times
+    towns2 14/267 -> 8/559  [Bank of Albion, Blackwater Branch → Dark-Elf]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns2 14/267 -> 16/1522  [Bank of Albion, Blackwater Branch → Undermou]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 23:56:26  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 6 times
+    towns2 17/2435 -> 8/559  [Bank of Arlysia → Dark-Elf City Moatside]  no route: only way is through an avoided area (by design)  ->  ok
+           before: no route: The only way to 8/559 Dark-Elf City, Moatside goes through Negative Power Plane, which you're avoiding.
+    towns2 17/2435 -> 16/1522  [Bank of Arlysia → Undermountain Caverns]  stopped: no exit where the plan had one  ->  reached, but flagged: loop
+           before: stopped short: at 16/551 Treetops (status: Stopped (stopped) — Rego carries on to 16/1522) 00:13:03  Stopped: no exit n from 16/551 and no other way on MME's map
+           after:  loop: 16/565 Treetops 6 times
+
+Darkness check (rooms with MME light <= -150 dark, no light / 'light torch'): 18/22 Lost City walks ok — the catacombs (light -175) walk fine by dead reckoning plus 'pro'.
+
+
+==============================================================================================================
+Final round, after the fixes — every walk
+==============================================================================================================
+MudPilot realm walk sweep (practice server, honest gates) — 2026-11-13 00:22
+292 walks: 233 reached the target (some flagged below: loop / stuck / wrong way), 59 didn't
+first issue per walk: ok 208, stopped short 29, no route 28, loop 14, stuck 6, wrong way 5, stalled 1, setup 1
+all issues: stopped short 29, no route 28, loop 17, wrong way 11, stuck 10, stalled 1, setup 1
+rooms walked / planned: 100140 / 73820
+
+  fixed level 55: 30/32 ok
+  kingsport level 55: 30/30 ok
+  labelled level 55: 29/40 ok
+  random level 30: 28/30 ok
+  random level 55: 59/80 ok
+  town level 55: 57/80 ok
+
+Problems:
+- [r7fixed] 1/1 Town Gates → 13/503 Rugged Shoreline, Tidepool  [Tidepool south entrance from Silvermere]  walked None/None in 0 s, ended -
+    no route: The only way to 13/503 Rugged Shoreline, Tidepool goes through Black Wasteland, which you're avoiding.
+    log: 23:56:56  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 23:56:58  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 23:56:58  Not going to 13/503 Rugged Shoreline, Tidepool: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7fixed] 1/1 Town Gates → 8/560 Dark-Elf Castle, Gatehouse  [Dark-Elf Castle Gatehouse from Silvermere]  walked 399/9 in 99.1 s, ended 8/559 Dark-Elf City, Moatside
+    stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 00:07:57  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    stuck: no move for 81 s at 8/559 Dark-Elf City, Moatside
+    note: monster drop handed over: black star key (drop: dark cultist 10% (its lair)) at 1/1128 Slum Street
+    note: monster drop handed over: gate key (drop: obsidian statue 100%) at 8/461 Black Steel Gate
+    note: 1 detours: 00:07:57  the door south never opened — going round it
+    note: sim: search missed 8/431 W
+    log: 00:06:36  Have everything — on to 'Go to 8/560 Dark-Elf Castle, Gatehouse'
+    log: 00:06:36  Go to 8/560 — started by errands.tick
+    log: 00:06:36  Walking path: Go to 8/560 Dark-Elf Castle, Gatehouse (9 steps)
+    log: 00:07:57  the door south never opened — going round it
+    log: 00:07:57  …but the south exit is the only way to 8/560 — staying with it
+    log: 00:07:57  Stopped: the door south never opened (tried 'open' for 2 minutes)
+- [r7lab] 9/905 Rancid Sewer → 14/267 Bank of Albion, Blackwater Branch  [Port Blackwater: Bank of Albion, Blackwater Branch]  walked None/None in 0 s, ended -
+    no route: The only way to 14/267 Bank of Albion, Blackwater Branch goes through Black Wasteland, which you're avoiding.
+    log: 23:55:08  Go to 14/267 — started by e2e_realm_walk.walk_one
+    log: 23:55:11  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 23:55:11  Not going to 14/267 Bank of Albion, Blackwater Branch: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7lab] 15/2330 Huge Cavern, Training Area → 16/10240 Infernal Cavern, Jagged Path  [Volcano: Infernal Cavern, Jagged Path]  walked 693/896 in 37.0 s, ended 16/2699 Volcano, Cramped Tunnels
+    stopped short: at 16/2699 Volcano, Cramped Tunnels (status: Hung up (HP 171/715 below 25%)) 23:57:06  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    loop: 16/565 Treetops 7 times
+    note: stopped before a boss at 16/354 Guarded Hut — went in (Alt+R)
+    note: stopped before a boss at 16/355 Guarded Hut — went in (Alt+R)
+    note: stopped before a boss at 16/1864 Undermountain Caverns — went in (Alt+R)
+    note: stopped before a boss at 16/1868 Undermountain Caverns — went in (Alt+R)
+    note: sim: bash failed 15/105 E; bash failed 15/105 E; bash failed 15/105 E; bash failed 15/105 E; bash failed 16/1510 E
+    left the plan: 16/550 Treetops → 16/553 Treetops
+    log: 23:57:06  Stopped before aged earth dragon's room (16/1865 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    log: 23:57:06  Going in
+    log: 23:57:06  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    log: 23:57:06  Going in
+    log: 23:57:08  HANGING UP — HP 171/715 below 25%
+    log: 23:57:08  Hung up (HP 171/715 below 25%)
+- [r7lab] 8/531 Dark Tower, Entrance → 16/9549 Molten River  [Volcano: Molten River (lower level)]  walked 762/437 in 40.3 s, ended 16/9507 Volcano, Smoldering Tunnel
+    stopped short: at 16/9507 Volcano, Smoldering Tunnel (status: Hung up (HP 178/715 below 25%)) 23:57:49  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    loop: 16/565 Treetops 7 times
+    note: reconnected (the last walk ended hung up)
+    note: monster drop handed over: king crab claw (drop: king crab 100%) at 16/287 Sandbar
+    note: stopped before a boss at 16/354 Guarded Hut — went in (Alt+R)
+    note: stopped before a boss at 16/355 Guarded Hut — went in (Alt+R)
+    note: stopped before a boss at 16/1864 Undermountain Caverns — went in (Alt+R)
+    note: stopped before a boss at 16/1868 Undermountain Caverns — went in (Alt+R)
+    note: sim: bash failed 8/462 N; bash failed 8/899 S; bash failed 8/899 S; bash failed 8/885 U; bash failed 8/885 U
+    log: 23:57:49  Stopped before aged earth dragon's room (16/1865 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    log: 23:57:49  Going in
+    log: 23:57:49  Stopped before aged earth dragon's room (16/1873 Undermountain Caverns). Alt+R (Options → Resume) walks in; untick its Stop box on the Bosses tab to never stop for it.
+    log: 23:57:49  Going in
+    log: 23:57:51  HANGING UP — HP 178/715 below 25%
+    log: 23:57:51  Hung up (HP 178/715 below 25%)
+- [r7lab] 1/1139 Slum Street, Bend → 16/4947 Ocean Floor, Sunken Ship  [Ocean: Ocean Floor, Sunken Ship, Kraken]  walked 333/340 in 183.4 s, ended 16/4947 Ocean Floor, Sunken Ship
+    stalled: no move for 150 s at 16/4947 Ocean Floor, Sunken Ship (status: Fighting kraken)
+    stuck: no move for 159 s at 16/4947 Ocean Floor, Sunken Ship
+    log: 00:02:22  Location confirmed by 'pro': 1/1403 Darkwood Forest, Main Road
+    log: 00:02:28  Go to: about to 'go hole' in 1/1694, which looks like other rooms — asking the board (pro)
+    log: 00:02:28  Location confirmed by 'pro': 1/1694 Darkwood Forest
+    log: 00:02:34  Go to: about to 'go path' in 17/143, which looks like other rooms — asking the board (pro)
+    log: 00:02:34  Location confirmed by 'pro': 17/143 Forest Trail
+    log: 00:04:00  Last 10 min: in a room, between steps 74%, fighting 15%, not walking 10%, waiting on party 0%, resting 0%, moving 0% · room→next step median 0.0s
+- [r7lab] 2/10935 Cave Den → 6/1243 Blazing Cavern  [Lava Fields: Efreeti]  walked 597/630 in 46.0 s, ended 6/1220 Lava Tube
+    stopped short: at 6/1220 Lava Tube (status: Hung up (HP 175/715 below 25%)) 
+    stuck: no move for 31 s at 2/10935 Cave Den
+    note: sim: search missed 7/148 S; search missed 7/148 S
+    log: 00:09:57  Go to: about to 'go path' in 2/9695, which looks like other rooms — asking the board (pro)
+    log: 00:09:57  Location confirmed by 'pro': 2/9695 Black Foothills, Western Road
+    log: 00:10:03  Go to: about to 'go path' in 2/88, which looks like other rooms — asking the board (pro)
+    log: 00:10:03  Location confirmed by 'pro': 2/88 Western Road
+    log: 00:10:08  HANGING UP — HP 175/715 below 25%
+    log: 00:10:08  Hung up (HP 175/715 below 25%)
+- [r7lab] 17/2175 Mausoleum, Stone Hallway → 14/5634 Alba Rock, Cliffside Path  [Tagesh Highlands: Alba Rock, Cliffside Path]  walked None/None in 0 s, ended -
+    no route: The only way to 14/5634 Alba Rock, Cliffside Path goes through Black Wasteland, which you're avoiding.
+    log: 00:10:24  Go to 14/5634 — started by e2e_realm_walk.walk_one
+    log: 00:10:25  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:10:25  Not going to 14/5634 Alba Rock, Cliffside Path: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7lab] 16/2712 Volcano, Magma Tunnels → 14/1772 Bobbin and Weaving Clothiers, Front Room  [Kingsport: Bobbin and Weaving Clothiers]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1772 Bobbin and Weaving Clothiers, Front Room goes through Negative Power Plane, which you're avoiding.
+    log: 00:11:01  Go to 14/1772 — started by e2e_realm_walk.walk_one
+    log: 00:11:02  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:11:02  Not going to 14/1772 Bobbin and Weaving Clothiers, Front Room: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7lab] 6/2492 Silver Mine Tunnel → 14/1725 The Bitter End Tavern  [Kingsport: The Bitter End Tavern]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1725 The Bitter End Tavern goes through Negative Power Plane, which you're avoiding.
+    log: 00:11:04  Go to 14/1725 — started by e2e_realm_walk.walk_one
+    log: 00:11:06  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:11:06  Not going to 14/1725 The Bitter End Tavern: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7lab] 17/734 Blackwood Forest → 14/4445 Grey Stone Cliffs  [Tagesh Highlands: Grey Stone Cliffs, Fork]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4445 Grey Stone Cliffs goes through Black Wasteland, which you're avoiding.
+    log: 00:11:08  Go to 14/4445 — started by e2e_realm_walk.walk_one
+    log: 00:11:09  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:11:09  Not going to 14/4445 Grey Stone Cliffs: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7lab] 16/4208 Ocean Floor, Deep Water → 2/11978 Arcane Study  [Rugged Plateau: Archmage Valduin]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11978 Arcane Study goes through Negative Power Plane, which you're avoiding.
+    note: cleared a fight left over from the last walk
+    log: 00:12:09  Go to 2/11978 — started by e2e_realm_walk.walk_one
+    log: 00:12:11  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:12:11  Not going to 2/11978 Arcane Study: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7lab] 8/705 Royal Throne Room → 14/4143 Bristlewood Forest, Grassy Landing  [Bristlewood Forest: Bristlewood Forest, Grassy Lndng]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4143 Bristlewood Forest, Grassy Landing goes through Negative Power Plane, which you're avoiding.
+    log: 00:13:46  Go to 14/4143 — started by e2e_realm_walk.walk_one
+    log: 00:13:47  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:13:47  Not going to 14/4143 Bristlewood Forest, Grassy Landing: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randA] 16/3109 Underground Passage → 2/11685 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11685 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 23:56:20  Go to 2/11685 — started by e2e_realm_walk.walk_one
+    log: 23:56:21  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 23:56:21  Not going to 2/11685 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randA] 12/2014 Great Pyramid → 14/4543 Jagged Cliff  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4543 Jagged Cliff goes through Negative Power Plane, which you're avoiding.
+    log: 23:56:24  Go to 14/4543 — started by e2e_realm_walk.walk_one
+    log: 23:56:25  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 23:56:25  Not going to 14/4543 Jagged Cliff: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randA] 1/1952 Ancient Crypt, Tomb → 14/8325 Caer Fenwyn, Stables  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/8325 Caer Fenwyn, Stables goes through Black Wasteland, which you're avoiding.
+    log: 00:02:43  Go to 14/8325 — started by e2e_realm_walk.walk_one
+    log: 00:02:44  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:02:44  Not going to 14/8325 Caer Fenwyn, Stables: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randA] 16/2326 Earthen Catacombs → 13/599 Shoreline, Sandy Beach  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 13/599 Shoreline, Sandy Beach goes through Negative Power Plane, which you're avoiding.
+    log: 00:03:34  Go to 13/599 — started by e2e_realm_walk.walk_one
+    log: 00:03:35  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:03:35  Not going to 13/599 Shoreline, Sandy Beach: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randA] 15/141 Orc Barracks → 3/608 Unholy Altar  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 3/608 Unholy Altar goes through Black Wasteland, which you're avoiding.
+    log: 00:04:36  Go to 3/608 — started by e2e_realm_walk.walk_one
+    log: 00:04:37  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:04:37  Not going to 3/608 Unholy Altar: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randA] 8/1658 Lower Caverns, Underground Lake → 14/6441 Carnaugh Plain  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/6441 Carnaugh Plain goes through Black Wasteland, which you're avoiding.
+    log: 00:05:18  Go to 14/6441 — started by e2e_realm_walk.walk_one
+    log: 00:05:20  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:05:20  Not going to 14/6441 Carnaugh Plain: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randA] 2/971 Dragon's Teeth Hills → 14/4410 Shabby Hovel  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4410 Shabby Hovel goes through Black Wasteland, which you're avoiding.
+    log: 00:05:29  Go to 14/4410 — started by e2e_realm_walk.walk_one
+    log: 00:05:30  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:05:30  Not going to 14/4410 Shabby Hovel: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randA] 17/2101 Mausoleum, Stone Hallway → 8/677 Castle, Dark Hallway  [random]  walked 575/33 in 196.1 s, ended 8/559 Dark-Elf City, Moatside
+    stopped short: at 8/559 Dark-Elf City, Moatside (status: Stopped: the door south never opened (tried 'open' for 2 minutes)) 00:12:00  Stopped: the door south never opened (tried 'open' for 2 minutes)
+    stuck: no move for 81 s at 8/559 Dark-Elf City, Moatside
+    note: monster drop handed over: black star key (drop: dark cultist 10% (its lair)) at 1/1522 Dark Cavern
+    note: monster drop handed over: gate key (drop: obsidian statue 100%) at 8/461 Black Steel Gate
+    note: 1 detours: 00:12:00  the door south never opened — going round it
+    note: sim: bash failed 17/2038 E; bash failed 17/247 N; bash failed 17/247 N; search missed 10/275 N; bash failed 1/1119 N
+    log: 00:10:38  Have everything — on to 'Go to 8/677 Castle, Dark Hallway'
+    log: 00:10:38  Go to 8/677 — started by errands.tick
+    log: 00:10:38  Walking path: Go to 8/677 Castle, Dark Hallway (33 steps)
+    log: 00:12:00  the door south never opened — going round it
+    log: 00:12:00  …but the south exit is the only way to 8/677 — staying with it
+    log: 00:12:00  Stopped: the door south never opened (tried 'open' for 2 minutes)
+- [r7randA] 2/186 Dragon's Teeth Hills → 14/3883 Lake Alba  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/3883 Lake Alba goes through Black Wasteland, which you're avoiding.
+    log: 00:12:46  Go to 14/3883 — started by e2e_realm_walk.walk_one
+    log: 00:12:47  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:12:47  Not going to 14/3883 Lake Alba: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randA] 17/702 Blackwood Forest → 14/6949 Upper Mine Tunnel, Cart Track  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/6949 Upper Mine Tunnel, Cart Track goes through Black Wasteland, which you're avoiding.
+    log: 00:16:35  Go to 14/6949 — started by e2e_realm_walk.walk_one
+    log: 00:16:36  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:16:36  Not going to 14/6949 Upper Mine Tunnel, Cart Track: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randK] 7/880 Cracked Plain → 14/7807 Verdant Meadow  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/7807 Verdant Meadow goes through Black Wasteland, which you're avoiding.
+    log: 23:55:09  Go to 14/7807 — started by e2e_realm_walk.walk_one
+    log: 23:55:10  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 23:55:10  Not going to 14/7807 Verdant Meadow: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randK] 16/875 Storm Mountain, Rocky Path → 2/11296 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11296 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 23:57:11  Go to 2/11296 — started by e2e_realm_walk.walk_one
+    log: 23:57:12  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 23:57:12  Not going to 2/11296 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 14/7568 Vale Of Durand, The Kingsroad → 8/1265 Negative Power Plane  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 8/1265 Negative Power Plane goes through Negative Power Plane, which you're avoiding.
+    log: 23:58:08  Go to 8/1265 — started by e2e_realm_walk.walk_one
+    log: 23:58:09  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 23:58:09  Not going to 8/1265 Negative Power Plane: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 13/4133 Crimson Keep, Barracks → 2/11231 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/11231 Rugged Plateau goes through Black Wasteland, which you're avoiding.
+    log: 23:59:53  Go to 2/11231 — started by e2e_realm_walk.walk_one
+    log: 23:59:54  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 23:59:54  Not going to 2/11231 Rugged Plateau: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randK] 12/1667 Limestone Caverns → 14/1091 Harbor Square  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1091 Harbor Square goes through Negative Power Plane, which you're avoiding.
+    log: 00:00:11  Go to 14/1091 — started by e2e_realm_walk.walk_one
+    log: 00:00:12  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:00:12  Not going to 14/1091 Harbor Square: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 6/2720 Gold Mine, Cart Track → 14/4776 Brynafon River  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/4776 Brynafon River goes through Negative Power Plane, which you're avoiding.
+    log: 00:00:14  Go to 14/4776 — started by e2e_realm_walk.walk_one
+    log: 00:00:16  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:00:16  Not going to 14/4776 Brynafon River: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 16/3519 Ocean Floor, Shallows → 2/10589 Rugged Plateau  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 2/10589 Rugged Plateau goes through Negative Power Plane, which you're avoiding.
+    log: 00:00:35  Go to 2/10589 — started by e2e_realm_walk.walk_one
+    log: 00:00:36  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:00:36  Not going to 2/10589 Rugged Plateau: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 16/9925 Infernal Cavern, Wall → 13/3823 Swamp of Tharollok, Overgrown Path  [random]  walked 41/857 in 106.5 s, ended 16/2862 Volcano, Magma Tunnels
+    stopped short: at 16/2862 Volcano, Magma Tunnels (status: Hung up (HP 167/715 below 25%)) 
+    log: 00:04:57  Go to: 16/9925 looks like other rooms — asking the board (pro)
+    log: 00:04:57  Location confirmed by 'pro': 16/9925 Infernal Cavern, Wall
+    log: 00:06:13  Go to: about to 'go crack' in 16/9831, which looks like other rooms — asking the board (pro)
+    log: 00:06:13  Location confirmed by 'pro': 16/9831 Volcano, Magma Tunnels
+    log: 00:06:42  HANGING UP — HP 167/715 below 25%
+    log: 00:06:42  Hung up (HP 167/715 below 25%)
+- [r7randK] 3/428 Copperwood Forest → 14/3023 Lower Bristlewood  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/3023 Lower Bristlewood goes through Black Wasteland, which you're avoiding.
+    note: reconnected (the last walk ended hung up)
+    log: 00:06:47  Go to 14/3023 — started by e2e_realm_walk.walk_one
+    log: 00:06:48  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 00:06:48  Not going to 14/3023 Lower Bristlewood: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7randK] 16/4998 Sunken Ship, Hold → 13/305 Jungle Trail  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 13/305 Jungle Trail goes through Negative Power Plane, which you're avoiding.
+    log: 00:08:14  Go to 13/305 — started by e2e_realm_walk.walk_one
+    log: 00:08:16  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:08:16  Not going to 13/305 Jungle Trail: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randK] 16/2801 Volcano, Magma Tunnels → 14/7577 Vale Of Durand, The Kingsroad  [random]  walked None/None in 0 s, ended -
+    no route: The only way to 14/7577 Vale Of Durand, The Kingsroad goes through Negative Power Plane, which you're avoiding.
+    log: 00:08:18  Go to 14/7577 — started by e2e_realm_walk.walk_one
+    log: 00:08:19  Only way there is through Negative Power Plane — avoided, so not going (Settings → Other → Routing)
+    log: 00:08:19  Not going to 14/7577 Vale Of Durand, The Kingsroad: the only way is through Negative Power Plane (avoided — Settings → Other → Routing)
+- [r7randL30] 14/9785 Rotting Morass → 6/1154 Underwater Passage  [random]  walked 75/920 in 44.3 s, ended 14/8984 The Quagmire
+    stopped short: at 14/8984 The Quagmire (status: Hung up (HP 97/390 below 25%)) 
+    log: 00:05:19  Go to: 14/9785 looks like other rooms — asking the board (pro)
+    log: 00:05:19  Location confirmed by 'pro': 14/9785 Rotting Morass
+    log: 00:05:25  Go to: about to 'go trail' in 14/9485, which looks like other rooms — asking the board (pro)
+    log: 00:05:25  Location confirmed by 'pro': 14/9485 Lorthan, Marsh Road
+    log: 00:06:02  HANGING UP — HP 97/390 below 25%
+    log: 00:06:02  Hung up (HP 97/390 below 25%)
+- [r7randL30] 17/2249 mausoleum Labyrinth                                   → 1/398 Magic Shoppe  [random]  walked None/None in None s, ended -
+    setup: bot thinks it's in 17/2191 Mausoleum Labyrinth
+- [r7towns] 5/245 Bank of Delanon → 13/503 Rugged Shoreline, Tidepool  [Bank of Delanon → Tidepool south entrance]  walked 0/None in 7.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:00:11  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:00:04  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 00:00:04  Go to: checking abil 204 (exits need them)
+    log: 00:00:07  Go to 13/503 — started by automation.<lambda>
+    log: 00:00:08  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:00:11  Go to 13/503 — started by automation.<lambda>
+    log: 00:00:11  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns] 6/1334 Bank of Khazarad → 16/2118 Volcano, Fiery Lair  [Bank of Khazarad → Volcano / Fiery Lair]  walked 0/None in 3.9 s, ended 6/1334 Bank of Khazarad
+    stopped short: at 6/1334 Bank of Khazarad (status: Idle) 00:01:59  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:01:55  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:01:59  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r7towns] 5/245 Bank of Delanon → 16/320 Bank  [Bank of Delanon → Lost City bank]  walked 0/None in 4.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:02:10  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 00:02:06  Go to 16/320 — started by e2e_realm_walk.walk_one
+    log: 00:02:06  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:02:10  Go to 16/320 — started by automation.<lambda>
+    log: 00:02:10  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r7towns] 14/1 Bank of Albion → 16/2118 Volcano, Fiery Lair  [Bank of Albion → Volcano / Fiery Lair]  walked 0/None in 3.4 s, ended 14/1 Bank of Albion
+    stopped short: at 14/1 Bank of Albion (status: Idle) 00:02:16  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:02:13  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:02:16  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r7towns] 5/245 Bank of Delanon → 16/356 Guarded Hut  [Bank of Delanon → Lost City / Deranged Priest]  walked 0/None in 4.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:05:24  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 00:05:20  Go to 16/356 — started by e2e_realm_walk.walk_one
+    log: 00:05:21  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:05:24  Go to 16/356 — started by automation.<lambda>
+    log: 00:05:24  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r7towns] 5/245 Bank of Delanon → 16/1522 Undermountain Caverns  [Bank of Delanon → Undermountain Caverns]  walked 0/None in 4.6 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:06:03  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 00:05:59  Go to 16/1522 — started by e2e_realm_walk.walk_one
+    log: 00:06:00  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:06:03  Go to 16/1522 — started by automation.<lambda>
+    log: 00:06:03  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r7towns] 5/245 Bank of Delanon → 16/2118 Volcano, Fiery Lair  [Bank of Delanon → Volcano / Fiery Lair]  walked 0/None in 4.1 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:06:33  No walkable route from 5/245 to 16/2118 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else; the northeast exit of Volcano, Darken
+    log: 00:06:29  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:06:30  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:06:33  Go to 16/2118 — started by automation.<lambda>
+    log: 00:06:33  No walkable route from 5/245 to 16/2118 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r7towns] 5/245 Bank of Delanon → 12/1800 Great Pyramid  [Bank of Delanon → Great Pyramid]  walked 0/None in 4.3 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:07:21  No walkable route from 5/245 to 12/1800 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:07:17  Go to 12/1800 — started by e2e_realm_walk.walk_one
+    log: 00:07:18  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:07:21  Go to 12/1800 — started by automation.<lambda>
+    log: 00:07:21  No walkable route from 5/245 to 12/1800 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns] 14/267 Bank of Albion, Blackwater Branch → 16/2118 Volcano, Fiery Lair  [Bank of Albion, Blackwater Branch → Volcano / Fiery Lair]  walked 0/None in 3.3 s, ended 14/267 Bank of Albion, Blackwater Branch
+    stopped short: at 14/267 Bank of Albion, Blackwater Branch (status: Idle) 00:08:33  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:08:29  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:08:33  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r7towns] 2/2568 Bank of Rhudaur → 16/2118 Volcano, Fiery Lair  [Bank of Rhudaur → Volcano / Fiery Lair]  walked 0/None in 2.9 s, ended 2/2568 Bank of Rhudaur
+    stopped short: at 2/2568 Bank of Rhudaur (status: Idle) 00:09:03  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:09:00  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:09:03  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r7towns] 5/245 Bank of Delanon → 14/1290 Throne of Albion  [Bank of Delanon → Kingsport Throne of Albion]  walked 0/None in 3.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:19:05  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:19:01  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 00:19:01  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:19:04  Go to 14/1290 — started by automation.<lambda>
+    log: 00:19:05  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns2] 5/245 Bank of Delanon → 16/320 Bank  [Bank of Delanon → Lost City bank]  walked 0/None in 3.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 23:58:10  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 23:58:06  Go to 16/320 — started by e2e_realm_walk.walk_one
+    log: 23:58:06  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 23:58:09  Go to 16/320 — started by automation.<lambda>
+    log: 23:58:10  No walkable route from 5/245 to 16/320 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r7towns2] 2/2568 Bank of Rhudaur → 14/1290 Throne of Albion  [Bank of Rhudaur → Kingsport Throne of Albion]  walked None/None in 0 s, ended -
+    no route: The only way to 14/1290 Throne of Albion goes through Black Wasteland, which you're avoiding.
+    log: 23:59:00  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 23:59:01  Only way there is through Black Wasteland — avoided, so not going (Settings → Other → Routing)
+    log: 23:59:01  Not going to 14/1290 Throne of Albion: the only way is through Black Wasteland (avoided — Settings → Other → Routing)
+- [r7towns2] 5/245 Bank of Delanon → 16/1522 Undermountain Caverns  [Bank of Delanon → Undermountain Caverns]  walked 0/None in 4.4 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:01:02  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 00:00:58  Go to 16/1522 — started by e2e_realm_walk.walk_one
+    log: 00:00:59  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:01:02  Go to 16/1522 — started by automation.<lambda>
+    log: 00:01:02  No walkable route from 5/245 to 16/1522 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol telepor
+- [r7towns2] 5/245 Bank of Delanon → 16/356 Guarded Hut  [Bank of Delanon → Lost City / Deranged Priest]  walked 0/None in 3.8 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:01:08  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport' on you, which takes you somewhere else
+    log: 00:01:05  Go to 16/356 — started by e2e_realm_walk.walk_one
+    log: 00:01:05  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:01:08  Go to 16/356 — started by automation.<lambda>
+    log: 00:01:08  No walkable route from 5/245 to 16/356 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+; the east exit of Earthen Catacombs (16/2273): it casts 'golden idol teleport
+- [r7towns2] 5/245 Bank of Delanon → 14/1 Bank of Albion  [Bank of Delanon → Kingsport / Bank of Albion]  walked 0/None in 7.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:01:18  No walkable route from 5/245 to 14/1 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:01:11  Go to 14/1 — started by e2e_realm_walk.walk_one
+    log: 00:01:11  Go to: checking abil 204 (exits need them)
+    log: 00:01:14  Go to 14/1 — started by automation.<lambda>
+    log: 00:01:15  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:01:18  Go to 14/1 — started by automation.<lambda>
+    log: 00:01:18  No walkable route from 5/245 to 14/1 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns2] 17/2435 Bank of Arlysia → 16/2118 Volcano, Fiery Lair  [Bank of Arlysia → Volcano / Fiery Lair]  walked 0/None in 4.0 s, ended 17/2435 Bank of Arlysia
+    stopped short: at 17/2435 Bank of Arlysia (status: Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)) 00:01:40  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (que
+    log: 00:01:36  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:01:40  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r7towns2] 5/245 Bank of Delanon → 13/503 Rugged Shoreline, Tidepool  [Bank of Delanon → Tidepool south entrance]  walked 0/None in 4.0 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:05:04  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:04:59  Go to 13/503 — started by e2e_realm_walk.walk_one
+    log: 00:05:00  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:05:03  Go to 13/503 — started by automation.<lambda>
+    log: 00:05:04  No walkable route from 5/245 to 13/503 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns2] 2/2568 Bank of Rhudaur → 16/2118 Volcano, Fiery Lair  [Bank of Rhudaur → Volcano / Fiery Lair]  walked 0/None in 3.0 s, ended 2/2568 Bank of Rhudaur
+    stopped short: at 2/2568 Bank of Rhudaur (status: Idle) 00:05:09  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:05:06  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:05:09  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r7towns2] 6/1334 Bank of Khazarad → 16/2118 Volcano, Fiery Lair  [Bank of Khazarad → Volcano / Fiery Lair]  walked 0/None in 2.9 s, ended 6/1334 Bank of Khazarad
+    stopped short: at 6/1334 Bank of Khazarad (status: Idle) 00:05:14  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:05:12  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:05:14  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+- [r7towns2] 14/267 Bank of Albion, Blackwater Branch → 16/2118 Volcano, Fiery Lair  [Bank of Albion, Blackwater Branch → Volcano / Fiery Lair]  walked 0/None in 3.3 s, ended 14/267 Bank of Albion, Blackwater Branch
+    stopped short: at 14/267 Bank of Albion, Blackwater Branch (status: Idle) 00:09:54  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:09:50  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:09:54  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need black serpent key, chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can w
+- [r7towns2] 5/245 Bank of Delanon → 14/1290 Throne of Albion  [Bank of Delanon → Kingsport Throne of Albion]  walked 0/None in 3.7 s, ended 5/245 Bank of Delanon
+    stopped short: at 5/245 Bank of Delanon (status: No route — see the log) 00:14:23  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+    log: 00:14:19  Go to 14/1290 — started by e2e_realm_walk.walk_one
+    log: 00:14:20  Go to: no way there with the quest flags MudPilot has — reading them again ('abil') before giving up
+    log: 00:14:23  Go to 14/1290 — started by automation.<lambda>
+    log: 00:14:23  No walkable route from 5/245 to 14/1290 — blocked by the @go portal exit of Dank Cave, Large Den (5/781): 'go portal' needs level 75+
+- [r7towns2] 1/297 Bank of Godfrey → 16/2118 Volcano, Fiery Lair  [Bank of Godfrey → Volcano / Fiery Lair]  walked 0/None in 4.0 s, ended 1/297 Bank of Godfrey
+    stopped short: at 1/297 Bank of Godfrey (status: Idle) 00:18:05  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+    log: 00:18:01  Go to 16/2118 — started by e2e_realm_walk.walk_one
+    log: 00:18:05  Not walking 'Go to 16/2118 Volcano, Fiery Lair': you need chiseled key, red rock key, log raft — can't fetch chiseled key, red rock key automatically (quest item, or no known source you can walk to)
+
+All walks:
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/356 Guarded Hut                       81/87     17.7 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/320 Bank                              76/76      2.3 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/311 Temple Stairs                     69/69      3.2 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/2268 Earthen Catacombs                40/40      2.0 s  fixed
+  ok L55 1/1 Town Gates                         → 16/356 Guarded Hut                      416/400    38.6 s  fixed
+  ok L55 14/1 Bank of Albion                    → 16/320 Bank                            1098/1069   86.1 s  fixed
+  ok L55 16/1412 Deep Jungle, Abandoned Temple  → 16/541 Training Grounds                  85/87      3.8 s  fixed
+  ok L55 16/356 Guarded Hut                     → 16/1412 Deep Jungle, Abandoned Temple    74/74     11.7 s  fixed
+  ok L55 16/2268 Earthen Catacombs              → 16/320 Bank                              41/42      6.9 s  fixed
+  ok L55 13/337 Shoreline, Bayside              → 13/503 Rugged Shoreline, Tidepool        31/32      3.4 s  fixed
+  !! L55 1/1 Town Gates                         → 13/503 Rugged Shoreline, Tidepool      None/None      0 s  fixed  (no route)
+  ok L55 14/1 Bank of Albion                    → 13/503 Rugged Shoreline, Tidepool        98/97     43.2 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1290 Throne of Albion                  9/9       2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/987 Kingsport, North Gate             33/33      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/815 Kingsport, Harbor Ramp            16/16      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1145 Kingsport, Castle Gates           3/3       2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/805 Kingsport Harbor, North Pier      32/32      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1077 Burial Vault                     28/28      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1667 City Sewers, Ladder              19/19      2.0 s  fixed
+  ok L55 14/1290 Throne of Albion               → 14/1 Bank of Albion                       9/9       2.0 s  fixed
+  ok L55 14/702 Kingsport Harbor, Wharf         → 14/1015 Kingsport, King's Gate           62/64      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2415 Northwick Village, Entrance      70/70      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1895 Southwick Village                57/57      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2814 Command Tent                     39/41      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/2489 Albion River, Waterfall          87/14      3.1 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/1818 Crownlands, Eastern Crossroads   33/34      2.0 s  fixed
+  ok L55 14/1 Bank of Albion                    → 14/267 Bank of Albion, Blackwater Bran   67/66     27.4 s  fixed
+  ok L55 16/320 Bank                            → 16/2118 Volcano, Fiery Lair             281/26    381.5 s  fixed  (stuck)
+  ok L55 16/320 Bank                            → 16/1522 Undermountain Caverns           248/204     9.6 s  fixed  (loop)
+  ok L55 1/1 Town Gates                         → 8/559 Dark-Elf City, Moatside           404/8      19.0 s  fixed
+  !! L55 1/1 Town Gates                         → 8/560 Dark-Elf Castle, Gatehouse        399/9      99.1 s  fixed  (stopped short)
+  ok L55 1/1 Town Gates                         → 12/1800 Great Pyramid                   356/222    25.9 s  fixed
+  ok L55 14/2415 Northwick Village, Entrance    → 14/1 Bank of Albion                      68/70      2.4 s  kingsport
+  ok L55 14/8175 The River Lorian, Alba Conflue → 14/1091 Harbor Square                   189/193    97.3 s  kingsport
+  ok L55 14/815 Kingsport, Harbor Ramp          → 14/7332 The River Lorian, Waterfall     336/33     15.2 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/8177 Lorian Middle Course, Near Doc  173/176     6.8 s  kingsport
+  ok L55 14/2462 Albion River, Fork             → 14/1766 Hraldin's House of Protection    66/66      2.0 s  kingsport
+  ok L55 14/1875 Stone Chamber, Ladder          → 14/1777 Arcane Rarities                  31/31      2.0 s  kingsport
+  ok L55 14/9111 Coldspring River, Fork         → 14/1923 Lower Albion River, Southern D  127/87      3.8 s  kingsport
+  ok L55 14/1787 Phaedra's Natural Pharmacy     → 14/1778 Runic Inscriptions, First Floo    2/2       2.0 s  kingsport
+  ok L55 14/1774 Fwyren's Bow and Fletchery     → 14/1906 Wagon Trail, Junction            60/60      2.0 s  kingsport
+  ok L55 14/2489 Albion River, Waterfall        → 14/8175 The River Lorian, Alba Conflue  120/3     152.9 s  kingsport  (stuck)
+  ok L55 14/1895 Southwick Village              → 14/2340 Lower Albion River, Northern D   76/76      2.0 s  kingsport
+  ok L55 14/2476 Albion River, Near Docks       → 14/1895 Southwick Village                91/92      2.2 s  kingsport
+  ok L55 14/2575 Upper Albion River, Eastern Do → 14/2048 Cramped General Store           115/118     3.0 s  kingsport
+  ok L55 14/2453 Albion River, Northwick Docks  → 14/1254 Bard's Square                    63/64      2.0 s  kingsport
+  ok L55 14/1777 Arcane Rarities                → 14/1793 General Store                     7/7       2.0 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/1484 Troubadour's Guild, Supply Cou   79/80      2.3 s  kingsport
+  ok L55 14/1667 City Sewers, Ladder            → 14/1770 Gwyned's Tannery, Front Room     13/13      2.0 s  kingsport
+  ok L55 14/1286 Inner Keep, Office             → 14/2377 Old Mill Crossroad               57/59      2.0 s  kingsport
+  ok L55 14/2489 Albion River, Waterfall        → 14/2377 Old Mill Crossroad               34/5       2.0 s  kingsport
+  ok L55 14/1145 Kingsport, Castle Gates        → 14/1906 Wagon Trail, Junction            50/52      2.0 s  kingsport
+  ok L55 14/2182 Lower Albion River, Near Docks → 14/1875 Stone Chamber, Ladder            40/40      2.0 s  kingsport
+  ok L55 14/1 Bank of Albion                    → 14/5714 Alba River Bottoms, Decline     252/259     6.4 s  kingsport
+  ok L55 14/1777 Arcane Rarities                → 14/1058 Temple Square                    15/15      2.0 s  kingsport
+  ok L55 14/1254 Bard's Square                  → 14/1780 Nedric's Bespoke Ornaments       29/29      2.0 s  kingsport
+  ok L55 14/2048 Cramped General Store          → 14/1769 Hraldin's House of Protection    62/64      2.0 s  kingsport
+  ok L55 14/1768 Hraldin's House of Protection  → 14/1725 The Bitter End Tavern            54/56      2.0 s  kingsport
+  ok L55 14/1776 Arcane Rarities                → 14/1290 Throne of Albion                 20/20      2.0 s  kingsport
+  ok L55 14/1723 Black Market                   → 14/2548 Upper Albion River, Near Docks   65/1       2.1 s  kingsport
+  ok L55 14/2441 Northwick Mill                 → 14/1254 Bard's Square                    59/60      2.0 s  kingsport
+  ok L55 14/1895 Southwick Village              → 14/9163 The River Lorian, Coldspring C  143/109     4.4 s  kingsport
+  ok L55 13/1237 Icy Mountain, Large Cavern     → 17/580 Arlysia, City Docks              936/956    52.9 s  labelled
+  ok L55 9/76 Slimy Sewer Tunnel                → 6/924 Marble Stairwell                  214/61      8.2 s  labelled  (loop)
+  !! L55 9/905 Rancid Sewer                     → 14/267 Bank of Albion, Blackwater Bran None/None      0 s  labelled  (no route)
+  ok L55 14/3093 Bristlewood Forest Trail       → 14/8441 Corpse-ridden Field             163/166     4.1 s  labelled
+  ok L55 2/9212 Stonework Tunnel                → 7/11 Stone Chamber, Throne Room         182/186    13.2 s  labelled
+  ok L55 14/3966 Alba River                     → 14/8684 Farnmill Landing, Docks         103/105     5.0 s  labelled
+  ok L55 14/326 The Crusty Barnacle Inn         → 14/9789 Arched Stone Structure          202/203    26.2 s  labelled
+  ok L55 2/1797 Dark Grey Stone Tunnel          → 15/1405 Old Mine Tunnel, Hole Up        369/381    15.8 s  labelled
+  !! L55 15/2330 Huge Cavern, Training Area     → 16/10240 Infernal Cavern, Jagged Path   693/896    37.0 s  labelled  (stopped short)
+  !! L55 8/531 Dark Tower, Entrance             → 16/9549 Molten River                    762/437    40.3 s  labelled  (stopped short)
+  ok L55 7/1395 Obsidian Plateau, Platform Edge → 7/1222 Small Path, Dead End             223/225     5.5 s  labelled
+  ok L55 13/3613 Crumbling Mausoleum, Vault     → 8/689 Guest Quarters                    694/98     38.8 s  labelled
+  ok L55 7/1787 Cracked Tunnel                  → 12/1090 Sandstone Mine Tunnel           495/143    34.9 s  labelled
+  ok L55 14/7355 The River Lorian, Rapids       → 1/598 Sewer Tunnel                      908/923    48.3 s  labelled
+  ok L55 14/3830 Lake Alba, Opening             → 2/2567 Armour Shop                      721/735    42.9 s  labelled
+  ok L55 16/3622 Ocean Floor, Shallows          → 3/681 Black Wasteland                   158/162    19.9 s  labelled
+  ok L55 13/3691 Swamp of Tharollok, Wetlands   → 1/852 Bard's Room                       227/235    11.6 s  labelled
+  ok L55 8/512 Torture Chamber                  → 1/2420 Bronzewood Forest                261/265     9.6 s  labelled
+  ok L55 3/618 Rotting Mansion, Bedroom         → 1/1098 Slum Street, Western Door        126/126     3.4 s  labelled
+  ok L55 12/2099 Entrance Hall                  → 17/1641 White Forest, Landing           472/288    20.2 s  labelled
+  !! L55 1/1139 Slum Street, Bend               → 16/4947 Ocean Floor, Sunken Ship        333/340   183.4 s  labelled  (stalled)
+  ok L55 15/720 Darkened Tunnels                → 6/568 Entrance Copper House Room        357/361    18.4 s  labelled
+  ok L55 2/388 Dragon's Teeth Hills             → 13/3138 Swamp of Tharollok, Boggy Trai  270/276    37.0 s  labelled
+  ok L55 2/1902 Stone Tunnel, Hole Down         → 16/1160 Storm Fortress                 1202/744    69.5 s  labelled  (loop)
+  ok L55 1/2519 Arena Practice Room             → 6/1406 Spiral Stairwell, Cave-In        177/179     5.0 s  labelled
+  ok L55 1/2236 Large Tomb                      → 1/1765 Huge Cave, Refuse Pit             72/74      6.9 s  labelled
+  ok L55 14/8882 Cypress Swamp                  → 7/1406 Cracked Tunnel                   896/908    48.2 s  labelled
+  ok L55 6/754 Cramped Tunnel, Intersection     → 8/530 Officer's Quarters                509/71     39.0 s  labelled
+  !! L55 2/10935 Cave Den                       → 6/1243 Blazing Cavern                   597/630    46.0 s  labelled  (stopped short)
+  ok L55 16/1200 Massive Wooden Gateway         → 15/1458 Old Mine Tunnel, Hole Up        339/351    10.9 s  labelled
+  !! L55 17/2175 Mausoleum, Stone Hallway       → 14/5634 Alba Rock, Cliffside Path      None/None      0 s  labelled  (no route)
+  ok L55 16/2674 Lagoon, Reef                   → 17/3359 Large Cave, Tunnel              169/173    30.8 s  labelled
+  !! L55 16/2712 Volcano, Magma Tunnels         → 14/1772 Bobbin and Weaving Clothiers,  None/None      0 s  labelled  (no route)
+  !! L55 6/2492 Silver Mine Tunnel              → 14/1725 The Bitter End Tavern          None/None      0 s  labelled  (no route)
+  !! L55 17/734 Blackwood Forest                → 14/4445 Grey Stone Cliffs              None/None      0 s  labelled  (no route)
+  ok L55 14/3851 Lake Alba, Near Shore          → 1/1765 Huge Cave, Refuse Pit            804/822    55.0 s  labelled
+  !! L55 16/4208 Ocean Floor, Deep Water        → 2/11978 Arcane Study                   None/None      0 s  labelled  (no route)
+  ok L55 13/3395 Abandoned Cemetary             → 15/319 White Corridor                   383/390    30.5 s  labelled
+  ok L55 14/1847 Dirt Track Junction            → 1/2682 Misty Bog                        765/784    57.4 s  labelled
+  !! L55 8/705 Royal Throne Room                → 14/4143 Bristlewood Forest, Grassy Lan None/None      0 s  labelled  (no route)
+  ok L55 6/3140 Mountain Trail                  → 3/582 Stone Stair                       347/111    14.9 s  random
+  ok L55 16/3510 Ocean Floor, Shallows          → 10/279 Frozen Cavern, Dark Hole         177/180    25.6 s  random
+  ok L55 14/3893 Lake Alba                      → 2/90 Western Road                       712/726    47.1 s  random
+  ok L55 2/11751 Rugged Plateau                 → 14/2506 Coldspring Lake, Outlet         226/37     30.4 s  random
+  ok L55 7/1091 Smooth Crystal Tunnel           → 8/873 Central Keep, Passageway          179/182     4.7 s  random
+  !! L55 16/3109 Underground Passage            → 2/11685 Rugged Plateau                 None/None      0 s  random  (no route)
+  !! L55 12/2014 Great Pyramid                  → 14/4543 Jagged Cliff                   None/None      0 s  random  (no route)
+  ok L55 13/12812 Opulent Villa, Courtyard      → 14/676 Shadowy Marsh                    885/167    41.4 s  random
+  ok L55 13/1078 Icy Mountain Path              → 16/4451 Ocean Surface, Drop Off        1133/306    58.9 s  random
+  ok L55 2/9548 Black Foothills, Western Road   → 15/48 Huge Cavern, Training Area        275/279    22.2 s  random
+  ok L55 14/5748 Alba River                     → 2/10110 Hilltop Encampment              496/503    42.6 s  random
+  ok L55 1/273 Stone Street                     → 17/717 Blackwood Forest, Garden         221/224    22.2 s  random
+  ok L55 17/179 Eastern Road                    → 15/1450 Old Mine Tunnel                 429/436    92.4 s  random
+  ok L55 15/10147 Diamond Mine Tunnel           → 10/120 Narrow Plateau                   530/538    39.2 s  random
+  ok L55 16/10990 Abyssal Island                → 16/13048 Cracked Plateau                 97/98      9.3 s  random
+  ok L55 12/1279 Limestone Caverns              → 6/2532 Silver Mine Tunnel               224/83     11.9 s  random
+  ok L55 14/3714 Bristledeep, Ancient Growth    → 14/8632 Smoldering Fields               147/149    10.0 s  random
+  !! L55 1/1952 Ancient Crypt, Tomb             → 14/8325 Caer Fenwyn, Stables           None/None      0 s  random  (no route)
+  ok L55 17/10256 Mountain Valley, Dark Gorge   → 2/2210 Gouged Tunnel                    434/443    44.5 s  random
+  !! L55 16/2326 Earthen Catacombs              → 13/599 Shoreline, Sandy Beach          None/None      0 s  random  (no route)
+  ok L55 14/1815 Crownlands, The Kingsroad      → 7/427 Fungus Forest                     707/725    55.9 s  random
+  !! L55 15/141 Orc Barracks                    → 3/608 Unholy Altar                     None/None      0 s  random  (no route)
+  ok L55 14/1735 Underground Passage            → 1/3045 Darkwood Forest                  630/647    36.6 s  random
+  !! L55 8/1658 Lower Caverns, Underground Lake → 14/6441 Carnaugh Plain                 None/None      0 s  random  (no route)
+  ok L55 14/5739 Alba River Bottoms             → 14/7201 Alba Keep, Courtyard            180/182     4.4 s  random
+  !! L55 2/971 Dragon's Teeth Hills             → 14/4410 Shabby Hovel                   None/None      0 s  random  (no route)
+  ok L55 2/1267 Stone Tunnel                    → 6/1362 Ornate Passageway, Stairwell     268/278    21.9 s  random
+  ok L55 1/554 Sewer Tunnel                     → 9/270 Crumbling Tunnel                  130/134     8.5 s  random
+  ok L55 16/4536 Ocean Surface                  → 1/2611 Graveyard, Western Edge           93/94      9.1 s  random
+  ok L55 12/385 Scorching Desert                → 7/1698 Cracked Tunnel                   540/549    87.2 s  random
+  ok L55 14/10461 Abandoned Mine Tunnel         → 6/284 Misty Bog                        1098/1119   51.4 s  random
+  !! L55 17/2101 Mausoleum, Stone Hallway       → 8/677 Castle, Dark Hallway              575/33    196.1 s  random  (stopped short)
+  ok L55 13/2211 Frozen Wasteland, Tundra       → 14/9999 Blackstone Chair                278/279    41.3 s  random
+  !! L55 2/186 Dragon's Teeth Hills             → 14/3883 Lake Alba                      None/None      0 s  random  (no route)
+  ok L55 7/189 Fungus Forest, Waterfall         → 16/1888 Lagoon, Reef                    514/528    38.3 s  random
+  ok L55 14/8607 Smoldering Fields, Cart Path   → 13/3583 Crumbling Mausoleum, Vault     1118/1090   84.0 s  random
+  ok L55 5/1100 Gigas Forest, Rope Bridge       → 5/150 Twisting Alley                     80/80      4.3 s  random
+  ok L55 12/1499 Limestone Caverns              → 11/28 Golden Passage                    330/158    19.8 s  random
+  ok L55 9/331 Crumbling Tunnel                 → 7/477 Fungus Forest                     170/174    65.6 s  random
+  !! L55 17/702 Blackwood Forest                → 14/6949 Upper Mine Tunnel, Cart Track  None/None      0 s  random  (no route)
+  ok L55 16/1051 Storm Mountain, Rocky Path     → 15/1844 Diamond Mine Tunnel             931/957    34.7 s  random
+  ok L55 6/1874 Crumbling City Street, Dead End → 17/562 Arlysia, Outer Wall              444/447    13.8 s  random
+  !! L55 7/880 Cracked Plain                    → 14/7807 Verdant Meadow                 None/None      0 s  random  (no route)
+  ok L55 6/184 Swamp Ridge Path                 → 17/369 Farmstead, Entry                 203/206     9.3 s  random
+  ok L55 17/10640 Clock Tower, Eighth Floor     → 1/2793 Darkwood Forest                  411/139    20.2 s  random
+  ok L55 16/4604 Ocean Surface                  → 8/117 Black Cave, Glowing Tunnel        273/277    15.3 s  random
+  ok L55 16/2388 Earthen Catacombs              → 16/1970 Volcano, Chiseled Tunnels       298/257    11.6 s  random  (loop)
+  ok L55 2/2699 Stone Tunnel                    → 17/3426 Large Cave, Tunnel              370/377    49.5 s  random
+  !! L55 16/875 Storm Mountain, Rocky Path      → 2/11296 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 16/2050 Volcano, Red Tunnels           → 8/390 Lower Caverns, Underground Lake   719/735    19.4 s  random
+  ok L55 14/9839 Brackenfen                     → 14/68 Barley Fields                     253/262    28.3 s  random
+  !! L55 14/7568 Vale Of Durand, The Kingsroad  → 8/1265 Negative Power Plane            None/None      0 s  random  (no route)
+  ok L55 14/9051 The Quagmire, Old Trail        → 15/503 Darkened Tunnels                 968/988    65.3 s  random
+  ok L55 16/268 Underground Lake                → 17/1943 Library                         251/227    31.2 s  random
+  !! L55 13/4133 Crimson Keep, Barracks         → 2/11231 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 6/1885 Crumbling City Street           → 12/475 Scorching Desert                 355/122    11.1 s  random
+  !! L55 12/1667 Limestone Caverns              → 14/1091 Harbor Square                  None/None      0 s  random  (no route)
+  !! L55 6/2720 Gold Mine, Cart Track           → 14/4776 Brynafon River                 None/None      0 s  random  (no route)
+  ok L55 13/2879 Cultivated Fields              → 17/954 Blackwood Forest                 196/198    14.1 s  random
+  !! L55 16/3519 Ocean Floor, Shallows          → 2/10589 Rugged Plateau                 None/None      0 s  random  (no route)
+  ok L55 2/637 Dragon's Teeth Hills             → 16/3911 Ocean Floor, Deep Chasm         318/320    25.9 s  random
+  ok L55 12/156 Scorching Desert                → 13/2648 Swamp of Tharollok, Raised Pat  514/520    17.0 s  random
+  ok L55 14/7611 Vale Of Durand, Wooded Trail   → 1/884 Secret Passage, Bend              672/688    49.3 s  random
+  ok L55 14/9213 The River Lorian, Lower Course → 17/3556 Bloodwood Weald                1006/1022   79.1 s  random
+  ok L55 13/12616 Aurean Hills                  → 16/2204 Earthen Catacombs              1259/847    72.2 s  random  (wrong way)
+  !! L55 16/9925 Infernal Cavern, Wall          → 13/3823 Swamp of Tharollok, Overgrown    41/857   106.5 s  random  (stopped short)
+  !! L55 3/428 Copperwood Forest                → 14/3023 Lower Bristlewood              None/None      0 s  random  (no route)
+  ok L55 14/7632 Meadowlands, Country Trail     → 2/1769 Dark Grey Stone Tunnel           677/689    38.5 s  random
+  ok L55 5/4213 Murky Swamp                     → 5/903 Gigas Forest, Wooden Platform     167/168     9.0 s  random
+  ok L55 6/1494 Redstone Tunnel                 → 12/674 Scorching Desert                 140/41      5.6 s  random
+  ok L55 1/1359 Darkwood Forest                 → 2/2821 Stone Tunnel                     183/186    20.1 s  random
+  !! L55 16/4998 Sunken Ship, Hold              → 13/305 Jungle Trail                    None/None      0 s  random  (no route)
+  !! L55 16/2801 Volcano, Magma Tunnels         → 14/7577 Vale Of Durand, The Kingsroad  None/None      0 s  random  (no route)
+  ok L55 1/1699 Darkwood Forest                 → 12/1142 Sandstone Mine Tunnel           279/157    11.8 s  random
+  ok L55 15/1265 Old Mine Tunnel, Hole Down     → 2/132 Southwestern Road                 257/263    10.0 s  random
+  ok L55 16/2186 Earthen Catacombs              → 16/1200 Massive Wooden Gateway           97/99      2.7 s  random
+  ok L55 14/1883 Riverside Trail                → 15/1433 Old Mine Tunnel, Hole Down      876/884    49.6 s  random
+  ok L55 2/11544 Boulder-strewn Clearing        → 14/7845 Meadowlands                     276/286    30.7 s  random
+  ok L55 6/2144 Redstone Tunnel                 → 7/792 Cracked Plain, Black Chasm        435/441    17.0 s  random
+  ok L55 3/146 Ironwood Forest                  → 2/924 Dragon's Teeth Hills              103/108     2.6 s  random
+  ok L30 17/9556 Burning Plains                 → 6/1777 Copper Mine Tunnel               268/78     14.2 s  random
+  ok L30 16/4833 Ocean Surface, Green Kelp Padd → 1/3007 Darkwood Forest                  209/210    15.9 s  random
+  ok L30 14/111 Barley Fields, City Wall        → 2/11943 Red Granite Mesa                127/127     8.4 s  random
+  ok L30 12/2480 Collapsed Passage              → 15/10093 Diamond Mine Tunnel            504/345    35.2 s  random
+  ok L30 10/219 Tower, Foyer                    → 1/706 Sewer Tunnel                      117/121    13.5 s  random
+  ok L30 16/1156 Mountain Plateau, Flat Ledge   → 1/1907 Labyrinth Passage                554/555    13.4 s  random
+  ok L30 17/3135 Grand Hallway                  → 9/448 Torchlit Tunnels                  526/224    28.7 s  random
+  ok L30 16/89 Tasloi Village, Massive Web      → 2/9287 Stonework Tunnel                 276/281    20.3 s  random
+  ok L30 17/307 Graveyard                       → 6/621 Gnome Village                     196/207    16.0 s  random
+  ok L30 13/590 Shoreline, Sandy Beach          → 11/7 Crimson Passage                    701/717    32.5 s  random
+  ok L30 13/13304 Tal'kiran Shore, Shallows     → 3/21 Mossy Tunnel                       750/41     42.7 s  random
+  ok L30 13/962 Icy Mountain Path               → 15/10062 Diamond Mine Tunnel           1315/348   167.3 s  random  (stuck)
+  ok L30 3/751 Black Wasteland                  → 9/1385 Ancient Darkwood Tree, Spiral S  168/115    48.0 s  random
+  ok L30 16/1791 Undermountain Caverns          → 2/2131 Dark Grey Stone Tunnel           533/545    22.6 s  random
+  ok L30 7/1249 Black Fortress, Gaol            → 15/277 White Corridor                   116/116     8.0 s  random
+  ok L30 13/1631 Frozen Wasteland, Tundra       → 7/1451 Cracked Tunnel                   768/778    41.2 s  random
+  ok L30 13/281 Shoreline, Sandy Beach          → 6/1501 Redstone Cave                    845/856    44.6 s  random
+  ok L30 8/796 Building Rooftop                 → 3/242 Bronzewood Forest, Small Path     189/110    54.4 s  random
+  !! L30 14/9785 Rotting Morass                 → 6/1154 Underwater Passage                75/920    44.3 s  random  (stopped short)
+  ok L30 2/2460 Black Mountains                 → 2/477 Dragon's Teeth Hills              219/225    10.3 s  random
+  ok L30 14/10159 Ruined General Store          → 14/10406 Flooded Passage                 76/80     34.0 s  random
+  ok L30 2/1420 Stone Tunnel                    → 16/152 Underground River                361/126    15.1 s  random
+  !! L30 17/2249 mausoleum Labyrinth            → 1/398 Magic Shoppe                     None/None   None s  random  (setup)
+  ok L30 16/1675 Undermountain Caverns          → 15/1312 Old Mine Tunnel                 634/645    95.5 s  random
+  ok L30 16/4274 Sunken Ship, Hold              → 12/668 Scorching Desert                 444/141   174.8 s  random  (stuck)
+  ok L30 14/8784 Cypress Swamp                  → 14/6912 Bannock Quarry, Cart Track      255/84    248.8 s  random  (stuck)
+  ok L30 7/1497 Cracked Tunnel                  → 1/2613 Graveyard, Western Edge          328/337    13.9 s  random
+  ok L30 2/205 Dragon's Teeth Hills             → 3/350 Copperwood Forest                 284/131     8.2 s  random
+  ok L30 17/2071 Mausoleum, Stone Hallway       → 2/124 Southwestern Road                 239/226    32.2 s  random
+  ok L30 14/3701 Bristledeep, Ancient Growth    → 1/1697 Darkwood Forest                  780/793    65.5 s  random
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/1522 Undermountain Caverns          1518/577   139.5 s  town  (loop)
+  ok L55 6/1334 Bank of Khazarad                → 16/1522 Undermountain Caverns           750/554    35.2 s  town  (loop)
+  ok L55 14/1 Bank of Albion                    → 8/559 Dark-Elf City, Moatside           935/8      61.4 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/356 Guarded Hut                      951/363    60.3 s  town  (wrong way)
+  ok L55 2/2568 Bank of Rhudaur                 → 12/1800 Great Pyramid                   553/222    38.5 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/1522 Undermountain Caverns           479/426    21.8 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 12/1800 Great Pyramid                   367/370    11.6 s  town
+  !! L55 5/245 Bank of Delanon                  → 13/503 Rugged Shoreline, Tidepool         0/None    7.7 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 16/356 Guarded Hut                     1413/943    98.5 s  town  (wrong way)
+  !! L55 6/1334 Bank of Khazarad                → 16/2118 Volcano, Fiery Lair               0/None    3.9 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 14/1290 Throne of Albion                  9/9       2.0 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/320 Bank                               0/None    4.0 s  town  (stopped short)
+  !! L55 14/1 Bank of Albion                    → 16/2118 Volcano, Fiery Lair               0/None    3.4 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 13/503 Rugged Shoreline, Tidepool       801/817    51.9 s  town
+  ok L55 1/297 Bank of Godfrey                  → 16/320 Bank                             789/352    55.9 s  town  (wrong way)
+  ok L55 1/297 Bank of Godfrey                  → 16/1522 Undermountain Caverns          1033/554    66.1 s  town  (loop)
+  !! L55 5/245 Bank of Delanon                  → 16/356 Guarded Hut                        0/None    4.0 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 16/320 Bank                             508/352    29.5 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/1522 Undermountain Caverns             0/None    4.6 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 16/356 Guarded Hut                      375/363    20.8 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/2118 Volcano, Fiery Lair               0/None    4.1 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 14/1290 Throne of Albion                624/638    38.8 s  town
+  !! L55 5/245 Bank of Delanon                  → 12/1800 Great Pyramid                     0/None    4.3 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 12/1800 Great Pyramid                   215/222     7.9 s  town
+  ok L55 17/2435 Bank of Arlysia                → 13/503 Rugged Shoreline, Tidepool       847/859    52.3 s  town
+  !! L55 14/267 Bank of Albion, Blackwater Bran → 16/2118 Volcano, Fiery Lair               0/None    3.3 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1 Bank of Albion                      66/66     22.2 s  town
+  !! L55 2/2568 Bank of Rhudaur                 → 16/2118 Volcano, Fiery Lair               0/None    2.9 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 8/559 Dark-Elf City, Moatside           892/8      38.6 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 8/559 Dark-Elf City, Moatside           361/8      41.3 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 13/503 Rugged Shoreline, Tidepool       840/683    43.7 s  town
+  ok L55 1/297 Bank of Godfrey                  → 14/1 Bank of Albion                     616/630    37.8 s  town
+  ok L55 14/1 Bank of Albion                    → 16/320 Bank                             962/932    66.6 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/320 Bank                             518/352    23.8 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/356 Guarded Hut                     1251/943   171.6 s  town  (stuck)
+  ok L55 6/1334 Bank of Khazarad                → 14/1 Bank of Albion                     750/774    51.0 s  town
+  ok L55 6/1334 Bank of Khazarad                → 14/1290 Throne of Albion                769/782    52.0 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/320 Bank                             230/224    11.5 s  town
+  ok L55 6/1334 Bank of Khazarad                → 8/559 Dark-Elf City, Moatside           519/8      29.4 s  town
+  !! L55 5/245 Bank of Delanon                  → 14/1290 Throne of Albion                  0/None    3.7 s  town  (stopped short)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/1522 Undermountain Caverns          1516/577   141.5 s  town  (loop)
+  ok L55 6/1334 Bank of Khazarad                → 12/1800 Great Pyramid                   216/222    22.1 s  town
+  ok L55 17/2435 Bank of Arlysia                → 8/559 Dark-Elf City, Moatside           612/8      82.7 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/320 Bank                               0/None    3.7 s  town  (stopped short)
+  ok L55 2/2568 Bank of Rhudaur                 → 8/559 Dark-Elf City, Moatside           362/8      40.5 s  town
+  ok L55 14/1 Bank of Albion                    → 14/1 Bank of Albion                       0/None    2.0 s  town
+  !! L55 2/2568 Bank of Rhudaur                 → 14/1290 Throne of Albion               None/None      0 s  town  (no route)
+  ok L55 6/1334 Bank of Khazarad                → 16/1522 Undermountain Caverns          1185/554    70.4 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 12/1800 Great Pyramid                   927/222    38.7 s  town
+  !! L55 5/245 Bank of Delanon                  → 16/1522 Undermountain Caverns             0/None    4.4 s  town  (stopped short)
+  !! L55 5/245 Bank of Delanon                  → 16/356 Guarded Hut                        0/None    3.8 s  town  (stopped short)
+  !! L55 5/245 Bank of Delanon                  → 14/1 Bank of Albion                       0/None    7.0 s  town  (stopped short)
+  ok L55 17/2435 Bank of Arlysia                → 16/356 Guarded Hut                      248/235    12.8 s  town
+  !! L55 17/2435 Bank of Arlysia                → 16/2118 Volcano, Fiery Lair               0/None    4.0 s  town  (stopped short)
+  ok L55 14/1 Bank of Albion                    → 16/1522 Undermountain Caverns          1643/541   113.0 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 14/1 Bank of Albion                     619/630    38.5 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 8/559 Dark-Elf City, Moatside           891/8      37.9 s  town
+  !! L55 5/245 Bank of Delanon                  → 13/503 Rugged Shoreline, Tidepool         0/None    4.0 s  town  (stopped short)
+  !! L55 2/2568 Bank of Rhudaur                 → 16/2118 Volcano, Fiery Lair               0/None    3.0 s  town  (stopped short)
+  !! L55 6/1334 Bank of Khazarad                → 16/2118 Volcano, Fiery Lair               0/None    2.9 s  town  (stopped short)
+  ok L55 6/1334 Bank of Khazarad                → 14/1290 Throne of Albion                764/782    51.7 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 16/356 Guarded Hut                     1458/943   118.4 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/1522 Undermountain Caverns          1187/554    69.7 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 13/503 Rugged Shoreline, Tidepool        92/93     23.3 s  town
+  !! L55 14/267 Bank of Albion, Blackwater Bran → 16/2118 Volcano, Fiery Lair               0/None    3.3 s  town  (stopped short)
+  ok L55 1/297 Bank of Godfrey                  → 12/1800 Great Pyramid                   369/370    12.2 s  town
+  ok L55 2/2568 Bank of Rhudaur                 → 16/356 Guarded Hut                      951/363    61.1 s  town  (wrong way)
+  ok L55 14/1 Bank of Albion                    → 16/356 Guarded Hut                     1397/943    97.9 s  town
+  ok L55 14/1 Bank of Albion                    → 8/559 Dark-Elf City, Moatside           941/8      60.7 s  town
+  ok L55 17/2435 Bank of Arlysia                → 12/1800 Great Pyramid                   505/222    18.4 s  town
+  !! L55 5/245 Bank of Delanon                  → 14/1290 Throne of Albion                  0/None    3.7 s  town  (stopped short)
+  ok L55 17/2435 Bank of Arlysia                → 13/503 Rugged Shoreline, Tidepool       845/859    52.6 s  town
+  ok L55 1/297 Bank of Godfrey                  → 16/1522 Undermountain Caverns          1036/554    66.4 s  town  (loop)
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1290 Throne of Albion                 58/58     22.7 s  town
+  ok L55 17/2435 Bank of Arlysia                → 16/1522 Undermountain Caverns           468/426    22.1 s  town  (loop)
+  ok L55 1/297 Bank of Godfrey                  → 14/1290 Throne of Albion                624/638    38.8 s  town
+  !! L55 1/297 Bank of Godfrey                  → 16/2118 Volcano, Fiery Lair               0/None    4.0 s  town  (stopped short)
+  ok L55 2/2568 Bank of Rhudaur                 → 12/1800 Great Pyramid                   552/222    26.5 s  town
+  ok L55 14/267 Bank of Albion, Blackwater Bran → 14/1 Bank of Albion                      66/66     22.5 s  town
+  ok L55 14/1 Bank of Albion                    → 12/1800 Great Pyramid                   976/222    60.1 s  town
+
+==============================================================================================================
+Fixed (0.8.189, each with a test)
+==============================================================================================================
+- Treetops walls opened from another room behind another such wall (16/551 N: vine → knot → bark): pilot.py
+  _tour/_steps plan nested tours (depth 4). tests/test_nested_actions.py (plans it, then walks it on the practice server).
+- Solo Dark-Elf City "only way is through Black Wasteland": automation._opener_route drops items nobody can get (amber
+  talisman) and plans again. tests/test_opener_unobtainable.py
+- Fetches in the wrong order (gate key's statue before the orb whose door it's behind): errands.plan/source_for never
+  count an item still to fetch. tests/test_errand_order.py
+- Heavy Iron Gates (6/2619 S) opener needs the gold signet ring: worlddb._attach_open keeps the command's item; can_use
+  and _opener_items honour it. tests/test_door_opener_item.py
+- Lever door shut again (7/150 SE, lever in 7/152): pilot.redo_remote + the door handler go back round instead of
+  'pull lever' in the wrong room / giving up. tests/test_remote_door_redo.py (walked on the practice server)
+- Boss killed but stopped for again in its other rooms: automation._boss_dead (Bosses-tab clock) in _boss_ahead /
+  _boss_stops. tests/test_boss_dead_stop.py
+- Two keys ending alike ('use house key'): automation._door_key sends the whole name. tests/test_key_name.py
+- Boat landing on a look-alike wharf: automation._at_sea takes the landing room among the candidates.
+  tests/test_boat_landing.py
+- "No route" blamed level 1+ for a 2,000,000-copper fare: worlddb.why_no_route lists the fare. tests/test_why_fare.py
+
+==============================================================================================================
+Judgement calls for Dan (not changed)
+==============================================================================================================
+1. Traps vs your HP. A trap costs at most 21 rooms in routing, whatever it does; the Hedge Maze (17/28xx) has 400-700
+   damage traps and the walk goes through them (sometimes it's the only way out). On the practice server a 715-HP
+   level 55 hung up at 1 HP twice. Weigh traps against your HP / rest to full before a big one?
+2. Damaging rooms vs your HP. Volcano tunnels (magma heat 30-60 a room), the Quagmire (bog poison), rivers without a
+   raft: long stretches are walked without resting first and end in "Hung up (HP below 25%)". Rest before a known
+   damaging stretch, or route round when it's not much longer?
+3. Doors you can't open aren't checked when planning. A '[61 picklocks/strength]' door with strength 60 is planned
+   through; the walk goes 100+ rooms there and stops ("the door north is locked", 14/332). door_doable is only used
+   for key doors.
+4. Lever tours are costed at 12 rooms. The 6/861 four-lever puzzle is a 150-room tour and the Treetops one ~45, so a
+   Go to can pick a lever way that's really longer than a plain one. Cost the tour by its real length?
+5. Dark-Elf Castle gate (8/559 S, 1000 picklocks) only opens from inside ('turn wheel' in 8/560): Go to the castle
+   gatehouse now gets to the moat (with the Fungus Tunnel fix) and waits 2 minutes at the gate, then stops.
+6. Kingsport is an island on MME's map: the only ways off are the 2,000,000-copper secure passage boats and a level-60
+   portal. With the default avoid areas, unattended walks from Kingsport to the Lost City take ~1000 rooms (the 300-
+   room way crosses the Negative Power Plane). Inside Kingsport and round it (Crownlands, Albion River) all 90+
+   walks were clean in every round.
+7. Portals / holes guarded by a monster ('nomonsters' in MME: the Deranged Priest's 'go hole', the master assassin's
+   'push panel'): with combat off the walk tries 8 times and stops ("isn't getting anywhere"); the planner doesn't
+   know the monster has to die first. With combat on it fights and goes.
+8. Map gaps, not MudPilot: Bank of Delanon (5/245) has no way out on MME's map but a level-75 portal; the Volcano's
+   Fiery Lair needs the chiseled and red rock keys (quest items); Tidepool from Silvermere without GuildmasterQuest is
+   only through Black Wasteland (avoided).
+9. The boss-dead change (#6 above) trusts the Bosses-tab clock (MME regen time or your own figure). Veto if you'd
+   rather stop for every boss room regardless.
+10. Party: each follower needs their own golden idol for the catacombs teleport (16/2273 E); the practice server is
+   one character, so the party side wasn't walked.
+11. keyed_route ('as if you had every key', the last fallback) can still plan through an item nobody can get; the main
+   plan no longer does. Only matters when every other plan fails.
+
+Not reproduced: the Earthen Catacombs / Lost City walk itself works on the practice server with the idol (the 0.8.181
+fix), also with the catacombs dark (MME light -175, no light: dead reckoning plus 'pro'). The Kingsport complaints
+didn't reproduce beyond the boat landing and fare message — a log of one that goes wrong for real would help.

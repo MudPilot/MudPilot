@@ -1,0 +1,2 @@
+# Developer bug-report address (Discord webhook URL, https://discord.com/api/webhooks/...).
+# Put it on the first non-# line. Blank = reports are only saved locally.

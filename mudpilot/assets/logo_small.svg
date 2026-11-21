@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="44 38 168 168" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b222c"/><stop offset="1" stop-color="#0b0d10"/>
+    </linearGradient>
+    <radialGradient id="mud" cx="0.38" cy="0.32" r="0.8">
+      <stop offset="0" stop-color="#b07a52"/><stop offset="0.6" stop-color="#8a5a3a"/><stop offset="1" stop-color="#6b4229"/>
+    </radialGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a3a26"/><stop offset="1" stop-color="#3f2819"/>
+    </linearGradient>
+    <radialGradient id="lens" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#9dffc6"/><stop offset="0.5" stop-color="#2fbf71"/><stop offset="1" stop-color="#1a7a47"/>
+    </radialGradient>
+  </defs>
+  <!-- tile -->
+  <rect x="44" y="38" width="168" height="168" rx="34" fill="url(#bg)"/>
+  <!-- mud blob body with drips -->
+  <path d="M128 52 C178 52 204 92 204 140 C204 168 198 186 190 196
+           C186 202 180 202 178 194 C176 206 168 214 160 206 C156 200 156 196 154 202
+           C150 214 138 218 132 208 C128 202 126 204 122 210 C114 220 100 216 100 204
+           C98 196 94 198 90 204 C82 212 70 206 72 194 C66 198 58 194 58 184
+           C54 172 52 156 52 140 C52 92 78 52 128 52 Z" fill="url(#mud)"/>
+  <!-- drip blobs -->
+  <ellipse cx="111" cy="222" rx="5" ry="6" fill="#7a4c30"/>
+  <ellipse cx="168" cy="214" rx="4" ry="5" fill="#7a4c30"/>
+  <!-- shine -->
+  <ellipse cx="92" cy="98" rx="14" ry="8" fill="#ffffff" opacity="0.18" transform="rotate(-30 92 98)"/>
+  <!-- aviator cap -->
+  <path d="M62 110 C64 70 92 46 128 46 C164 46 192 70 194 110 C176 98 154 92 128 92 C102 92 80 98 62 110 Z" fill="url(#cap)"/>
+  <path d="M128 48 L128 92" stroke="#2c1b10" stroke-width="3" opacity="0.6"/>
+  <!-- ear flaps -->
+  <path d="M62 106 C54 118 54 140 62 152 C70 150 74 140 74 128 C74 118 70 110 62 106 Z" fill="url(#cap)"/>
+  <path d="M194 106 C202 118 202 140 194 152 C186 150 182 140 182 128 C182 118 186 110 194 106 Z" fill="url(#cap)"/>
+  <!-- goggles strap + goggles on forehead -->
+  <path d="M60 100 C90 86 166 86 196 100" stroke="#2c1b10" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <circle cx="104" cy="90" r="20" fill="#c9cfd8"/>
+  <circle cx="152" cy="90" r="20" fill="#c9cfd8"/>
+  <circle cx="104" cy="90" r="14" fill="url(#lens)"/>
+  <circle cx="152" cy="90" r="14" fill="url(#lens)"/>
+  <rect x="120" y="86" width="16" height="8" rx="4" fill="#c9cfd8"/>
+  <circle cx="99" cy="85" r="4" fill="#fff" opacity="0.85"/>
+  <circle cx="147" cy="85" r="4" fill="#fff" opacity="0.85"/>
+  <!-- eyes -->
+  <ellipse cx="106" cy="138" rx="9" ry="11" fill="#1a1208"/>
+  <ellipse cx="150" cy="138" rx="9" ry="11" fill="#1a1208"/>
+  <circle cx="109" cy="133" r="3.5" fill="#fff"/>
+  <circle cx="153" cy="133" r="3.5" fill="#fff"/>
+  <circle cx="103" cy="142" r="1.6" fill="#fff" opacity="0.8"/>
+  <circle cx="147" cy="142" r="1.6" fill="#fff" opacity="0.8"/>
+  <!-- blush -->
+  <ellipse cx="88" cy="158" rx="9" ry="5" fill="#ff8a8a" opacity="0.45"/>
+  <ellipse cx="168" cy="158" rx="9" ry="5" fill="#ff8a8a" opacity="0.45"/>
+  <!-- smile -->
+  <path d="M116 158 C122 168 134 168 140 158" stroke="#1a1208" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <!-- scarf wrap -->
+  <path d="M70 178 C100 192 156 192 186 178 L190 190 C158 206 98 206 66 190 Z" fill="#2fbf71"/>
+  <path d="M74 186 C104 198 152 198 182 186" stroke="#1a7a47" stroke-width="2.5" fill="none" opacity="0.8"/>
+</svg>
