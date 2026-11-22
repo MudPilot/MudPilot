@@ -112,7 +112,15 @@ Copy diagnostics (Ctrl+Shift+D) puts a summary on the clipboard if someone helpi
 
 • MudPilot's map, room, monster, item, shop and spell data come from MME's databases.
 • Many of its game calculations work the way MME works them: spell and melee damage, who can use an item, which spells a class learns, the exp tables and the monster attack simulator.
-• Used with his blessing."""),
+• Used with his blessing.
+
+Thanks also to Phrixas for pMUD.
+
+• Several of MudPilot's features were designed after studying how pMUD does them: the Go to walker, the gather rules for info commands, @spawn boss timers, area-spell safety, Enter on Tick, NoHang, the stall watchdog, room reports, the walked routes for puzzle areas, and the debug bundle.
+• One file comes straight from pMUD: mudpilot/bundled/megamud_messages.md (pMUD's MegaMUD messages import, with its decoding of the flag bits).
+• Used with his blessing.
+
+License: MudPilot is free software under the GNU General Public License v3.0 (the LICENSE file; source at github.com/MudPilot/MudPilot)."""),
 ]
 
 

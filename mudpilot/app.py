@@ -3246,6 +3246,11 @@ class App:
         lk = ttk.Label(f, text="github.com/syntax53/MMUD-Explorer", style="Muted.TLabel", cursor="hand2")
         lk.pack()
         lk.bind("<Button-1>", lambda e: __import__("webbrowser").open("https://github.com/syntax53/MMUD-Explorer"))
+        ttk.Label(f, text="Thanks also to Phrixas for pMUD: several of MudPilot's features were designed after studying "
+                          "how pMUD does them, and its MegaMUD messages import comes straight from pMUD.",
+                  style="Muted.TLabel", justify="center", wraplength=420).pack(pady=(8, 0))
+        ttk.Label(f, text="Free software under the GNU GPL v3.0 — github.com/MudPilot/MudPilot", style="Muted.TLabel",
+                  justify="center", wraplength=420).pack(pady=(8, 0))
         ttk.Button(f, text="OK", style="Accent.TButton", command=d.destroy).pack(pady=(14, 0))
         d.transient(self.root)
 

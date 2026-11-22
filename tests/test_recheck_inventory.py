@@ -19,6 +19,7 @@ class T:
     def send_line(self, x): sent.append(x)
     def close(self): pass
 s.telnet = T(); s._entered = True
+s.state.picklocks, s.state.strength = 182, 60     # ('st' read: 0.8.222 reads it first before a picklocks door)
 g, b = s.state, s.bot
 g.level = 25
 AMU = s.world.item_names["glowing red amulet"]["num"]

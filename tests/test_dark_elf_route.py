@@ -22,6 +22,7 @@ class T:
     def send_line(self, x): sent.append(x)
     def close(self): pass
 s.telnet = T(); s._entered = True; s.state.level = 47
+s.state.picklocks, s.state.strength = 182, 60   # (PVE's 'st': 0.8.222 waits for it before a Go to through a door)
 s.on_no_route = lambda m: None
 ok = True
 def check(n, c):
@@ -63,7 +64,7 @@ b.goto((8, 493))
 todo = (b.errands.active or {}).get("todo") or []
 check(f"…and fetches the gate key from the statue even with picklocks 182 ({[(w.item_name(t['num']), t.get('summon')) for t in todo]})",
       any(w.item_name(t["num"]) == "gate key" and t.get("summon") == "touch statue" for t in todo))
-b.stop("Stopped by you"); b.errands.cancel(); s.state.picklocks = 0
+b.stop("Stopped by you"); b.errands.cancel()
 s.state.carrying = "astral staff (Weapon Hand)"; s.state.inv_seq += 1
 # party level: a level-30 follower can't take the level-40 portal
 s.partysync.peers["Revolution"] = {"lvl": 30, "t": 0}

@@ -1094,6 +1094,9 @@ class WorldDB:
                 need = self.exit_need(ex)
                 if need and not need[1]:
                     sets.append(frozenset({need[0]}))  # 'Item: 942' — the mine pass gate: each walker shows one
+            for it_ in ((getattr(ex, "req", None) or {}).get("items") or ()) if ex is not None else ():
+                sets.append(frozenset({int(it_)}))   # a room command that needs an item ('climb hole' + rope): each
+                                                     # walker too, not just the leader (partyB P1, the 7/1524 pit)
             for s in sets:
                 if s and s not in out:
                     out.append(s)
@@ -1103,7 +1106,11 @@ class WorldDB:
         """The most a room / exit spell can hurt you for (MME's MaxBase), following its textblock's casts — 0 when
         something you carry stops it (a raft in the river, the item MME says negates it)."""
         cache = self.__dict__.setdefault("_spell_dmg", {})
-        key = (int(sp), frozenset(have))
+        # (keyed on just the carried items that matter to this spell: freezing the whole 'every item' set on each call
+        #  made route planning 4-7x slower once 0.8.222's HP wall asked about every room spell — m1617 #1)
+        rel = self._spell_rel(int(sp))
+        have = frozenset(i for i in rel if i in have) if (have and rel) else frozenset()
+        key = (int(sp), have)
         if key in cache:
             return cache[key]
         s = self.spells.get(int(sp)) or {}
@@ -1124,10 +1131,34 @@ class WorldDB:
         cache[key] = out
         return out
 
+    def _spell_rel(self, sp, depth=0) -> frozenset:
+        """The items that can stop a spell (and the spells its textblock casts): all spell_damage looks at in `have`."""
+        cache = self.__dict__.setdefault("_spell_rel_c", {})
+        if sp in cache:
+            return cache[sp]
+        rel = set(self.spell_items(int(sp)) or ()) | set((getattr(self, "negates", {}) or {}).get(int(sp), []) or ())
+        s = self.spells.get(int(sp)) or {}
+        ab = {int(a[0]): a[1] for a in s.get("abils") or [] if len(a) >= 2 and a[0] is not None}
+        if 1 not in ab and int(ab.get(148) or 0) and depth < 4:
+            from .mmetext import block_lines
+            for segs in block_lines(getattr(self, "textblocks", {}) or {}, int(ab[148])):
+                for sg in segs:
+                    m = re.match(r"\s*cast\s+(\d+)", sg or "")
+                    if m:
+                        rel |= self._spell_rel(int(m.group(1)), depth + 1)
+        out = frozenset(rel)
+        if depth == 0:
+            cache[sp] = out
+        return out
+
     def room_damage(self, room, have=()) -> int:
         """What walking into this room can do to you (its room spell), 0 = nothing."""
         sp = (getattr(self, "room_spells", {}) or {}).get(tuple(room))
-        return self.spell_damage(sp, frozenset(have or ())) if sp else 0
+        if not sp:
+            return 0
+        if have is not None and not isinstance(have, (set, frozenset, dict)):
+            have = set(have)
+        return self.spell_damage(sp, have or frozenset())
 
     def carry_item_set(self) -> frozenset:
         """Items an exit needs each walker to carry: the idol teleport's, 'Item: N' gates (the mine pass)."""
@@ -1204,7 +1235,14 @@ class WorldDB:
             c, dr, ex = prev[node]
             if not ok(c, dr, ex):
                 why = ex.etype or ex.kind
-                if ex.kind == "hidden" and ex.needs_actions and not ex.action_cmds():
+                hw = self.hp_wall(ex, have)
+                if hw:
+                    hp = int((self.char or {}).get("max_hp") or 0)
+                    what = "a trap" if ex.kind == "trap" and self.TRAP_RE.search(ex.etype or "") and \
+                        int(self.TRAP_RE.search(ex.etype or "").group(1)) >= hp else \
+                        f"{self.rooms[ex.to].name} ({ex.to[0]}/{ex.to[1]})"
+                    why = f"{what} can do up to {hw} damage — your whole max HP ({hp}) or more"
+                elif ex.kind == "hidden" and ex.needs_actions and not ex.action_cmds():
                     why = "a hidden exit that needs an action MME doesn't list"
                     far = [(rm, t) for rm, t in getattr(self, "remote_opens", {}).get(c, [])]
                     if far:
@@ -1219,7 +1257,7 @@ class WorldDB:
                            [f"ability {a} ≥ {v}" for a, v in q["abil"]] + \
                            ([f"{q['price']:,} copper (you have {wealth:,})" if wealth is not None
                              else f"{q['price']:,} copper"] if q.get("price") else []) + \
-                           (["a monster there first"] if q.get("monster") else [])
+                           ([f"{self.req_monster_names(q)} there"] if q.get("monster") else [])
                     why = f"'{ex.text_command}' needs " + (", ".join(bits) or "something")
                     for a, v in q["abil"]:
                         h = self.quest_hint(a, v)
@@ -1240,7 +1278,10 @@ class WorldDB:
                     why = f"{ex.etype or 'a door'} — nobody in the party can open it (you said no to trying, or nobody was there to ask)"
                 out.append((c, dr, why))
             node = c
-        out = list(reversed(out))[:limit]
+        out = list(reversed(out))
+        # (a max-HP wall first: it's this character's hard stop, and it was cut off behind three key doors the key run
+        #  would sort out — m58 bug 1, 8/1835's 200-damage trap)
+        out = sorted(out, key=lambda t: 0 if "whole max HP" in (t[2] or "") else 1)[:limit]
         for k in ([goal] if not isinstance(goal, (set, frozenset)) else []):
             for wv in (getattr(self, "npc_ways", {}).get(k) or [])[:1]:
                 rm = wv["rooms"][0] if wv["rooms"] else None
@@ -1637,7 +1678,12 @@ class WorldDB:
     def _cast_moves_you(self, ex) -> bool:
         """A 'Cast: pre-N, post-M' exit whose spell teleports you (gloomy teleport → the Black Moat): it
         doesn't really lead where the map says."""
-        key = id(self.char)
+        c_ = self.char or {}
+        fn_ = c_.get("abil")
+        # (not id(self.char): route_char builds a new dict each plan and ids get reused, so a stale answer from before the
+        #  quest flags changed planned through the pyramid's level-4 arches at DaoLord 8 — flags2 #4)
+        key = (c_.get("abil_sig"), fn_(133) if fn_ else None, fn_(134) if fn_ else None, bool(c_.get("gate_any")),
+               id(fn_) if fn_ is not None and c_.get("abil_sig") is None else None)
         c = getattr(ex, "_moves", None)
         if c is not None and c[0] == key:
             return c[1]
@@ -1659,6 +1705,8 @@ class WorldDB:
 
     def _branch_applies(self, req) -> bool:
         """Would this textblock branch fire for you? Quest values we don't know count as 'maybe not'."""
+        if (self.char or {}).get("gate_any") and (req.get("abil") or req.get("abil_eq") or req.get("no_abil")):
+            return False                             # (the map-only "any way in?" check: a quest-value arch isn't a wall)
         fn = (self.char or {}).get("abil")
         for a, v in req.get("abil") or []:
             val = fn(a) if fn else None
@@ -1701,6 +1749,37 @@ class WorldDB:
             if len(cm) > 1:
                 a["cmds"] = cm[1:] + cm[:1]
 
+    def leads_in(self, start, target):
+        """Map-only, no rules: does any chain of exits at all lead from start to target, and does one of them need a
+        monster there ('req monster')? (reachable, via_monster). A cheap backwards walk from the target, so a Go to a
+        room nothing leads into skips the whole-realm searches (m1018 #1: 40-150 s for 11/38, 10/260, 10/48)."""
+        rev = getattr(self, "_rev_exits", None)
+        if rev is None:
+            rev = {}
+            for k, r in self.rooms.items():
+                for ex in r.exits.values():
+                    if ex.to in self.rooms:
+                        rev.setdefault(tuple(ex.to), []).append((k, ex))
+            self._rev_exits = rev
+        start, target = tuple(start), tuple(target)
+        seen, todo, mon, found = {target}, [target], False, False
+        while todo:
+            k = todo.pop()
+            for frm, ex in rev.get(k, ()):
+                if (getattr(ex, "req", None) or {}).get("monster"):
+                    mon = True
+                if frm == start:
+                    found = True
+                if frm not in seen:
+                    seen.add(frm)
+                    todo.append(frm)
+        return found, mon
+
+    def req_monster_names(self, req) -> str:
+        """'needs <monster> there': the monster(s) MME's 'req monster' wants in the room (0.8.222)."""
+        names = [(self.monsters.get(int(m)) or {}).get("name") or f"monster #{m}" for m in (req or {}).get("monster") or []]
+        return " or ".join(dict.fromkeys(names)) or "a particular monster"
+
     def req_ok(self, ex, level=None, have=None) -> bool:
         """A room command's conditions: level, class, race, quest abilities, items, cash. Something we
         can't check (an ability we haven't been told) counts as met — the walker asks with 'abil N'."""
@@ -1711,14 +1790,21 @@ class WorldDB:
         if c.get("gate_any"):                        # ("is there a way in at all?" — the map, not this character)
             if req["items"] and not all(i in (have or []) for i in req["items"]):
                 return False
-            return not req.get("monster")
+            # (gate_any="monster": is there a way in once that monster's there? — 0.8.222, _reachable_twin)
+            return not req.get("monster") or c.get("gate_any") == "monster"
         if req["level"] and (not level or level < req["level"]):
             return False
-        if req["maxlevel"] and level and level > req["maxlevel"]:
+        if req["maxlevel"] and level and max(level, int((self.char or {}).get("top_level") or 0)) > req["maxlevel"]:
             return False
         if req["classes"] and c.get("class") is not None and c["class"] not in req["classes"]:
             return False
         if req["races"] and c.get("race") is not None and c["race"] not in req["races"]:
+            return False
+        # (leading: every member must be let through too, as gate_ok does for 'restricted' exits — party3 #3: a Bard led
+        #  a Warrior up 'ask barmaid adventure')
+        if req["classes"] and any(x is not None and x not in req["classes"] for x in c.get("party_classes") or ()):
+            return False
+        if req["races"] and any(x is not None and x not in req["races"] for x in c.get("party_races") or ()):
             return False
         fn = c.get("abil")
         pf = c.get("party_abil")
@@ -1910,6 +1996,109 @@ class WorldDB:
         return ex is not None and ex.kind == "door" and "1000 picklocks" in (ex.etype or "").lower() \
             and not ex.action_cmds()
 
+    def stuck_door(self, ex) -> bool:
+        """0.8.222 (Dan, 11-20 bug hunt): a '1000' door nobody at any level picks or bashes and nothing we know opens —
+        not one of the pyramid's timed doors or a walked-for-real segment's. A Go to whose only way is one stops before
+        setting off (a level-30 warrior tried 15/731 NE ~40 times on the way to the Throne Room)."""
+        return self.one_way_door(ex) and id(ex) not in (getattr(self, "timed_doors", None) or ()) \
+            and id(ex) not in (getattr(self, "segment_exits", None) or ())             and (tuple(ex.to), ex.dir) not in self.OPENS_ANYWAY
+
+    # '1000' doors that do open in the game, some way MME doesn't spell out: Morukai's lair door (9/1423 W → 9/1425) on
+    # the phoenix feather trip (door_hopeless). Keyed by where the door leads and its direction
+    OPENS_ANYWAY = {((9, 1425), "W")}
+    # '1000' doors the game opens with a command MudPilot doesn't send yet: the reason a Go to stops for them (m12 #3,
+    # flags2 #6 — the warehouse door 1/1104 N opens with 'use crowbar' in its room's own textblock; 18 rooms behind it,
+    # the 2/26 boss lair among them)
+    DOOR_OPENERS = {((1, 1327), "N"): "'use crowbar' (with a crowbar) in that room"}
+
+    def hp_wall(self, ex, have=None) -> int:
+        """0.8.222 (Dan's 0.8.190 rule, 11-20 bug hunt): a trap, or a room's spell, that can do your whole max HP (the
+        weakest member's, leading) in one go is never walked into — the damage, or 0. An L12 with 156 HP walked onto a
+        200-damage trap from full and hung up at 1 HP (8/1835). Your HP not known yet: 0."""
+        hp = int((self.char or {}).get("max_hp") or 0)
+        if hp <= 0 or ex is None or (self.char or {}).get("gate_any") or getattr(self, "_hp_wall_off", False):
+            return 0                                 # (gate_any: the map-only "any way in?" check — m1617 #4)
+        carried = (self.char or {}).get("carried")
+        if carried is not None:
+            have = carried                           # (what you carry: the key planner's 'every item' has the phoenix
+                                                     #  feather, so magma read as 0 and an L8 walked in — regr222 #2)
+        if ex.kind == "trap":
+            m = self.TRAP_RE.search(ex.etype or "")
+            if m and int(m.group(1)) >= hp:
+                return int(m.group(1))
+        rs = getattr(self, "room_spells", None)
+        if rs and ex.to in rs:
+            top = self.__dict__.setdefault("_room_top_dmg", {})
+            t = top.get(ex.to)
+            if t is None:
+                t = top[ex.to] = self.room_damage(ex.to, ())       # (with nothing carried: the most it can do)
+            if t < hp:
+                return 0
+            d = self.room_damage(ex.to, have or ())
+            if d >= hp:
+                return d
+        return 0
+
+    def pocket(self, start, level=None, have=None, asked=False, cap=20000, allow=frozenset(), unknown_walls=False,
+               doors_open=False):
+        """0.8.222 (Dan, 11-20 bug hunt: Stone Barracks 14/6217, Manor Stables…): the rooms you can walk to from start
+        with doors nobody can open as walls (the '1000' ones always; ones beyond the party's picklocks/strength too
+        unless someone's there to ask — asked). allow: (from, to) doors the Go to walks in through — back out through them
+        is fine too. unknown_walls: a picklocks door whose answer isn't known yet (no 'st') counts as a wall too. None =
+        more than `cap` rooms: plenty of ways about, not a pocket. doors_open: every door / key door passes (is it the
+        doors that shut it in, or something else — MME showing no way out, sea rooms?). Spell traps count as a way, as
+        route() takes them when there's no other (the Darkened Tunnels side pockets, 15/560)."""
+        prev_trap, prev_off = getattr(self, "_trap_ok", False), getattr(self, "_hp_wall_off", False)
+        self._trap_ok = True
+        if doors_open:
+            self._hp_wall_off = True                 # (a trap bigger than your max HP shuts you in as surely as a door)
+        try:
+            return self._pocket(start, level, have, asked, cap, allow, unknown_walls, doors_open)
+        finally:
+            self._trap_ok, self._hp_wall_off = prev_trap, prev_off
+
+    def _pocket(self, start, level, have, asked, cap, allow, unknown_walls, doors_open):
+        from collections import deque
+        start = tuple(start)
+        seen, q = {start}, deque([start])
+        while q:
+            k = q.popleft()
+            r = self.rooms.get(k)
+            for ex in (r.exits.values() if r else ()):
+                if ex.to in seen or ex.to not in self.rooms:
+                    continue
+                if doors_open and (ex.kind in ("door", "key") or (ex.kind == "item" and (self.exit_need(ex) or (0, 1))[1]
+                                                                    is False) or (getattr(ex, "req", None) or {}).get("items")):
+                    seen.add(ex.to)
+                    if len(seen) > cap:
+                        return None
+                    q.append(ex.to)
+                    continue
+                ok = self.can_use(ex, level=level, have=have)
+                if ex.kind in ("door", "key") and (k, ex.to) in allow and not self.stuck_door(ex):
+                    seen.add(ex.to)                  # (the door we came in by: we got through it once)
+                    q.append(ex.to)
+                    continue
+                if not ok and ex.kind == "key":
+                    # (a key door without the key: route() leaves those to the key run, but one the party can pick or
+                    #  bash — '[or 101 picklocks]' with 182 — is a way out; stats not read yet: give it the benefit)
+                    m = re.search(r"\[(?:or\s+)?(any|\d+)\s+picklocks", ex.etype or "", re.I)
+                    if m and (m.group(1).lower() == "any" or int(m.group(1)) < 1000):
+                        b = self.door_beaten(ex, have)
+                        ok = b is not False or asked
+                if not ok:
+                    continue
+                if self.stuck_door(ex) or (not asked and self.door_hopeless(ex, have)):
+                    continue
+                if unknown_walls and ex.kind in ("door", "key") and not ex.actions and \
+                        self.door_beaten(ex, have) is None and re.search(r"\d+\s+picklocks", ex.etype or "", re.I):
+                    continue
+                seen.add(ex.to)
+                if len(seen) > cap:
+                    return None
+                q.append(ex.to)
+        return seen
+
     def exit_cost(self, ex, cur=None, have=None) -> float:
         """Steps an exit 'costs' for routing: traps and tolls are walked round when it's cheap to."""
         if ex.kind == "trap":
@@ -2035,7 +2224,9 @@ class WorldDB:
                 (bool((self.char or {}).get("spell_traps")) or getattr(self, "_trap_ok", False))
             if ex.kind == "restricted" and (self.char or {}).get("gate_any") and self.LEVEL_RE.search(ex.etype):
                 gate = True                          # (the map-only "any way in?" check: a level gate isn't a wall)
-            if not (lm and int(lm.group(1)) <= level <= (int(lm.group(2)) or 9999)) and not (need and need[0] in have) \
+            top_ = max(level or 0, int((self.char or {}).get("top_level") or 0)) if lm else 0
+            if not (lm and int(lm.group(1)) <= level and top_ <= (int(lm.group(2)) or 9999)) \
+                    and not (need and need[0] in have) \
                     and not gate and not paid and not spell_trap:
                 return False
         if avoid and ex.to in avoid and ex.to != goal and not (isinstance(goal, (set, frozenset)) and ex.to in goal):
@@ -2055,7 +2246,7 @@ class WorldDB:
         if id(ex) in (getattr(self, "shut_doors", None) or ()):
             return False                             # pMUD: a pyramid 1000-door that never opens (board_fixes)
         rd = getattr(self, "refused_doors", None)
-        if rd and rd.get(id(ex), 0) > _time.time():
+        if rd and rd.get(id(ex), 0) > _time.time() and not (self.char or {}).get("gate_any"):
             return False                             # nobody can open it and the player said No (0.8.201)
         if getattr(ex, "req", None) and not self.req_ok(ex, level, have):
             return False
@@ -2079,6 +2270,8 @@ class WorldDB:
         if ex.kind == "door" and ex.actions and have is not None and ex.action_items() and \
                 not all(i in have for i in ex.action_items()):
             return False                         # a door its room command opens only with an item (signet ring)
+        if self.hp_wall(ex, have):
+            return False                         # 0.8.222: could do your whole max HP in one go (why_no_route says so)
         return True
 
     MEMO_SECS = 600
@@ -2105,7 +2298,8 @@ class WorldDB:
                         int(c.get("max_hp") or 0) // 25, c.get("hangup_pct"), c.get("door_power"), c.get("combat"),
                         frozenset(c.get("party_have")) if c.get("party_have") is not None else None,
                         getattr(self, "party_strict_only", False),
-                        (c.get("wealth") or 0) // 500 if c.get("wealth") is not None else None, c.get("gate_any"))
+                        (c.get("wealth") or 0) // 500 if c.get("wealth") is not None else None, c.get("gate_any"),
+                        frozenset(c.get("carried")) if c.get("carried") is not None else None, c.get("top_level"))
 
     def route(self, start: Room, goal, passable: set | None = None, max_nodes: int = 200000,
               avoid: set | frozenset | None = None, level: int | None = None, have: set | None = None):
@@ -2128,7 +2322,17 @@ class WorldDB:
             hit = self._memo.get(key) if key is not None else None
             if hit and _t.time() - hit[0] < self.MEMO_SECS:
                 return list(hit[1]) if hit[1] is not None else None
-            r = self._route_uncached(start, goal, passable, max_nodes, avoid, level, have)
+            off = False
+            hp = int((self.char or {}).get("max_hp") or 0)
+            if hp > 0 and start and tuple(start) in (getattr(self, "room_spells", None) or {}):
+                cr = (self.char or {}).get("carried")
+                off = self.room_damage(tuple(start), cr if cr is not None else (have or ())) >= hp
+            prev_off = getattr(self, "_hp_wall_off", False)
+            self._hp_wall_off = prev_off or off      # (in the White Forest at L8: walk out, as 0.8.221 did — regr222 #1)
+            try:
+                r = self._route_uncached(start, goal, passable, max_nodes, avoid, level, have)
+            finally:
+                self._hp_wall_off = prev_off
             if key is not None:
                 if len(self._memo) > 4000:
                     self._memo = {}

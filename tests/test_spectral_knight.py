@@ -91,6 +91,7 @@ def run(secs, until=None):
     return False
 run(8, lambda: s2.state.room is not None and s2._entered)
 s2.state.level = 55
+s2.state.picklocks, s2.state.strength = 182, 60     # ('st' read: 0.8.222 reads it first before a picklocks door)
 s2.world.fail_edge((6, 885), "E")
 check(f"the walk starts ({s2.bot.goto((6, 994))})", s2.bot.walking)
 run(300, lambda: not s2.bot.walking)

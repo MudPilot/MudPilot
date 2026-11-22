@@ -33,6 +33,8 @@ class Comeback:
         self.rego_when_back = None  # (who, when): an @rego held until everyone away for a restart is back
 
     AWAY_SECS = 15 * 60
+    SCATTER_HOLD_SECS = 30      # a scattered member's @where answer: the walk waits this long at most (0.8.222)
+    STILL_HERE_SECS = 120       # @stop'd but still in the party and following after this: they never left (0.8.222)
 
     def stepped_away(self, name) -> bool:
         t = self.away.get((name or "").lower())
@@ -356,6 +358,10 @@ class Comeback:
         f = self.fetch
         if f and f["phase"] in ("asked", "invite", "invited") and f["name"] in self.missing:
             return f["name"]                         # finding / inviting them back: stay put
+        if f and f.get("no_invite") and f["phase"] == "asked" and now - f["t"] < self.SCATTER_HOLD_SECS:
+            # 0.8.222 (Dan, 11-20 bug hunt D1): a member still in the party but not with us — stand still while their
+            # @where answer comes in (30 s at most), instead of walking on further away from them
+            return f["name"]
         for n, m in list(self.missing.items()):
             if m["why"] == "dropped" and not self.fetch:
                 if now - m["t"] > lim:
@@ -436,7 +442,40 @@ class Comeback:
             return n
         return None
 
+    def _rego_check(self):
+        """0.8.222 (Dan, 11-20 bug hunt D2): an @rego held for a member who sent @stop but never logged off (no
+        "started to follow you" ever comes). Still in the party and following ~2 minutes after the @stop (seen in a
+        'par' since): count them back and go ahead, logged. Held 15 minutes anyway: dropped, logged — not silently."""
+        rw = self.rego_when_back
+        if not rw:
+            return
+        now, st, b = time.time(), self.s.state, self.s.bot
+        party = {n.split()[0].lower(): rec for n, rec in (st.party or {}).items() if n and n.split()}
+        stale = False
+        for n in list(self.away):
+            t0 = self.away.get(n) or 0
+            if not self.stepped_away(n) or now - t0 < self.STILL_HERE_SECS or n not in party:
+                continue
+            if float((party.get(n) or {}).get("t") or 0) >= t0 + self.STILL_HERE_SECS:
+                self.away.pop(n, None)
+                self.s.log(f"Comeback: {n.capitalize()} sent @stop but is still in the party and following "
+                           f"{int((now - t0) // 60)} min later — counting them back")
+            else:
+                stale = True                         # in the list from before: a fresh 'par' says if they're still in
+        if stale and b.ready("rego_par", 30) and not b.walking:
+            b.send("par")
+        if any(self.stepped_away(n) for n in list(self.away)):
+            return
+        self.rego_when_back = None
+        if now - rw[1] >= self.AWAY_SECS:
+            self.s.log(f"Comeback: dropped {rw[0]}'s @rego — held {int(self.AWAY_SECS // 60)} min and not everyone "
+                       f"came back")
+        elif not b.walking:
+            self.s.log(f"Everyone's back — carrying on ({rw[0]}'s @rego)")
+            b.rego()
+
     def tick(self):
+        self._rego_check()
         ca = getattr(self, "_comeback_ask", None)
         if ca and (self.s.state.locate_ok > ca[2] or time.time() - ca[1] > 6):
             self._comeback_ask = None               # the room number's in (or never came): now ask the leader

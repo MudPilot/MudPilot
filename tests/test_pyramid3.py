@@ -38,7 +38,7 @@ fk = w.monsters[598]
 check("floating key: melee only", b.monster_spell(fk) == "")
 sent.clear(); b._cool.clear()
 check("…the task holds the walk", b._room_task(time.time()))
-check(f"…and attacks it ({sent})", "a key" in sent)
+check(f"…and attacks it by its whole name ({sent})", "a floating key" in sent)
 feed("[HP=684/MA=473]:Great Pyramid", "You notice golden lion key here.", "Obvious exits: east, west")
 g.candidates = [(12, 2005)]
 sent.clear(); b._cool.clear()
@@ -72,5 +72,5 @@ feed("[HP=684/MA=473]:Great Pyramid", "Also here: floating key.", "Obvious exits
 g.candidates = [(12, 2005)]
 sent.clear(); b._cool.clear()
 b._room_task(time.time())
-check(f"Go to ended in the key room: attacks the floating key anyway ({sent})", "a key" in sent)
+check(f"Go to ended in the key room: attacks the floating key anyway ({sent})", "a floating key" in sent)
 print("ALL PASS" if ok else "SOME FAILED"); sys.exit(0 if ok else 1)

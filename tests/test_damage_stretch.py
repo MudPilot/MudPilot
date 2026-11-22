@@ -31,8 +31,14 @@ dmg, what = b._stretch_damage()
 check(f"the stretch ahead adds up ({dmg} — {what})", dmg >= 60 * magma - 1 and "rooms that hurt" in what)
 g.hp = 500
 held = b._hurt_ahead(mp.steps[0])
-check(f"at 500/715 HP: rest to full first ({held}, {logs[-1:]})", held and b._danger_hp == 100)
+check(f"at 500/715 HP, {dmg} ahead: full HP wouldn't cover it either, so no rest (0.8.222) ({held}, {logs[-1:]})",
+      not held and any("going on" in l for l in logs))
+part = path_from_route(w, (16, 9505), (r or [])[:8], name="Go to 8 rooms on")
+b.path, b.idx = part, 0
+held = b._hurt_ahead(part.steps[0])
+check(f"8 magma rooms at 500/715 HP: rest to full first ({held}, {logs[-1:]})", held and b._danger_hp == 100)
 b._danger_hp = 0
+b.path, b.idx = mp, 0
 g.hp = 715
 check("at full HP: go (resting won't make it smaller — said once)",
       not b._hurt_ahead(mp.steps[0]) and any("going on" in l for l in logs))

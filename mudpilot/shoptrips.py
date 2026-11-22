@@ -354,7 +354,7 @@ class ShopTrips:
             return
         self.s.log(f"Trip: {why} — back to {mp.title}")
         if t.get("goto"):
-            self.s.bot.goto(t["goto"])                 # cash for an item: plan it again — the item check buys it
+            self.s.bot.goto(t["goto"], then=t.get("then"))   # cash for an item: plan it again — the item check buys it
             return
         self.s.bot.start_path(mp, loop=loop, checked=not t.get("recheck"))
 

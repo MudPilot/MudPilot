@@ -107,7 +107,7 @@ def _parse_step(line: str) -> Step | None:
         flags = int(parts[1], 16)
     except ValueError:
         flags = 0
-    body = parts[2].strip()
+    body = re.sub(r"[\x00-\x1f\x7f]", "", parts[2]).strip()   # (a stray control byte, 'N\x05': loopsC LC1b)
     pre = []
     m = re.match(r"^([^\[]*)\[(.*)\]\s*$", body)
     if m:

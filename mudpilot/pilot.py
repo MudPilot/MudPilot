@@ -132,6 +132,15 @@ class Pilot:
         if r is None and (a.cfg.auto_get_items or a.cfg.bash_key_doors):
             # the same 'as if you had every key' plan goto() falls back on (the door gets picked / bashed)
             r = a.keyed_route(frm, to)                # (keeps out of avoided areas — they get asked about)
+        if r and any(w.stuck_door(ex) for ex in r):
+            # (a '1000' door back in the plan when goto() had found a way round it — the Dark-Elf Castle's moat: the
+            #  first re-plan put 8/559 S back and it sent 'open' for 2 minutes, m58 bug 0)
+            try:
+                alt = a._round_stuck(frm, to, r, None)
+            except Exception:
+                alt = None
+            if alt:
+                r = alt
         return r
 
     # ------------------------------------------------------------ planning
@@ -236,14 +245,29 @@ class Pilot:
         fe = getattr(w, "failed_edges", None)
         if not fe:
             return None
+        # (M14B-3: the Temple Control Room's lever behind '[80]' doors a strength-75 mage can't open — each re-plan's
+        #  tour un-failed the door and went back to it, 3,958 rooms in 15 min. At most REDO_MAX times per leg in 30
+        #  minutes, and never through a door nobody in the party can open)
+        import time as _t
+        cnt = w.__dict__.setdefault("_leg_past_failed_n", {})
+        now = _t.time()
+        n, t0 = cnt.get((a_, b_), (0, now))
+        if now - t0 > 1800:
+            n, t0 = 0, now
+        if n >= REDO_MAX:
+            return None
+        cnt[(a_, b_)] = (n + 1, t0)
         saved = dict(fe)
         fe.clear()
         w.forget_routes()
         try:
-            return w.route(a_, b_, max_nodes=20000)
+            leg = w.route(a_, b_, max_nodes=20000)
         finally:
             fe.update(saved)
             w.forget_routes()
+        if leg and any(ex.kind == "door" and w.door_hopeless(ex) for ex in leg):
+            return None
+        return leg
 
     @staticmethod
     def _crosses(cur, route, key) -> bool:
@@ -381,7 +405,8 @@ class Pilot:
         """A move the room tracker can follow: a direction, or a text exit that always goes to the same room
         ('go path'). A teleport (a vortex) or a boat can put you anywhere that looks the same."""
         req = getattr(ex, "req", None) or {}
-        return "(teleport)" not in (ex.etype or "").lower() and not req.get("voyage")
+        return "(teleport)" not in (ex.etype or "").lower() and not req.get("voyage") and not getattr(ex, "scatter", None)
+        # (a random drop — the Padded Cells — lands in any of its look-alikes: not trusted without 'pro', m149 N2)
 
     def _where(self, now):
         """The room we're in for sure, or None (asked the board / lost — this tick is taken)."""
@@ -509,7 +534,9 @@ class Pilot:
             a.log(f"Go to: at {here[0]}/{here[1]}" + (f", not {exp[0]}/{exp[1]}" if exp else "")
                   + " — planning from here")
             a.why("pilot_replan", here=here, expected=exp)
-            if exp is not None and self.target and tuple(exp) == tuple(self.target) and tuple(here) != tuple(exp):
+            if exp is not None and self.target and tuple(exp) == tuple(self.target) and tuple(here) != tuple(exp) \
+                    and time.time() - getattr(a, "_flee_at", 0) > 30:
+                # (not when we ran — attacked at the target and fled twice isn't the target throwing us out: fight3 #1)
                 # (0.8.201, walk check: the step INTO the target landed somewhere else — 17/2978's room spell throws
                 #  you to 17/2980. Each bounce was an 18-room lap back, 5 laps before the drift guard paused. The
                 #  same throw twice in 10 minutes: stop and say why)
@@ -523,8 +550,14 @@ class Pilot:
                     w_ = a.s.world
                     sp_ = (getattr(w_, "room_spells", None) or {}).get(tuple(self.target))
                     spn = ((w_.spells.get(sp_) or {}).get("Name") if sp_ else None)
-                    a.stop(f"Stopped: {self.target[0]}/{self.target[1]} sends you back out to {here[0]}/{here[1]}"
-                           + (f" (its room spell '{spn}')" if spn else "") + " — tried twice, not looping round again")
+                    if spn:
+                        a.stop(f"Stopped: {self.target[0]}/{self.target[1]} sends you back out to {here[0]}/{here[1]}"
+                               f" (its room spell '{spn}') — tried twice, not looping round again")
+                    else:
+                        # (no room spell: the step into it took you somewhere else — 'go alley' at 2/2519 is a command
+                        #  two exits share, and the game picks the other one: flags2 #7)
+                        a.stop(f"Stopped: the step into {self.target[0]}/{self.target[1]} took you to {here[0]}/{here[1]}"
+                               " instead — tried twice, not looping round again")
                     return True
             if a._drifted("detour"):
                 self.need_plan = True

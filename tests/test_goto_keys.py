@@ -19,6 +19,7 @@ class T:
     def send_line(self, x): sent.append(x)
     def close(self): pass
 s.telnet = T(); s._entered = True; s.state.level = 30
+s.state.picklocks, s.state.strength = 182, 60     # ('st' read: 0.8.222 reads it first before a picklocks door)
 s.on_no_route = lambda m: popups.append(m)
 ok = True
 def check(n, c):

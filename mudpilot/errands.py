@@ -103,7 +103,9 @@ class Errands:
             # nothing in reach with the keys you carry — you're behind a door you pick (Evolution, 2026-11-03, in the
             # guardian golem's rooms: 'no known place to get' a log raft): as a Go to plans it, through those doors
             best = self._rank(cands, here, toward, num, lvl, avoid,
-                              (set(self.bot.every_item()) | set(extra)) - set(without))
+                              (set(self.bot.every_item()) | set(extra)) - set(without) - {num})
+            # (never the item being fetched itself: the way to the rope shop went down Storm Mountain's rope exits, the red
+            #  rock key's lair is behind its own key door — m1617 #3)
         if not best:
             return None
         return {"num": num, "kind": best[1], "room": best[2], "what": best[3], "dist": best[0][1], **best[4]}
@@ -324,7 +326,7 @@ class Errands:
             # nowhere we know of to get it — but someone in the party may carry one (Dan, 2026-11-01: Buddy's Go to
             # the Iceforge stopped dead at "can't fetch dragon key" without asking Revolution or Evolution)
             for n in [n for n in missing if w.item_name(n) in bad]:
-                todo.append({"num": n, "kind": "party", "room": None, "what": "from the party", "dist": 0})
+                todo.insert(0, {"num": n, "kind": "party", "room": None, "what": "from the party", "dist": 0})   # (asked first: partyA #2)
             bad = []
         if bad:
             return False, (f"can't fetch {', '.join(bad)} automatically (quest item, or no known source "

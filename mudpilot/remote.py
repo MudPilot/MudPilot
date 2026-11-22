@@ -1588,8 +1588,7 @@ class RemoteControl:
         if a.lower() == "last":
             if not b.last_path:
                 return "no loop has run yet this session"
-            b.start_path(b.last_path, loop=True)
-            return f"looping '{b.last_path.title}'"
+            return self._loop_from_here(b.last_path)
         low = a.lower()
         found = [p for p in self.s.paths if low == p.title.lower()] or \
                 [p for p in self.s.paths if low in p.title.lower() or low in p.filename.lower()]
@@ -1597,8 +1596,14 @@ class RemoteControl:
             return f"no loop named '{a}'"
         if len(found) > 1:
             return f"'{a}' matches {len(found)}: " + ", ".join(p.title for p in found[:4])
-        mp = found[0]
-        if mp.resolved and mp.steps[0].room and self.s.state.room and \
+        return self._loop_from_here(found[0])
+
+    def _loop_from_here(self, mp):
+        """Loop mp: off the loop, a Go to its start first (its carried-item and way-out checks), as the Paths tab does.
+        (loopsA LA3: '@loop last' and @rego's fallback started the loop straight off — from 25 rooms away the walker's
+        own way on sent 'use potion of levitation' with no potion, over and over.)"""
+        b = self.s.bot
+        if mp.resolved and mp.steps and mp.steps[0].room and self.s.state.room and \
                 not any(st_.room == self.s.state.room for st_ in mp.steps):
             b.goto(mp.steps[0].room, then=mp)
             return f"walking to the start of '{mp.title}', then looping"
@@ -1778,6 +1783,8 @@ class RemoteControl:
         if not b.last_path:
             self.s.log(f"{s} sent @rego — nothing to carry on with")
             return "nothing to resume"
+        if b.last_loop:
+            return self._loop_from_here(b.last_path).replace("looping", "resuming", 1)
         b.start_path(b.last_path, loop=b.last_loop)
         return f"resuming '{b.last_path.title}'"
 

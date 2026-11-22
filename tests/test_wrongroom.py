@@ -47,6 +47,7 @@ g.candidates = [(12, 1830)]
 r = w.rooms[(12, 1830)]
 feed("[HP=684/MA=473]:Great Pyramid", "Obvious exits: south")
 g.candidates = [(12, 1830)]
+g.locate_until = 0       # (the earlier 'pro's answered: 0.8.222's walk waits for a pending one)
 sent.clear()
 for _ in range(30):
     b._last_progress = time.time(); b.tick(); g.pending.clear(); s.state.in_combat = False

@@ -16,11 +16,11 @@ s = Session(st, world_path=os.path.join(here, "mudpilot", "bundled", "Paradigm.d
 s.log = lambda m, *a, **k: None
 b, g = s.bot, s.state
 g.carrying, g.keys = "golden idol", "iron house key"
-check(f"one house key: the short name ({b._door_key((6, 569), 'S')})", b._door_key((6, 569), "S") == "house key")
+check(f"one house key: the whole name (Dan, 2026-11-21) ({b._door_key((6, 569), 'S')})", b._door_key((6, 569), "S") == "iron house key")
 g.keys = "copper house key, iron house key"
 check(f"the copper one too: the whole name ({b._door_key((6, 569), 'S')})", b._door_key((6, 569), "S") == "iron house key")
 check(f"…and at the copper door its own ({b._door_key((6, 568), 'N')})", b._door_key((6, 568), "N") == "copper house key")
 g.keys = "golden lion key, silver key"
-check(f"nothing alike: as before ({b._door_key((12, 2034), 'W')})", b._door_key((12, 2034), "W") in ("lion key", None))
+check(f"nothing alike: the whole name ({b._door_key((12, 2034), 'W')})", b._door_key((12, 2034), "W") in ("golden lion key", None))
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

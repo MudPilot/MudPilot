@@ -234,6 +234,7 @@ class GameState:
         self.log = log or (lambda *a: None)
         # vitals
         self.hp = self.max_hp = 0
+        self.max_hp_read = False     # (True once 'st' / a Hits: line gave the real max — not the best prompt seen)
         self.ma = self.max_ma = 0
         self.resting = False
         self.in_combat = False
@@ -718,7 +719,7 @@ class GameState:
             m = PARTY_ROW_RE.match(text)
             if m:
                 if not m.group(5):                         # invited, not in yet
-                    self.party[m.group(1)] = {"class": m.group(2), "ma": int(m.group(3)) if m.group(3) else 100,
+                    self.party[m.group(1)] = {"class": m.group(2).strip(), "ma": int(m.group(3)) if m.group(3) else 100,
                                               "hp": int(m.group(4)), "rank": m.group(7) or "", "t": time.time(),
                                               "flags": m.group(6) or ""}
                     self.party_seq += 1
@@ -855,6 +856,7 @@ class GameState:
         m = HITS_RE.search(text)
         if m:
             self.hp, self.max_hp = int(m.group(1)), int(m.group(2))
+            self.max_hp_read = True
         m = MANA_RE.search(text)
         if m:
             self.ma, self.max_ma = int(m.group(1)), int(m.group(2))
@@ -1096,7 +1098,9 @@ class GameState:
                 r = self.world.room(c)
                 for ex in (r.exits.values() if r else []):
                     if ex.accepts(str(move)):
-                        n = ex.to
+                        # (every exit that takes it, not just the last: 2/2519's two 'go alley' exits — loopsA LA4)
+                        if ex.to and ex.to not in out:
+                            out.append(ex.to)
             if n and n not in out:
                 out.append(n)
         return out

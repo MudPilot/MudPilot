@@ -511,7 +511,7 @@ class Session:
                 try:
                     for c in seq:
                         # straight out, not through self.send: while a Go to is planned in the background, bgplan
-                        # swaps self.send for a queue - the swap's 'use crozier' came back out after _expanding was
+                        # swaps self.send for a queue — the swap's 'use crozier' came back out after _expanding was
                         # cleared, was expanded again, and so on for ever: 130,000 'eq' lines and a crash
                         # (Revolution PVE, 2026-11-21)
                         type(self).send(self, c, from_bot)
@@ -1073,7 +1073,8 @@ class Session:
                   # pyramid's arches throw you about) isn't the answer at 9 (Buddy, 2026-11-04)
                   "abil_sig": tuple(sorted((aid, v) for (src, aid), (v, _t) in st.abil_rows.items()
                                            if src == "granted")),
-                  "wealth": st.wealth, "tolls": cfg.route_pay_tolls, "spell_traps": cfg.route_spell_traps,
+                  "wealth": (10 ** 12 if getattr(self.bot, "_bank_plan", False) else st.wealth),
+                  "tolls": cfg.route_pay_tolls, "spell_traps": cfg.route_spell_traps,
                   "party_classes": [num(w.classes, v.get("class")) for v in party] if leading else [],
                   "party": bool(party),
                   # 0.8.201, bug hunt: race and alignment gates only checked the leader — a Seedy or half-ogre
@@ -1086,7 +1087,12 @@ class Session:
         # follower is known to carry one
         b = self.bot
         try:
-            w.char.update({"max_hp": b._weakest_hp() or None,
+            w.char.update({"top_level": b.route_top_level() if leading else None,
+                           "max_hp": b._weakest_hp(read_only=True) or None,
+                           # (leading: only what every member carries counts against a room's damage — a 50-HP
+                           #  follower was walked through 23 rooms of magma on the leader's phoenix feather: partyB P2)
+                           "carried": (frozenset(b.held_items() or ()) & frozenset(b.party_carry() or ())) if leading
+                                      else frozenset(b.held_items() or ()),
                            "hangup_pct": int(cfg.hangup_hp_pct or 0) if cfg.hangup_low_hp else 0,
                            "door_power": b.door_power(leading),
                            "combat": bool(cfg.auto_combat),

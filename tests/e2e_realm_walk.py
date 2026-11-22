@@ -16,7 +16,7 @@ practice server saw (blocked exits, doors, teleports).
                                                                            every tests\\realm_walk_*.json
 Run several workers at once on different --port / --seed / --tag. Backburner tooling: exit 0 unless it breaks."""
 import argparse, collections, json, os, random, re, sys, tempfile, threading, time, traceback
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.environ.get("MUDPILOT_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # MUDPILOT_SRC: walk with another copy of the mudpilot package (a before/after comparison); the map and the
 # results stay here
 sys.path.insert(0, os.environ.get("MUDPILOT_SRC") or ROOT)
@@ -133,6 +133,305 @@ def pick_walks(world, mode, n, seed, level, kit):
     return walks
 
 
+
+# ------------------------------------------------------------------ --party: a pretend party on the leader's side
+# The practice server can't host a real party (no invite / follow / telepath between players), so --party plays the
+# followers from the server end, the way MudPilot reads a party when it leads: their rows in 'par', their names in
+# the room's "Also here" (they're always right behind you), their MudPilots' party sync over telepath ('@mpsync hi'
+# answered, '@mpsync me lvl= hp= str= pick= cls= kit=' told), answers to '@have <item>' and '@flags <n>', items handed
+# to them ('give log raft to Buddy') and asked of them ('@do give black star key to Tester'), and Game Data -> Players
+# (race / alignment). Every exit the leader takes is checked for each follower too (level, class, race, alignment,
+# quest flag, the item / toll / fare each walker pays, the rafts and idols each walker carries, a trap or room spell
+# that could kill them, a chance jump that can split the party): whatever would have left someone behind is an issue.
+#   --party "Revolution:lvl=30,hp=250,str=80,pick=0,cls=Warrior,race=Dwarf,align=Neutral,kit=golden idol+rope and grapple,abil=134.8,sync=1,cash=500"
+#   --party-random 2      two followers, their level / HP / kit / class / race / alignment rolled again for every walk
+PARTY_NAMES = ["Revolution", "Buddy", "Evolution", "Skittles", "Lyra"]
+PARTY_KIT_POOL = ["golden idol", "rope and grapple", "log raft", "mine pass", "waterskin", "climbing harness"]
+
+
+class FakeParty:
+    def __init__(self, world, spec="", rand=0, seed=1, level=55, sim=None):
+        self.w, self.sim, self.level = world, sim, level
+        self.rng = random.Random(seed * 7919 + 13)
+        self.rand = rand
+        self.members = {}              # name -> {lvl, hp, str, pick, cls, race, align, kit: Counter, abil, sync, cash}
+        self.base = {}                 # name -> the member as specified (each walk starts from it)
+        self.events = []               # (what, member, room, detail) this walk
+        self.sent = []                 # (member, what the leader telepathed them) this walk
+        self.leader = "Tester"
+        if spec:
+            for chunk in [c for c in spec.split(";") if c.strip()]:
+                name, _, rest = chunk.partition(":")
+                m = {}
+                for kv in [x for x in rest.split(",") if "=" in x]:
+                    k, v = [y.strip() for y in kv.split("=", 1)]
+                    if k in ("lvl", "hp", "str", "pick", "cash", "sync"):
+                        m[k] = int(v)
+                    elif k == "kit":
+                        m["kit"] = [x.strip() for x in v.split("+") if x.strip()]
+                    elif k == "abil":
+                        m["abil"] = {int(x.split(".")[0]): int(x.split(".")[1]) for x in v.split("+") if "." in x}
+                    else:
+                        m[k] = v
+                self.base[name.strip().capitalize()] = m
+        for i in range(rand):
+            nm = PARTY_NAMES[i % len(PARTY_NAMES)]
+            self.base.setdefault(nm, {"sync": 1 if self.rng.random() < 0.75 else 0})
+        self.reset()
+
+    def _member(self, m):
+        out = {"lvl": self.level, "hp": 13 * self.level, "str": 60, "pick": 0, "cls": "Warrior", "race": "Human",
+               "align": "Good", "kit": ["golden idol", "rope and grapple"], "abil": {}, "sync": 1, "cash": 5000000}
+        out.update(m)
+        return out
+
+    def roll(self):
+        """A random follower: anything from 40 levels under the leader to the leader's level, any class / race /
+        alignment, some of the walkers' own items."""
+        r = self.rng
+        lvl = max(1, self.level - r.choice([0, 0, 0, 0, 5, 10, 15, 25]))
+        cls = r.choice([v.get("Name") for v in self.w.classes.values()])
+        race = r.choice([v.get("Name") for v in self.w.races.values()])
+        align = r.choice(["Saint", "Good", "Good", "Lawful", "Neutral", "Neutral", "Seedy", "Outlaw", "Criminal",
+                          "Villain"])
+        kit = [k for k in PARTY_KIT_POOL if r.random() < (0.6 if k in ("golden idol", "rope and grapple") else 0.25)]
+        hp = int(lvl * r.uniform(8, 18))
+        return {"lvl": lvl, "hp": hp, "str": r.choice([40, 60, 80, 100, 120]), "pick": r.choice([0, 0, 0, 60, 120]),
+                "cls": cls, "race": race, "align": align, "kit": kit,
+                "abil": ({134: r.choice([0, 7, 8, 9, 13])} if r.random() < 0.3 else {}),
+                "cash": r.choice([200, 5000, 5000000, 5000000])}
+
+    def reset(self):
+        self.events, self.sent = [], []
+        self.members = {}
+        for n, b in self.base.items():
+            m = self._member({**(self.roll() if self.rand else {}), **b})
+            m["kit"] = collections.Counter(int((self.w.item_names.get(k.lower()) or {}).get("num") or 0)
+                                           for k in m["kit"])
+            m["kit"].pop(0, None)
+            self.members[n] = m
+
+    def describe(self):
+        return "; ".join(f"{n} L{m['lvl']} {m['hp']}hp {m['cls']}/{m['race']}/{m['align']} str{m['str']} "
+                         f"pick{m['pick']} cash{m['cash']} kit[{', '.join(self.w.item_name(k) for k in sorted(m['kit']) if m['kit'][k] > 0)}]"
+                         + (f" abil{m['abil']}" if m['abil'] else "") + ("" if m["sync"] else " (MegaMUD)")
+                         for n, m in self.members.items())
+
+    def find(self, word):
+        word = (word or "").strip().lower()
+        return next((n for n in self.members if n.lower() == word), None)
+
+    # ---- what their MudPilots say
+    def me_line(self, n):
+        m = self.members[n]
+        kit = sorted(k for k, q in m["kit"].items() if q > 0 and k in self.w.carry_item_set())
+        return (f"@mpsync me lvl={m['lvl']} hp={m['hp']} ma={m['hp'] // 2} ac=40 dr=8 dmg=150 "
+                f"cls={m['cls'].replace(' ', '-')} str={m['str']}" + (f" pick={m['pick']}" if m['pick'] else "")
+                + f" kit={'.'.join(str(k) for k in kit)}")
+
+    def party_rows(self, p):
+        rows = ["The following people are in your travel party:",
+                f"  {self.leader + ' Leader':<30}{'(Mage)':<13} [M:{int(100 * p.ma / max(p.max_ma, 1)):3d}%] "
+                f"[H:{int(100 * p.hp / max(p.max_hp, 1)):3d}%] - Frontrank"]
+        for n, m in self.members.items():
+            rows.append(f"  {n + ' Follower':<30}{'(' + m['cls'] + ')':<13} [M:100%] [H:100%] - Backrank")
+        return rows
+
+    def telepath(self, n, msg):
+        """The leader telepathed member n: the lines the game shows back."""
+        m, w = self.members[n], self.w
+        self.sent.append((n, msg))
+        out = []
+        low = msg.strip().lower()
+        if low.startswith("@mpsync hi"):
+            if m["sync"]:
+                out += [f"{n} telepaths: {{mpsync ok 0.8.222 tune lvl={m['lvl']}}}", f"{n} telepaths: {self.me_line(n)}"]
+            else:
+                out.append(f"{n} telepaths: {{command invalid or not allowed}}")
+        elif low.startswith("@mpsync"):
+            pass
+        elif low.startswith("@have "):
+            want = low[6:].strip()
+            hits = [w.item_name(k) for k, q in m["kit"].items() if q > 0 and want in w.item_name(k).lower()]
+            out.append(f"{n} telepaths: {{yes: {', '.join(hits)}}}" if hits else f"{n} telepaths: {{no {want}}}")
+        elif low.startswith("@flags"):
+            a = low[6:].strip()
+            if not m["sync"]:
+                out.append(f"{n} telepaths: {{command invalid or not allowed}}")
+            elif a.isdigit():
+                v = m["abil"].get(int(a))
+                nm = (getattr(w, "abil_names", {}) or {}).get(int(a))
+                head = f"{nm} ({a})" if nm else f"ability {a}"
+                out.append(f"{n} telepaths: {{{head} = {v if v is not None else 'not set'}}}")
+        elif re.match(r"@do (bash|pick) \w+", low) and self.sim is not None and self.sim.players:
+            # they bash / pick the door too (standing right behind you), each try a roll on their own stats
+            g, p = self.sim.gates, self.sim.players[-1]
+            saved = (g.strength, g.picklocks)
+            g.strength, g.picklocks = m["str"], m["pick"]
+            try:
+                for piece in re.split(r"\^M", msg.strip()[4:]):
+                    got = []
+                    g.door_cmd(p, piece.lower().split(), got)
+                    if any(x.startswith(("You bashed the door open", "You successfully unlocked")) for x in got):
+                        self.events.append(("member opened door", n, tuple(p.room), piece))
+                        out.append(f"{n} {piece.split()[0]}s the door open!")
+                        break
+            finally:
+                g.strength, g.picklocks = saved
+        elif low.startswith("@do give ") or low.startswith("@do .give "):
+            mm = re.match(r"@do \.?give (.+?) to (\w+)", low)
+            if mm:
+                num = next((k for k, q in m["kit"].items() if q > 0 and mm.group(1) in w.item_name(k).lower()), None)
+                if num is not None and self.sim is not None and self.sim.players:
+                    m["kit"][num] -= 1
+                    self.sim.players[-1].items[num] += 1
+                    self.events.append(("handed over", n, None, w.item_name(num)))
+                    out.append(f"{n} gives you {w.item_name(num)}.")
+        return out
+
+    def give(self, p, item_words, n):
+        """'give log raft to Buddy' from the leader."""
+        g = self.sim.gates
+        num = g.item_named(p, item_words.split())
+        if num is None:
+            return [f"You don't have {item_words} to give!"]
+        p.items[num] -= 1
+        self.members[n]["kit"][num] += 1
+        self.events.append(("given", n, None, self.w.item_name(num)))
+        return [f"You give {self.w.item_name(num)} to {n}."]
+
+    # ---- would each follower have got through the exit the leader just took?
+    def follow(self, g, here, ex, landed):
+        from mudpilot import simserver as ss
+        w = self.w
+        et = ex.etype or ""
+        saved = (g.cls_num, g.race_num, g.align)
+        for n, m in self.members.items():
+            fp = type("F", (), {})()
+            fp.level, fp.abil, fp.items, fp.cash = m["lvl"], dict(m["abil"]), m["kit"], m["cash"]
+            fp.hp = fp.max_hp = m["hp"]
+            g.cls_num = next((k for k, v in w.classes.items() if (v.get("Name") or "").lower() == m["cls"].lower()), None)
+            g.race_num = next((k for k, v in w.races.items() if (v.get("Name") or "").lower() == m["race"].lower()), None)
+            g.align = m["align"]
+            why = None
+            try:
+                why = g.gate_why(fp, ex)
+                if why == "blocked":
+                    why = None                       # (the leader got past a block: it's the room's, not theirs)
+                if not why and ex.kind == "item":
+                    mm = ss.GATE_ITEM_RE.match(et)
+                    num = int(mm.group(2)) if mm else 0
+                    if num and (w.items.get(num) or {}).get("gettable", 1) and m["kit"].get(num, 0) <= 0:
+                        why = f"needs {w.item_name(num)}"
+                    elif num and mm.group(1).lower().startswith("ticket") and m["kit"].get(num, 0) > 0:
+                        m["kit"][num] -= 1
+                if not why and ex.kind == "toll":
+                    mm = ss.TOLL_EX_RE.search(et)
+                    t = int(mm.group(1)) if mm else 0
+                    if m["cash"] < t:
+                        why = f"toll {t}, has {m['cash']}"
+                    else:
+                        m["cash"] -= t
+                if not why and (ex.kind == "text" or getattr(ex, "req", None)):
+                    req = dict(getattr(ex, "req", None) or {})
+                    req.pop("monster", None)
+                    why = g.req_why(fp, req)
+                    if not why and req.get("price"):
+                        m["cash"] -= int(req["price"])
+                if not why:
+                    for st_ in w.carry_needs([(here, ex)]):
+                        if st_ and not any(m["kit"].get(i, 0) > 0 for i in st_):
+                            why = "carries none of " + " / ".join(w.item_name(i) for i in sorted(st_)[:3])
+                            break
+            finally:
+                g.cls_num, g.race_num, g.align = saved
+            if why:
+                self.events.append(("left behind", n, here, f"{ex.dir} {why}"))
+                continue
+            if ex.kind == "trap":
+                mm = ss.TRAP_EX_RE.search(et)
+                if mm and int(mm.group(1)) >= m["hp"]:
+                    self.events.append(("trap could kill", n, here, f"{ex.dir} up to {mm.group(1)} vs {m['hp']} hp"))
+            try:
+                dmg = w.room_damage(ex.to, have=[k for k, q in m["kit"].items() if q > 0])
+            except Exception:
+                dmg = 0
+            if dmg and dmg >= m["hp"]:
+                self.events.append(("room could kill", n, here,
+                                    f"{ex.dir} -> {ex.to[0]}/{ex.to[1]} up to {dmg} vs {m['hp']} hp"))
+        if getattr(ex, "chance", False) or "(Chance)" in et:
+            self.events.append(("chance jump", "party", here, f"{ex.dir} {getattr(ex, 'text_command', '') or ''}".strip()))
+        if landed is not None and tuple(landed) != tuple(ex.to):
+            self.events.append(("teleported", "party", here, f"{ex.dir} -> {landed[0]}/{landed[1]}"))
+
+
+class _PartyReader:
+    """The server's view of what the bot types: lines meant for the pretend followers are answered here."""
+    def __init__(self, reader, writer, sim, party):
+        self.r, self.wr, self.sim, self.party = reader, writer, sim, party
+
+    def _say(self, lines):
+        p = self.sim.players[-1]
+        txt = "\n".join(lines) + "\n" + self.sim.prompt(p)
+        self.wr.write(txt.replace("\n", "\r\n").replace("\r\r", "\r").encode("cp437", "replace"), raw=True)
+
+    async def readline(self):
+        while True:
+            data = await self.r.readline()
+            if not data:
+                return data
+            cmd = data.decode("cp437", "replace").strip("\r\n").strip()
+            low = cmd.lower()
+            fp, p = self.party, (self.sim.players[-1] if self.sim.players else None)
+            if p is None:
+                return data
+            m = re.match(r"^/(\w+)\s+(.*)$", cmd)
+            if m and fp.find(m.group(1)):
+                self._say(fp.telepath(fp.find(m.group(1)), m.group(2)))
+                continue
+            if low in ("par", "party"):
+                self._say(fp.party_rows(p))
+                continue
+            m = re.match(r"^invite (\w+)$", low)
+            if m and fp.find(m.group(1)):
+                self._say([f"{fp.find(m.group(1))} started to follow you."])
+                continue
+            m = re.match(r"^give (.+?) to (\w+)$", low)
+            if m and fp.find(m.group(2)):
+                self._say(fp.give(p, m.group(1), fp.find(m.group(2))))
+                continue
+            m = re.match(r"^(?:l|look) (\w+)$", low)
+            if low.startswith(".") or (m and fp.find(m.group(1))):
+                fp.sent.append(("party", cmd))
+                self._say([])
+                continue
+            return data
+
+
+class _PartyWriter:
+    """Room shows: the followers in "Also here" (always right behind you)."""
+    ALSO = re.compile(r"Also here: ")
+
+    def __init__(self, writer, party):
+        self.wr, self.party = writer, party
+
+    def write(self, b, raw=False):
+        if not raw and self.party.members:
+            t = b.decode("cp437", "replace")
+            if "Obvious exits:" in t and "very dark" not in t:
+                names = ", ".join(self.party.members)
+                if self.ALSO.search(t):
+                    t = self.ALSO.sub(f"Also here: {names}, ", t, count=1)
+                else:
+                    t = re.sub(r"((?:\x1b\[[\d;]*m)*Obvious exits:)",
+                               lambda mm: f"\x1b[35mAlso here: {names}.\x1b[0m\r\n" + mm.group(1), t, count=1)
+                b = t.encode("cp437", "replace")
+        self.wr.write(b)
+
+    def __getattr__(self, k):
+        return getattr(self.wr, k)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", default="all", help="fixed / towns / kingsport / random / labelled / all")
@@ -155,7 +454,14 @@ def main():
     ap.add_argument("--move-delay", type=float, default=0.0, help="seconds per room on the practice server (real pace)")
     ap.add_argument("--bash-rate", type=float, default=0.35, help="practice server: chance a bash opens a door")
     ap.add_argument("--search-rate", type=float, default=0.5, help="practice server: chance a search finds an exit")
-    ap.add_argument("--party", default="", help="names of followers to pretend to lead (party sync / routing only)")
+    ap.add_argument("--party", default="",
+                    help="followers to pretend to lead: 'Name:lvl=30,hp=250,str=80,pick=0,cls=Warrior,race=Dwarf,"
+                         "align=Neutral,kit=golden idol+log raft,abil=134.8,sync=1,cash=500;Name2:...' (sync=0: "
+                         "MegaMUD, no party sync / @flags); a bare 'Name,Name2' = members like you")
+    ap.add_argument("--party-random", type=int, default=0,
+                    help="this many followers, their level / HP / kit / class / race / alignment rolled each walk")
+    ap.add_argument("--outdir", default=os.environ.get("REALM_WALK_OUT") or os.path.join(ROOT, "tests"),
+                    help="where realm_walk_<tag>.json goes")
     ap.add_argument("--picklocks", type=int, default=0)
     ap.add_argument("--dark", type=int, default=None, help="rooms with MME light at or below this are dark")
     ap.add_argument("--light", default="", help="the character's light command (auto-light on), e.g. 'light torch'")
@@ -172,7 +478,8 @@ def main():
         return merge(a.tag, a.out)
     tag = a.tag or f"{a.mode}{a.seed}L{a.level}"
     os.environ.setdefault("MUDPILOT_NO_RECORD", "1")
-    os.environ["MUDPILOT_DATA_DIR"] = os.path.join(tempfile.gettempdir(), "mudpilot_realm_walk", tag)
+    if not os.environ.get("MUDPILOT_DATA_DIR"):
+        os.environ["MUDPILOT_DATA_DIR"] = os.path.join(tempfile.gettempdir(), "mudpilot_realm_walk", tag)
     os.makedirs(os.environ["MUDPILOT_DATA_DIR"], exist_ok=True)
     import asyncio
     from mudpilot import simserver, config
@@ -224,13 +531,60 @@ def main():
                                "move_delay": a.move_delay, "bash_rate": a.bash_rate,
                                "search_rate": a.search_rate})
     g = sim.gates
+    party = None
+    if a.party or a.party_random:
+        spec = a.party if ":" in a.party else ";".join(f"{n.strip()}:" for n in a.party.split(",") if n.strip())
+        party = FakeParty(real, spec, a.party_random, a.seed, a.level, sim)
+        _cross = g.cross
+
+        def cross(p, ex, out):
+            here = tuple(p.room)
+            ok_ = _cross(p, ex, out)
+            if ok_ and sim.players and p is sim.players[-1]:
+                party.follow(g, here, ex, tuple(p.room))
+            return ok_
+        g.cross = cross
+        _room_cmd = g.room_command
+
+        def room_command(p, low, out):
+            # a room command run from its textblock ('jump east' off the rooftops) moves you without cross()
+            here = tuple(p.room)
+            rc = _room_cmd(p, low, out)
+            if rc == "moved" and sim.players and p is sim.players[-1]:
+                r_ = real.room(here)
+                ex = next((e for e in (r_.exits.values() if r_ else ()) if e.accepts(low)), None)
+                if ex is not None:
+                    party.follow(g, here, ex, tuple(p.room))
+            return rc
+        g.room_command = room_command
+        _ask = g.ask
+
+        def ask(p, parts, out):
+            # 'ask barmaid adventure': a monster's talk block moves you, without cross() either
+            here = tuple(p.room)
+            ok_ = _ask(p, parts, out)
+            if tuple(p.room) != here and sim.players and p is sim.players[-1]:
+                r_ = real.room(here)
+                ex = next((e for e in (r_.exits.values() if r_ else ()) if e.accepts(" ".join(parts))), None)
+                if ex is not None:
+                    party.follow(g, here, ex, tuple(p.room))
+            return ok_
+        g.ask = ask
+        print(f"[{tag}] party: {party.describe()}", flush=True)
+
+    def serve(r, w_):
+        if party is None:
+            return simserver.handle(sim, r, w_)
+        pw = _PartyWriter(w_, party)
+        party.writer, party.loop = pw, asyncio.get_running_loop()
+        return simserver.handle(sim, _PartyReader(r, pw, sim, party), pw)
 
     up = {}
 
     def run_server():
         async def go():
             try:
-                srv = await asyncio.start_server(lambda r, w_: simserver.handle(sim, r, w_), "127.0.0.1", a.port)
+                srv = await asyncio.start_server(serve, "127.0.0.1", a.port)
             except OSError as ex:
                 up["err"] = ex
                 return
@@ -276,7 +630,13 @@ def main():
         return False
     run(8, lambda: s.state.room is not None and s._entered)
     s.state.level = a.level
-    out_json = os.path.join(ROOT, "tests", f"realm_walk_{tag}.json")
+    if party is not None:
+        s.party_sim = party
+        s.sim_prompt = lambda: sim.prompt(sim.players[-1])
+        party_setup(s, party, run, first=True)
+        print(f"[{tag}] party sync: {s.partysync.info()} levels {s.partysync.levels()}", flush=True)
+    os.makedirs(a.outdir, exist_ok=True)
+    out_json = os.path.join(a.outdir, f"realm_walk_{tag}.json")
     results = []
     for i, wk in enumerate(walks):
         try:
@@ -295,6 +655,45 @@ def main():
     os._exit(0)
 
 
+def party_setup(s, party, run, first=False):
+    """A walk's start with --party: the followers as they are this walk (rolled again with --party-random), in
+    'par', in Game Data -> Players, and their MudPilots telling theirs again; nothing the leader learned about their
+    kit / flags last walk carries over."""
+    if not first:
+        party.reset()
+    b = s.bot
+    pd = s.players.data
+    for n, m in party.members.items():
+        rec = pd.get(n.lower()) or {"name": n, "surname": "", "relationship": "Unknown", "class": "", "race": "",
+                                    "gang": "", "level": 0, "last_seen": 0, "last_online": 0}
+        rec.update({"name": n, "class": m["cls"], "race": m["race"], "alignment": m["align"], "level": m["lvl"],
+                    "last_seen": time.time()})
+        pd[n.lower()] = rec
+    for sub, attr in (("partyflags", "known"), ("partyflags", "_asked"), ("errands", "known_have"),
+                      ("errands", "_rounds")):
+        d = getattr(getattr(b, sub, None), attr, None)
+        if isinstance(d, dict):
+            d.clear()
+    b.__dict__.pop("_way_memo", None)
+    s.send("par")
+    run(3, lambda: all(n in (s.state.party or {}) for n in party.members))
+    if first:
+        run(6, lambda: all(n.lower() in {k.lower() for k in s.partysync.info()}
+                           for n, m in party.members.items() if m["sync"]))
+    else:
+        # their (new) stats, as their MudPilots would tell a change
+        lines = [f"{n} telepaths: {party.me_line(n)}" for n, m in party.members.items() if m["sync"]]
+        for ln in lines:
+            # (one at a time, a prompt after each, the way the game shows a telepath)
+            txt = ("\r\n" + ln + "\r\n" + s.sim_prompt()).encode("cp437", "replace")
+            party.loop.call_soon_threadsafe(party.writer.write, txt, True)
+            run(1)
+    missing = [n for n in party.members if n not in (s.state.party or {})]
+    if missing:
+        s.log(f"[harness] party: {missing} not in state.party after 'par'")
+    party.events, party.sent = [], []
+
+
 def walk_one(s, sim, g, w, wk, seq, run, a):
     b = s.bot
     start, target = tuple(wk["start"]), tuple(wk["target"])
@@ -311,6 +710,7 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
         run(10, lambda: s.telnet.connected and s._entered and s.state.room is not None)
         s.state.level = a.level
     s.settings.auto_combat = bool(a.combat)          # (an errand turns it on for a monster's drop)
+    party = getattr(s, "party_sim", None)
     pl = sim.players[-1]
     pl.room = start; pl.combat = None; pl.resting = False
     g.setup(pl)
@@ -337,6 +737,11 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
     if s.state.room != start:
         res["issues"].append(("setup", f"bot thinks it's in {rname(w, s.state.room) if s.state.room else None}"))
         return res
+    if party is not None:
+        party_setup(s, party, run)
+        res["party"] = party.describe()
+        res["party_seen"] = {"levels": s.partysync.levels(), "hp": b._weakest_hp(),
+                             "door_power": b.door_power(True), "carry": sorted(b.party_carry()), "peers": {n: (p.get("lvl"), p.get("me")) for n, p in s.partysync.peers.items()}}
     ev0, sq0, lg0 = len(g.events), len(seq), len(s.logs)
     g.events.clear(); ev0 = 0
     trail, t0 = [start], time.time()
@@ -361,7 +766,17 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
         else:
             drift["since"] = None
     try:
-        ok = b.goto(target)
+        tg0 = time.time()
+        if os.environ.get("REALM_WALK_PROFILE"):
+            import cProfile, pstats, io
+            pr = cProfile.Profile()
+            ok = pr.runcall(b.goto, target)
+            sio = io.StringIO()
+            pstats.Stats(pr, stream=sio).sort_stats("cumulative").print_stats(35)
+            print(sio.getvalue()[:9000], flush=True)
+        else:
+            ok = b.goto(target)
+        res["plan_secs"] = round(time.time() - tg0, 1)
     except Exception:
         res["issues"].append(("exception", traceback.format_exc(limit=6)))
         return res
@@ -372,7 +787,10 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
         res["secs"] = 0
         res["log"] = s.logs[lg0:][-8:]
         return res
-    busy = lambda: (b.walking or b.errands.active or b.parked() or getattr(b, "_await_inv", None))
+    # (with a party: the '@have' / '@flags' rounds before setting off hold the walk too)
+    busy = lambda: (b.walking or b.errands.active or b.parked() or getattr(b, "_await_inv", None)
+                    or getattr(b.errands, "asking", None) or getattr(b.errands, "asking_key", None)
+                    or getattr(getattr(b, "partyflags", None), "asking", None) or getattr(b, "_planning", False))
     limit = a.max_secs
     monster = [False]
     stall = [False]
@@ -397,7 +815,7 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
                         g._dead[(rm_, num_)] = time.time() + 3600
             b.resume_boss()
         er = b.errands.active
-        cur = (er or {}).get("todo", [None])[0] if er else None
+        cur = ((er or {}).get("todo") or [None])[0] if er else None     # (an errand whose todo is done: [])
         if isinstance(cur, dict) and cur.get("kind") == "monster" and b.walking is False and \
                 tuple(pl.room) == tuple(cur.get("room") or ()) and cur.get("num") not in dropped:
             # at the monster the errand wants a drop from: the practice server doesn't run lairs or drop
@@ -472,6 +890,27 @@ def walk_one(s, sim, g, w, wk, seq, run, a):
         off = next((i for i, k in enumerate(trail) if k not in on), None)
         if off is not None:
             res["off_plan"] = [list(trail[off - 1]), list(trail[off])]
+    if party is not None:
+        pe = list(party.events)
+        res["party_events"] = [(e[0], e[1], list(e[2]) if e[2] else None, e[3]) for e in pe[:60]]
+        res["party_sent"] = [f"{n}: {m}" for n, m in party.sent[:60]]
+        left = [e for e in pe if e[0] == "left behind"]
+        if left:
+            e = left[0]
+            res["issues"].insert(0, ("follower left behind", f"{len(left)}x - {e[1]} at {rname(w, e[2])}: {e[3]}"))
+            res["ok"] = False
+        for kind in ("trap could kill", "room could kill"):
+            bad_ = [e for e in pe if e[0] == kind]
+            if bad_:
+                res["issues"].append((kind, f"{len(bad_)}x - {bad_[0][1]} at {rname(w, bad_[0][2])}: {bad_[0][3]}"))
+        jumps = [e for e in pe if e[0] == "chance jump"]
+        if jumps:
+            res["party_jumps"] = len(jumps)
+            res["notes"].append(f"{len(jumps)} chance jump(s) with the party: " +
+                                "; ".join(f"{rname(w, e[2])} {e[3]}" for e in jumps[:3]))
+        asks = [m for n, m in party.sent if n != "party" and not m.lower().startswith("@mpsync")]
+        if asks:
+            res["notes"].append(f"party asks: {len(asks)} - " + "; ".join(asks[:6]))
     blocked = [e for e in ev if e[0] in ("blocked", "walked into a closed door", "command refused", "bash failed",
                                          "pick failed", "search missed", "chance failed", "would have died")]
     if blocked:
@@ -489,7 +928,8 @@ def merge(prefix="", out=REPORT):
     from mudpilot.worlddb import WorldDB
     w = WorldDB(DB)
     rows = []
-    for f in sorted(glob.glob(os.path.join(ROOT, "tests", f"realm_walk_{prefix}*.json"))):
+    for f in sorted(glob.glob(os.path.join(os.environ.get("REALM_WALK_OUT") or os.path.join(ROOT, "tests"),
+                                           f"realm_walk_{prefix}*.json"))):
         try:
             rows += json.load(open(f, encoding="utf-8"))
         except (OSError, ValueError):

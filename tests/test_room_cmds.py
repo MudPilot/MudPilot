@@ -13,6 +13,7 @@ class Tel:
     def send_line(self, x): sent.append(x)
     def close(self): pass
 s.telnet = Tel(); s._entered = True
+s.state.picklocks, s.state.strength = 182, 60     # ('st' read: 0.8.222 reads it first before a picklocks door)
 w, b = s.world, s.bot
 ok = True
 def check(name, cond):

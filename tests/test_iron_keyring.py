@@ -22,6 +22,6 @@ check(f"Thrag's door with the iron keyring on you: the whole name ({k})", k == "
 g.carrying = "platinum sceptre (Weapon Hand), rope and grapple"
 g.keys = "golden idol, large iron key"
 k = b._door_key((1, 1794), "E")
-check(f"no keyring: the short name as before ({k})", k == "iron key")
+check(f"no keyring: the whole name too (Dan, 2026-11-21: always the entire text) ({k})", k == "large iron key")
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

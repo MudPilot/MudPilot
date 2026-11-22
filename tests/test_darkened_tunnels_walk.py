@@ -48,7 +48,9 @@ def run(secs, until=None):
 run(8, lambda: s.state.room is not None and s._entered)
 s.state.level = 41
 b = s.bot
-check(f"Go to the Throne Room from 15/335 starts ({b.goto((15, 416))})", b.walking)
+g0 = b.goto((15, 416))
+run(6, lambda: b.walking)                   # (0.8.222: a door on the way — st first, a few seconds)
+check(f"Go to the Throne Room from 15/335 starts ({g0})", b.walking)
 run(5)
 check(f"not stopped for 'no way there' ({[l for l in logs if 'Stopped' in l][:2]})",
       not any("no way there" in l for l in logs))

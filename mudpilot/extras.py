@@ -175,6 +175,13 @@ class Extras:
         self._walk_in_break(t, now)
         fl = getattr(self, "_following", None) or getattr(self, "_followed", None)
         m = self.LEADER_LEFT_RE.match(t)
+        if m and not getattr(self, "_following", None) and \
+                now - (getattr(self, "_followed_t", 0) or 0) >= self.b.s.LEADER_MEMORY:
+            # someone we followed hours ago isn't our leader any more: their logging off and back on mustn't send
+            # us across the realm to them (Evolution, 2026-11-21: camping outside Lallim, 3.5 h after leaving
+            # Miserable's party — Miserable restarted for an update and Evolution walked 481 steps, through 10
+            # dangerous lairs, to the zombie pen)
+            fl = None
         tr = getattr(self.b.s, "training", None)
         if m and fl and m.group(1).lower() == fl.lower() and tr is not None and tr.holding_comeback() \
                 and m.group(2).lower() == "left the realm":

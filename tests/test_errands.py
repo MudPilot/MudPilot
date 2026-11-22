@@ -22,6 +22,7 @@ thrag = (1, 1810)
 start = (1, 1789)
 s.state.candidates = [start]; s.state.view = RoomView(w.room(start).name, set(w.room(start).exits))
 s.state.carrying = "84 platinum pieces, skull mask (Face)"; s.state.keys = ""; s.state.level = 40
+b._door_power_unknown = lambda *a: False; b._out_unknown = lambda *a: False   # (stats unread on purpose: keys get fetched; not the 0.8.222 'st' step)
 b.goto(thrag)
 a = b.errands.active
 check(f"plans the keys first ({[t['what'] for t in a['todo']] if a else b.status})",

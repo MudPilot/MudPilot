@@ -24,6 +24,7 @@ trap = lambda n: Exit("N", (1, 1), f"(Trap, {n} damage)", True, False, "trap")
 w.char = {}
 check(f"HP not known: as before ({w.exit_cost(trap(400))})", w.exit_cost(trap(400)) == 21)
 g.max_hp, g.hp, g.level = 715, 715, 55
+g.max_hp_read = True     # ('st' read: 0.8.222 takes max HP only from 'st', not the prompt)
 s.route_char()
 check(f"the walker's max HP and hang-up line go to the map ({w.char.get('max_hp')}, {w.char.get('hangup_pct')})",
       w.char.get("max_hp") == 715 and w.char.get("hangup_pct") == 25)
