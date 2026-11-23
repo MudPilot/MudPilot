@@ -112,11 +112,11 @@ check("tick waits for the refreshed room after a kill", "self._refresh_at = now"
 x = s.bot.x
 x._sent_wait, x._wait_to = True, "Revolution"
 x.cfg.party_resume_msg = "@ok"
-x.care._reported = {"knocked"}
+x.care._reported = {"knocked"}; x.ailments["knocked"] = time.time()   # (0.8.224.2: the live condition counts)
 sent.clear()
 x.release_hold("held")
 check(f"down: no @ok yet ({sent})", not any("@ok" in c for c in sent) and x._sent_wait)
-x.care._reported = set()
+x.care._reported = set(); x.ailments.pop("knocked", None)
 x.release_hold("held")
 check(f"up again: @ok sent ({sent})", any("@ok" in c for c in sent) and not x._sent_wait)
 

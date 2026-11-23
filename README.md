@@ -129,6 +129,20 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.224.4
+
+- **Item spells that need a two-handed weapon work after the first one again** (PVEREV's divine intervention failed 217 of 221 times). After any wear/remove line the hands lost their slot names until the next 'i', so the off-hand chalice wasn't taken off first. The slots are kept now.
+
+## 0.8.224.3
+
+- **A follower says "@ok" after rests again after a reconnect or a death.** Since 0.8.224 a follower that had been knocked down or held, then reconnected or died, never said "@ok" again until MudPilot restarted, so the leader waited about 2 minutes every rest.
+- **The party low-HP relog really is twice at most.** A clear room on the look reset the count, so a character could relog again and again, lower each time. Now only 10 minutes ends a bout.
+- **An engulfed follower says "@ok" when it's freed,** and later rests' "@ok" isn't swallowed (since 0.8.224).
+- **A party you re-form yourself after a disband gets comeback again:** an invite or join you type ends the 5-minute pause.
+- **A pyramid timed door that never opens is gone round at most every 10 s after 40 tries too** (it re-planned 1,037 times in 3 minutes).
+- **Stop works while the "short way / safe way round" question is up.**
+- **The safe way round gets the same boss-room and party-item checks** as the normal way, so it can't lead into a boss room or split the party at an item exit.
+
 ## 0.8.224.2
 
 - **Rooms that hurt never stop a Go to any more** (Dan: "being the only option, it should just go"). The 0.8.223/0.8.224 "N rooms that hurt in a row" wall is gone, with its "go anyway?" question and its "no route" messages: the only way there is walked. Revolution's Go to to the Choira Pyromancer was stopped by the Lava Tube: 52 rooms of magma heat, counted at the most each room can do (60), came to ~3,100, and the real damage is far less.

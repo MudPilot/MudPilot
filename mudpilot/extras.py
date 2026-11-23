@@ -789,8 +789,11 @@ class Extras:
         reasons = self.__dict__.setdefault("_hold_reasons", set())
         reasons.discard(why)
         self.__dict__.setdefault("_hold_labels", {}).pop(why, None)
-        if self._sent_wait and not reasons and (getattr(self, "care", None) is not None and
-                                                 self.care._reported & {"held", "knocked"}):
+        now_ = time.time()
+        if self._sent_wait and not reasons and any(now_ - float((self.ailments or {}).get(k) or 0) < 60
+                                                   for k in ("held", "knocked")):
+            # (0.8.224.2, review: the live condition, a minute at most — the reported set outlived a reconnect or a
+            #  death and no @ok ever went out again)
             return                               # (0.8.224, real logs — 83 times: still flat on our back, the leader
                                                  #  walked off on our @ok and the party broke; the next tick tries again)
         if self._sent_wait and not reasons:

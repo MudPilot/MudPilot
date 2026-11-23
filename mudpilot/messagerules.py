@@ -296,7 +296,11 @@ class MessageRules:
             self.cleared_at = {**getattr(self, "cleared_at", {}), cond: time.time()}   # (bot._knocked_down_now)
         ail = AILMENT.get(cond)
         if ail:
-            self.s.bot.x.ailments.pop(ail, None)
+            if self.s.bot.x.ailments.pop(ail, None):
+                try:                                 # (0.8.224.3, loops hunt: the party heard @held — it hears @ok too)
+                    self.s.bot.x.care.report_mine(ail, False)
+                except Exception:
+                    pass
         if c:
             self.s.log(f"Messages: {cond.replace('_', ' ')} gone ({why})")
 

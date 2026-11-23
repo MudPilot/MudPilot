@@ -2193,6 +2193,8 @@ class Automation:
                 return False
             if full:
                 full = self._hurt_choice(here, target, full, ask, have=set(self.plan_items(target)))
+                if self.called_off(target) or self._stopped_since(seq0):
+                    return False
                 self._goto_alt = None
                 chk = self._goto_check(here, target, full, then, ask)
                 if chk is not None:
@@ -2282,6 +2284,8 @@ class Automation:
         if self.called_off(target):
             return False
         route = self._hurt_choice(here, target, route, ask)
+        if self.called_off(target) or self._stopped_since(seq0):
+            return False                             # (0.8.224.2, review: stopped while the route question was up)
         self._goto_alt = None
         chk = self._goto_check(here, target, route, then, ask)
         if chk is not None:
@@ -2319,6 +2323,11 @@ class Automation:
             alt = w.safe_round(tuple(here), tuple(target), level=self.route_level(),
                                have=have if have is not None else (self.held_items() or set()),
                                avoid=self.avoid_set() or None)
+            if alt:
+                # (0.8.224.2, review: the safe way gets plan_route's own boss / party-carry checks too)
+                alt = self._party_carry_way(here, target, self._boss_free_route(here, target, alt))
+                if alt and set(self._carry_short(alt)) - set(self._carry_short(route)):
+                    alt = None
             if not alt:
                 return route
             adm = sum(d for _r, d in w.hurt_stretches(alt, have))
@@ -6608,6 +6617,10 @@ class Automation:
         # a new life has no poison / blindness: a blindness kept past death held the walk and cast cure blind
         # every 4 s (0.8.201, bug hunt: ailments kept after death)
         self.x.ailments.clear()
+        try:
+            self.x.care._reported.clear()            # (0.8.224.2, review: a new life isn't knocked down either)
+        except Exception:
+            pass
         self.dead_hold = now                         # nothing walks until you start it yourself (dead_blocked)
         hang = (cfg.death_action or "stay") == "hangup"
         msg = f"Died{where}{what}." + (" Hanging up." if hang else " Staying put — nothing restarts until you do.")
@@ -7207,7 +7220,8 @@ class Automation:
                 tr_[(st.room, d)] = now
                 if self.route_around(st.room, d, f"the door {DIR_WORDS.get(d, d)} didn't open ({n - 1} tries)"):
                     return                             # another way round: don't stand here trying for 2 minutes
-            if n > 40:
+            if n > 40 and now - tr_.get((st.room, d), 0) >= self.TIMED_ROUND_SECS:
+                tr_[(st.room, d)] = now                # (0.8.224.3, loops hunt: the 10 s limit held after try 40 too)
                 if not self.route_around(st.room, d, f"the door {DIR_WORDS.get(d, d)} never opened"):
                     self.stop(f"Stopped: the door {DIR_WORDS.get(d, d)} never opened (tried 'open' for 2 minutes)")
                 return

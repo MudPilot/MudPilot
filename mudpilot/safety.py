@@ -470,7 +470,8 @@ class Safety:
         mobs = [sh for sh, _r in (state.view.monsters or [])]
         if mobs:
             return bool(self.hangup(f"HP: {', '.join(mobs[:3])} still here after the relog") or True)
-        self._party_relog = None
+        pr["clear"] = True                       # (0.8.224.2, review: kept — a clear room isn't a new bout; only
+                                                 #  10 minutes ends it, so it's twice at most, as it says)
         self.s.log("Back in after the low-HP hang-up — the room's clear")
         return False
 

@@ -310,6 +310,7 @@ class Session:
             # an ailment from before the drop (or before a death) isn't known to still be on: the next line about
             # it says (0.8.201, bug hunt: ailments never cleared)
             self.bot.x.ailments.clear()
+            self.bot.x.care._reported.clear()    # (0.8.224.2, review: or release_hold never says @ok again)
         except Exception:
             pass
         if hasattr(self, "safety"):
@@ -483,6 +484,13 @@ class Session:
             self._party_hold_from = time.time()
             self.log(f"Disbanded — no automatic invites or joins for {PARTY_HOLD_SECS // 60} minutes, so nobody "
                      "regroups straight away (type invite / join yourself to)")
+        if not from_bot and re.match(r"^\s*(?:invite|join)\s+\w+", cmd or "", re.I) and \
+                time.time() < getattr(self, "_party_hold_until", 0):
+            # (0.8.224.3, loops hunt) the party is being re-formed on purpose: the pause is over — comeback and
+            # regrouping look after the new party again (it ignored @comeback and never fetched a straggler)
+            self._party_hold_until = 0
+            if hasattr(self, "comeback"):
+                self.comeback._self_left = min(self.comeback._self_left, time.time() - 11)
         mjh = re.match(r"^\s*join\s+(\w+)", cmd or "", re.I) if from_bot else None
         if mjh and time.time() < getattr(self, "_party_hold_until", 0) and not asked:
             if self.bot.ready("party_hold_join_note", 15):

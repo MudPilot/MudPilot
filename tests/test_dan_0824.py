@@ -65,6 +65,8 @@ hs0, sr0 = w.hurt_stretches, w.safe_round
 w.char = dict(saved_char, max_hp=500, hangup_pct=30)
 w.hurt_stretches = lambda r, have=None: [([(1, 1)] * 10, 800)] if r is short_r else []
 w.safe_round = lambda *a, **k: dry_r
+bfr0, pcw0, cs0 = b._boss_free_route, b._party_carry_way, b._carry_short
+b._boss_free_route = lambda h, z, r: r; b._party_carry_way = lambda h, z, r: r; b._carry_short = lambda r: []
 asked3 = []
 pk = b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: asked3.append(a) or False)
 check(f"…800 damage vs 30 dry steps more: asked, no answer -> the safe way ({asked3[:1]})",
@@ -76,6 +78,7 @@ check("…nobody to ask: the safe way", pk is dry_r)
 w.safe_round = lambda *a, **k: ["d"] * 400
 check("…a huge detour: not asked, the short way", b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: 1 / 0) is short_r)
 w.hurt_stretches, w.safe_round = hs0, sr0
+b._boss_free_route, b._party_carry_way, b._carry_short = bfr0, pcw0, cs0
 w.char = saved_char
 
 # 0.8.224.2 regression (Evolution, L41 druid, 689 HP, 25% hang-up): 13/3012 -> 15/1164 through the Lava Tube, the only
@@ -146,7 +149,22 @@ s.hold_realm = False; s._want_connected = True; s.telnet.connected = True
 sf._party_relog = {"n": 1, "t": time.time(), "looked": False}
 g.view = RoomView("Stonecaps", {"N"}, [], [], [], time.time())
 sf.on_room(g)
-check("…back in to a clear room: stays", sf._party_relog is None and s.telnet.connected)
+check("…back in to a clear room: stays", sf._party_relog and sf._party_relog.get("clear") and s.telnet.connected)
+# 0.8.224.2 review: a clear look doesn't reset the count — twice at most within 10 minutes
+sf.hangup("HP 90/710 still falling (under 30%)")
+check("…hit again after a clear look: try 2", sf._party_relog and sf._party_relog["n"] == 2)
+s.telnet.connected = True
+sf.hangup("HP 20/710 still falling (under 30%)")
+check("…and again: offline for good", sf._party_relog is None and s.hold_realm and not s._want_connected)
+s.hold_realm = False; s._want_connected = True; sf.hung_up_until = 0; s.telnet.connected = True
+# 0.8.224.2 review: after a reconnect, the reported knocked/held set doesn't block @ok forever
+b.x.care._reported = {"knocked"}; b.x.ailments = {}
+b.x._sent_wait = True; b.x._hold_reasons = set(); b.x._wait_to = "Miserable"
+sent.clear(); b.x.release_hold("resting")
+check(f"follower: stale 'knocked' report no longer blocks @ok ({sent})", any("@ok" in c for c in sent))
+b.x.ailments = {"knocked": time.time() - 5}; b.x._sent_wait = True; sent.clear(); b.x.release_hold("resting")
+check(f"…still knocked down (5 s ago): no @ok yet ({sent})", not any("@ok" in c for c in sent))
+b.x.ailments = {}; b.x._sent_wait = False; b.x.care._reported = set()
 sf.hangup("PvP: Bob attacked you")
 check("PvP hang-up: never back in by itself", s.hold_realm and not s._want_connected and sf.hung_up_until == float("inf"))
 s.hold_realm = False; s._want_connected = True; sf.hung_up_until = 0; s.telnet.connected = True
@@ -236,11 +254,12 @@ s.send("disband party")
 sent.clear()
 s.send("join Evolution", from_bot=True)
 check(f"no automatic join during the pause ({sent})", not any(c.startswith("join") for c in sent))
-s.send("join Evolution")
-check("…one you type still goes", "join Evolution" in sent)
 sent.clear()
 s._late_joiner("Lyra started to follow you.")
 check(f"invite from before the disband accepted: disbanded again ({sent})", "disband party" in sent)
+s.send("join Evolution")
+check("…one you type still goes", "join Evolution" in sent)
+check("…and ends the pause (0.8.224.3: re-formed by hand, comeback looks after it again)", s._party_hold_until == 0)
 s._party_hold_until = 0
 
 print("ALL PASS" if ok else "SOME FAILED")

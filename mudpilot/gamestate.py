@@ -818,10 +818,18 @@ class GameState:
                 if not m:
                     return
                 name, wearing = m.group(1).lower(), bool(self.INV_WEAR_RE.match(t))
+                # 0.8.224.3 (R: logs — PVEREV's divine intervention failed 217 of 221 times): the slot names from the
+                # last 'i' are remembered, so a wear line puts "(Off-Hand)" / "(Weapon Hand)" back, not a generic
+                # "(Worn)" — item spells, wielded() and gear modes need to know which hand holds what
+                so = self.__dict__.setdefault("_slot_of", {})
+                for it in items:
+                    ms = re.match(r"^(?:\d+\s+)?(.*?)\s*\(([^)]*)\)\s*$", it)
+                    if ms and ms.group(2).strip().lower() not in ("worn", ""):
+                        so[ms.group(1).strip().lower()] = ms.group(2).strip()
                 for i, it in enumerate(items):
                     base = re.sub(r"\s*\([^)]*\)\s*$", "", it)
                     if base.lower().lstrip("anthe ").endswith(name) or base.lower() == name:
-                        items[i] = f"{base} (Worn)" if wearing else base
+                        items[i] = f"{base} ({so.get(base.strip().lower()) or 'Worn'})" if wearing else base
                         break
                 else:
                     return

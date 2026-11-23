@@ -92,10 +92,13 @@ def expand(world, cmd: str, carrying: str = "") -> list | None:
     gear = getattr(world, "gear", {}) or {}
     by_name = {x.get("name", "").lower(): x for x in gear.values()}
     slot = int(g.get("Worn") or 0)
-    off = next((n for n, s in worn if "off" in s.lower()), "")
+    off = next((n for n, s in worn if "off" in s.lower()), "") or next(
+        (n for n, _s in worn if int((by_name.get(n.lower()) or {}).get("Worn") or 0) == OFF_HAND), "")
+    # (0.8.224.3: a slot shown only as "(Worn)" — MME's slot for the item decides)
     pre, post = [], []
     if slot == WEAPON:
-        wpn = wielded(carrying or "")
+        wpn = wielded(carrying or "") or next(
+            (n for n, _s in worn if int((by_name.get(n.lower()) or {}).get("Worn") or 0) == WEAPON), "")
         if int(g.get("WeaponType") or 0) in TWO_HANDED and off:
             pre.append(f"remove {off}")              # a two-hander won't go on over an off-hand item
         pre.append(f"eq {item}")
