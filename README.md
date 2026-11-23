@@ -2,7 +2,7 @@
 
 A MegaMUD-style client for MajorMUD with MME (MajorMUD Explorer) built in. It always knows your exact map/room number, walks MegaMUD paths and loops, fights, casts the right spell for each mob, keeps your bless spells up, rests, and loots.
 
-**Download:** most players want the ready-to-run build: grab the latest zip from [Releases](https://github.com/MudPilot/MudPilot/releases/latest), unzip anywhere and run `MudPilot.exe`. To update, drop the new zip in your Downloads folder and restart MudPilot. This repository is the full source (GPL-3.0): see **Setup (Windows)** below to run it from Python.
+**Download:** most players want the ready-to-run build: grab the latest zip from [Releases](https://github.com/MudPilot/MudPilot/releases/latest), unzip anywhere and run `MudPilot.exe`. To update, drop the new zip in your Downloads folder and restart MudPilot. On Linux, take the `-linux.zip` and run `MudPilot`. **On a Mac**, take the `-mac-arm64.zip` (Apple Silicon) or `-mac-x64.zip`, and see [MAC.md](MAC.md) for the first launch. This repository is the full source (GPL-3.0): see **Setup (Windows)** below to run it from Python.
 
 Questions and bug reports: the MudPilot Discord, #bug-reports. Or use **Report a problem** inside MudPilot.
 
