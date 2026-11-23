@@ -2631,7 +2631,9 @@ class WorldDB:
             self._hc = {}                            # (0.8.223 speed: hurt / HP-wall answers for this search)
             try:
                 r = self._route_uncached(start, goal, passable, max_nodes, avoid, level, have)
-                r = self._round_stretches(start, goal, r, passable, max_nodes, avoid, level, have)
+                # 0.8.224.2 (Dan: "being the only option, it should just go"): no wall for a run of rooms that hurt any
+                # more — their damage only weighs the route choice (hurt costs), and a Go to may offer a safe way
+                # round (automation._hurt_choice, via safe_round)
             finally:
                 self._hp_wall_off = prev_off
                 self._hc = prev_hc
@@ -2640,6 +2642,21 @@ class WorldDB:
                     self._memo = {}
                 self._memo[key] = (_t.time(), tuple(r) if r is not None else None)
             return r
+
+    def safe_round(self, start, goal, level=None, have=None, avoid=None):
+        """0.8.224.2: the way that keeps out of every room that hurts (a raft / counter you'd carry counts) — or None."""
+        c = self.char or {}
+        plan = set(have or ())
+        hv = set(c.get("carried")) if c.get("carried") is not None else plan
+        boats = self._boat_items() if plan else frozenset()
+        rs = getattr(self, "room_spells", None) or {}
+        hot = set()
+        for rm, sp in rs.items():
+            si = boats & set(self.spell_items(sp) or ()) & plan if boats else ()
+            if self.room_damage(rm, (hv | set(si)) if si else hv):
+                hot.add(rm)
+        hot -= {tuple(goal), tuple(start)}
+        return self.route(start, goal, level=level, have=have, avoid=frozenset(set(avoid or ()) | hot))
 
     def _round_stretches(self, start, goal, r, passable, max_nodes, avoid, level, have):
         """0.8.223 (Dan, m1315 R6): a route with an unbroken stretch that hurts for your whole max HP is planned again

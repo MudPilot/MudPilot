@@ -25,7 +25,7 @@ APP_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if FROZEN:
     APP_HOME = long_path(APP_HOME)                  # (a folder that exists: config.py itself doesn't, compiled)
 APP_DIR = os.path.dirname(os.path.dirname(APP_HOME)) if FROZEN else APP_HOME
-EXE_NAME = "MudPilot.exe" if os.name == "nt" else "MudPilot"   # the compiled app's file name (Linux: no .exe)
+EXE_NAME = "MudPilot.exe" if os.name == "nt" else "MudPilot.bin" if sys.platform == "darwin" else "MudPilot"   # (Linux: no .exe; Mac: .bin — its disks ignore case, so "MudPilot" would clash with the mudpilot/ folder)
 APP_EXE = os.path.join(APP_HOME, EXE_NAME) if FROZEN else sys.executable
 
 

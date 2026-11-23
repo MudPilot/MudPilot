@@ -129,6 +129,19 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.224.2
+
+- **Rooms that hurt never stop a Go to any more** (Dan: "being the only option, it should just go"). The 0.8.223/0.8.224 "N rooms that hurt in a row" wall is gone, with its "go anyway?" question and its "no route" messages: the only way there is walked. Revolution's Go to to the Choira Pyromancer was stopped by the Lava Tube: 52 rooms of magma heat, counted at the most each room can do (60), came to ~3,100, and the real damage is far less.
+- **A safe way round is offered when there's a real one.** If the short way has a run of rooms that could do more than half your max HP (and past your hang-up line), and a way round hurts no more than a quarter as much, is at most twice as long and no more than 120 rooms longer: "Yes = the short way through them / No = the safe way round". No answer, or nobody to ask, takes the safe way round. Room damage still weighs which way is planned, as before.
+- A rest you type yourself gets your pre-rest / regen gear swap too, then sits back down.
+- **A quest step you just did opens the way straight away, wherever you're standing.** Evolution asked the Grey Lord 'box' (NeutralQuest 4 → 5), then a Go to to Chancellor Annora said "No walkable route … next step: talk to The Grey Lord about 'box'". MudPilot did read `abil` again and the game said 5, but the answer was only taken in from a room with no monsters and no items, and Town Square has its two signs, so it was never saved. The Go to also tried again 3 s after asking, before the answer counted. Now the answer counts wherever you are, and the Go to waits for it (10 s at most).
+- Goto → Add a room… adds any room by number (e.g. 2 873 for a gear stash), not just the one you're in. Right-click any room in the list → Add to my list as…
+- **Mac: Update fetches the Mac build.** Anything that wasn't Linux was treated as Windows, so a Mac would have downloaded the Windows zip. It now takes MudPilot-x.y.z-mac-arm64.zip (Apple Silicon) or -mac-x64.zip (Intel).
+
+## 0.8.224.1
+
+- **The heal mana lines moved** to Settings → Health → Mana, under Rest below / Rest until MA %: "Heal in a fight above MA %" and "Heal out of a fight above MA %". Each shows what the % is in mana (0 = off, heal at any mana).
+
 ## 0.8.224
 
 Found by re-walking 0.8.223 against 0.8.222 and by going through a week of the six characters' real logs.

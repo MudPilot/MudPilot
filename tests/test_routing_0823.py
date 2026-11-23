@@ -45,8 +45,7 @@ try:
         r = plan(src, (15, 1137), 533, lvl=41)
         sb = list((w.stretch_blocks or {}).values())
         why = w.why_no_route(src, (15, 1137), level=41, have=set()) if r is None else []
-        check(f"Lava Tube with 533 HP: no route over 540 in a row ({r is None}), why: {why[:1]}",
-              r is None and why and ("whole max HP" in why[0][2] or "hang-up line" in why[0][2]))
+        check(f"0.8.224.2 (Dan): Lava Tube with 533 HP: walked, no wall ({len(r or [])} steps)", r is not None)
         r = plan(src, (15, 1137), 2700, lvl=41)          # (0.8.224: the limit is the hang-up line — 1800 needs 2700 at 30%)
         check(f"Lava Tube with 2700 HP: walks ({len(r or [])} steps)", r is not None)
     t = time.time()
@@ -79,8 +78,8 @@ try:
             r = go((7, 995), (15, 1137), lvl=41, hp=533)
         finally:
             b._reachable_twin, b._align_is_the_block = rt0, al0
-        check(f"Go to the Lava Tube at 533 HP: not walked, no twin search ({calls}, {time.time() - t:.1f}s): {r[2][:100]}",
-              not r[1] and not calls)
+        check(f"0.8.224.2: Go to the Lava Tube at 533 HP: walked, no twin search ({calls}, {time.time() - t:.1f}s)",
+              r[1] and not calls)
     # 9: the jail cell — a thief picks the 101 door in, can't pick the 151 door out, the jail key drops outside
     r = go((1, 1), (1, 541), lvl=30, pick=150, strg=45)
     check(f"jail cell 1/541 with picklocks 150: refused up front ({r[2][:110]})", not r[1] and "back out" in r[2])

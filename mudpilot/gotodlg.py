@@ -94,7 +94,7 @@ class Picker(tk.Toplevel):
             ttk.Button(b, text="Preview route…", command=self.preview).pack(side="left", padx=(6, 0))
         ttk.Button(b, text="Cancel", command=self.destroy).pack(side="left", padx=6)
         if mode == "goto":
-            ttk.Button(b, text="Add this room", command=self.add_here).pack(side="left", padx=(0, 6))
+            ttk.Button(b, text="Add a room…", command=self.add_here).pack(side="left", padx=(0, 6))
             self.tree.bind("<Button-3>", self._menu)
         self.note = ttk.Label(b, text="", style="Muted.TLabel")
         self.note.pack(side="left", padx=8)
@@ -104,19 +104,73 @@ class Picker(tk.Toplevel):
         self.fill()
 
     # ---- your list: add the room you're in, rename or remove an entry (right-click)
-    def add_here(self):
-        from tkinter import simpledialog
-        k = self.s.state.room
-        if not k:
-            self.note.configure(text="Not sure which room you're in — press Enter (look) first")
-            return
-        r = self.s.world.room(k)
-        nm = simpledialog.askstring("Add this room", f"Name for {k[0]}/{k[1]}:", initialvalue=r.name if r else "",
-                                    parent=self)
-        if nm and nm.strip():
-            grp = simpledialog.askstring("Add this room", "Folder (area):", initialvalue="My places", parent=self)
-            self.s.place_add(k, nm.strip(), (grp or "My places").strip() or "My places")
+    ROOM_RE = re.compile(r"^\s*(\d+)\s*[/\s,.-]\s*(\d+)\s*$")
+
+    def add_here(self, key=None):
+        """Add a room to your Goto list: the room you're in by default, or any map/room you type ('2 873' — Dan,
+        2026-11-22: his gear stash, from wherever he is). Name defaults to the room's MME name until you type one."""
+        w = self.s.world
+        k = tuple(key) if key else self.s.state.room
+        d = tk.Toplevel(self)
+        d.title("Add a room")
+        d.transient(self)
+        fr = ttk.Frame(d, padding=12)
+        fr.pack(fill="both", expand=True)
+        room_v = tk.StringVar(value=f"{k[0]}/{k[1]}" if k else "")
+        r0 = w.room(k) if k else None
+        name_v = tk.StringVar(value=r0.name if r0 else "")
+        grp_v = tk.StringVar(value="My places")
+        ttk.Label(fr, text="Room (map/room)").grid(row=0, column=0, sticky="w", pady=3)
+        re_ = ttk.Entry(fr, textvariable=room_v, width=12)
+        re_.grid(row=0, column=1, sticky="w", padx=6)
+        info = ttk.Label(fr, text="", style="Muted.TLabel")
+        info.grid(row=0, column=2, sticky="w")
+        ttk.Label(fr, text="Name").grid(row=1, column=0, sticky="w", pady=3)
+        ne = ttk.Entry(fr, textvariable=name_v, width=34)
+        ne.grid(row=1, column=1, columnspan=2, sticky="w", padx=6)
+        ttk.Label(fr, text="Folder (area)").grid(row=2, column=0, sticky="w", pady=3)
+        ttk.Entry(fr, textvariable=grp_v, width=20).grid(row=2, column=1, columnspan=2, sticky="w", padx=6)
+        st = {"auto": name_v.get(), "key": k}
+
+        def parse():
+            m = self.ROOM_RE.match(room_v.get())
+            key_ = (int(m.group(1)), int(m.group(2))) if m else None
+            return key_ if key_ and w.room(key_) else None
+
+        def changed(*_a):
+            key_ = parse()
+            r = w.room(key_) if key_ else None
+            here = key_ is not None and key_ == self.s.state.room
+            info.configure(text=(f"{r.name}" + (" (you're here)" if here else "")) if r else
+                           ("type map/room, e.g. 2 873" if room_v.get().strip() else "you're somewhere unknown — type one"))
+            if r and name_v.get() == st["auto"]:      # not typed over yet: follow the room
+                st["auto"] = r.name
+                name_v.set(r.name)
+            st["key"] = key_
+            ok_b.state(["!disabled"] if key_ else ["disabled"])
+
+        def ok(*_a):
+            key_ = parse()
+            nm = name_v.get().strip()
+            if not key_ or not nm:
+                return
+            self.s.place_add(key_, nm, grp_v.get().strip() or "My places")
+            self.note.configure(text=f"Added {nm} ({key_[0]}/{key_[1]})")
+            d.destroy()
             self.fill()
+        b = ttk.Frame(fr)
+        b.grid(row=3, column=0, columnspan=3, sticky="e", pady=(10, 0))
+        ok_b = ttk.Button(b, text="Add", style="Accent.TButton", command=ok)
+        ok_b.pack(side="right", padx=(6, 0))
+        ttk.Button(b, text="Cancel", command=d.destroy).pack(side="right")
+        room_v.trace_add("write", changed)
+        changed()
+        d.bind("<Return>", ok)
+        d.bind("<Escape>", lambda ev: d.destroy())
+        (ne if k else re_).focus_set()
+        (ne if k else re_).select_range(0, "end")
+        self._add_dlg = d
+        return d
 
     def _menu(self, ev):
         iid = self.tree.identify_row(ev.y)
@@ -127,6 +181,7 @@ class Picker(tk.Toplevel):
         key = item[1]
         m = tk.Menu(self, tearoff=0)
         m.add_command(label="Go", command=self.go)
+        m.add_command(label="Add to my list as…", command=lambda: self.add_here(key))
         m.add_command(label="Rename…", command=lambda: self._rename(iid, key))
         m.add_command(label="Remove from the list", command=lambda: (self.s.place_remove(key), self.fill()))
         m.tk_popup(ev.x_root, ev.y_root)

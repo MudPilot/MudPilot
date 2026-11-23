@@ -43,17 +43,53 @@ w.char = dict(w.char, hangup_pct=30)
 # 1 + 5: refused, quick to refuse again, and walked once you said yes
 w.forget_routes(); w.stretch_blocks = {}; w.stretch_ok = {}
 r = w.route((1, 2), (6, 472), level=60, have=set())
-check("Misty Bog at 500 HP: refused without a yes", r is None and ((1, 2), (6, 472)) in w.stretch_blocks)
-t0 = time.time()
-r2 = w.route((1, 2), (6, 472), level=60, have=set(), avoid=frozenset({(1, 99999)}))
-check(f"…the same refusal again (another avoid set) comes back at once ({time.time() - t0:.2f} s)",
-      r2 is None and time.time() - t0 < 1.0)
-w.stretch_ok = {(6, 472): time.time()}; w.forget_routes()
-r3 = w.route((1, 2), (6, 472), level=60, have=set())
-check(f"…said yes: walked ({len(r3 or [])} steps)", r3)
-w.stretch_ok = {}; w.forget_routes()
+check(f"0.8.224.2 (Dan): Misty Bog at 500 HP: walked, no wall, no prompt ({len(r or [])} steps)",
+      r is not None and not w.stretch_blocks)
+# the safe-way-round pick: only when a run hurts for over half your max HP and a way round is no huge detour
+asked2 = []
+b.held_items = lambda: set()
+short = w.route((14, 1923), (14, 9045), level=60, have=set())
+w.char = dict(w.char, max_hp=520)
+pick = b._hurt_choice((14, 1923), (14, 9045), short, lambda *a: asked2.append(a) or False)
+check(f"hurt pick: the safe way round only if it's a real alternative (asked {len(asked2)}, kept short {pick is short})",
+      (pick is short and not asked2) or (asked2 and asked2[0][3] == "hurtpick" and pick is not short))
+check("the app asks 'Yes = the short way / No = the safe way round' for kind 'hurtpick'",
+      'kind == "hurtpick"' in open(os.path.join(here, "mudpilot", "app.py"), encoding="utf-8").read())
+w.forget_routes()
 check("the app asks 'Go anyway?' for kind 'hurt'",
       'kind == "hurt"' in open(os.path.join(here, "mudpilot", "app.py"), encoding="utf-8").read())
+
+# …a case where it does ask (mocked: 40 steps through 800 damage, or 70 dry steps round)
+short_r, dry_r = ["s"] * 40, ["d"] * 70
+hs0, sr0 = w.hurt_stretches, w.safe_round
+w.char = dict(saved_char, max_hp=500, hangup_pct=30)
+w.hurt_stretches = lambda r, have=None: [([(1, 1)] * 10, 800)] if r is short_r else []
+w.safe_round = lambda *a, **k: dry_r
+asked3 = []
+pk = b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: asked3.append(a) or False)
+check(f"…800 damage vs 30 dry steps more: asked, no answer -> the safe way ({asked3[:1]})",
+      asked3 and asked3[0][:2] == (40, 70) and asked3[0][3] == "hurtpick" and pk is dry_r)
+pk = b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: True)
+check("…yes: the short way", pk is short_r)
+pk = b._hurt_choice((1, 1), (1, 2), short_r, None)
+check("…nobody to ask: the safe way", pk is dry_r)
+w.safe_round = lambda *a, **k: ["d"] * 400
+check("…a huge detour: not asked, the short way", b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: 1 / 0) is short_r)
+w.hurt_stretches, w.safe_round = hs0, sr0
+w.char = saved_char
+
+# 0.8.224.2 regression (Evolution, L41 druid, 689 HP, 25% hang-up): 13/3012 -> 15/1164 through the Lava Tube, the only
+# way — walked, no question about rooms that hurt
+st.hangup_hp_pct = 25; g.level = 41; g.max_hp = g.hp = 689; g.max_ma = 0; g.max_hp_read = True
+g.picklocks, g.strength = 40, 60; g.carrying = "You are carrying nothing"; g.inv_seq = 1
+b.held_items = lambda: set()
+g.candidates = [(13, 3012)]
+w.forget_routes(); b.stop("t")
+qs = []
+b.goto((15, 1164), ask=lambda *a: qs.append(a) or False)
+check(f"Evolution 13/3012 -> 15/1164: walks, no rooms-that-hurt question (walking {b.walking}, asked {[q[3] if len(q) > 3 else 'area' for q in qs]})",
+      b.walking and not any(len(q) > 3 and q[3] in ("hurt", "hurtpick") for q in qs))
+b.stop("t"); st.hangup_hp_pct = 30; g.level = 60
 
 # 3: a shop-sold counter is offered
 g.max_hp = 500; g.hp = 500; g.level = 60

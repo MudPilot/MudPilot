@@ -24,7 +24,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))       # ...\M
 # install on the mini PC). MudPilot.exe at the top opens the newest.
 FROZEN = "__compiled__" in globals()
 LINUX = sys.platform.startswith("linux")
-EXE_NAME = "MudPilot.exe" if os.name == "nt" else "MudPilot"      # (the Linux build has no .exe)
+MAC = sys.platform == "darwin"
+EXE_NAME = "MudPilot.exe" if os.name == "nt" else "MudPilot.bin" if sys.platform == "darwin" else "MudPilot"   # (Linux: no .exe; Mac: .bin — its disks ignore case, so "MudPilot" would clash with the mudpilot/ folder)
 EXE = sys.executable
 if FROZEN:
     from mudpilot.config import long_path
@@ -40,8 +41,16 @@ RESTART_EXIT = 3
 HOLD_MAX = 60 * 60                  # a forgotten 'hold' can't keep MudPilot closed for more than an hour
 CRASH_SECS = 60
 # the Linux build is MudPilot-x.y.z-linux.zip; each system only ever takes its own (the Windows one never matched it)
-ZIP_RE = re.compile(r"^MudPilot-(\d+(?:\.\d+)+)-linux\.zip$" if FROZEN and LINUX else r"^MudPilot-(\d+(?:\.\d+)+)\.zip$",
-                    re.I)
+# (0.8.224.2: the Mac build is MudPilot-x.y.z-mac-arm64.zip / -mac-x64.zip, or -mac.zip for both — a Mac took the
+#  Windows zip before)
+def _mac_zip_re():
+    import platform
+    arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
+    return r"^MudPilot-(\d+(?:\.\d+)+)-mac(?:-" + arch + r")?\.zip$"
+
+
+ZIP_RE = re.compile(r"^MudPilot-(\d+(?:\.\d+)+)-linux\.zip$" if FROZEN and LINUX else
+                    _mac_zip_re() if FROZEN and MAC else r"^MudPilot-(\d+(?:\.\d+)+)\.zip$", re.I)
 NEVER = ("data/", "data-", ".venv/", ".mp-prev/")
 DATA_NAME = ""
 

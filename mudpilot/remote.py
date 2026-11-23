@@ -1486,6 +1486,9 @@ class RemoteControl:
                 q = f"{area} - nobody in the party can open it. try anyway? reply y or n"
             elif kind == "hurt":
                 q = f"{area}. go anyway? reply y or n"      # 0.8.224 (Dan): rooms that hurt past your limit
+            elif kind == "hurtpick":
+                q = (f"the short way goes through {area}. y = the short way ({short} rooms), n = the safe way round "
+                     f"({scenic} rooms). reply y or n")
             elif scenic is None:
                 q = f"the only way goes through {area} ({short} rooms). take {area}? reply y or n"
             else:

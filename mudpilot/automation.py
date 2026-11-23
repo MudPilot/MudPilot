@@ -2192,6 +2192,7 @@ class Automation:
             if full and (self.called_off(target) or self._stopped_since(seq0)):
                 return False
             if full:
+                full = self._hurt_choice(here, target, full, ask, have=set(self.plan_items(target)))
                 self._goto_alt = None
                 chk = self._goto_check(here, target, full, then, ask)
                 if chk is not None:
@@ -2280,6 +2281,7 @@ class Automation:
             return True
         if self.called_off(target):
             return False
+        route = self._hurt_choice(here, target, route, ask)
         self._goto_alt = None
         chk = self._goto_check(here, target, route, then, ask)
         if chk is not None:
@@ -2292,6 +2294,55 @@ class Automation:
         self._goto_target = tuple(target) if not isinstance(target, (set, frozenset)) else None
         self.start_path(mp, loop=False)
         return True
+
+    HURT_PICK_PCT = 50       # a run of rooms that hurts for at least this % of your max HP (and past the hang-up line)
+    HURT_PICK_EXTRA = 120    # …and a way round that's at most this many rooms more, and not over twice as long
+
+    def _hurt_choice(self, here, target, route, ask, have=None):
+        """0.8.224.2 (Dan: "if there's a much easier route and the route is considered dangerous maybe a prompt that lets
+        them pick the route"). Nothing is ever refused for rooms that hurt. Only when the way has a run that could do
+        more than half your max HP and past your hang-up line, and a way round that hurts at most a quarter as much and
+        isn't a huge detour: 'Yes = the short way through them / No = the safe way round' — no answer, or nobody to ask
+        (an errand, a member's @goto): the safe way round. Otherwise the way as planned."""
+        if not route or isinstance(target, (set, frozenset)):
+            return route
+        w = self.s.world
+        try:
+            hp = int((w.char or {}).get("max_hp") or 0)
+            if hp <= 0:
+                return route
+            st_ = w.hurt_stretches(route, have)
+            worst = max((d for _r, d in st_), default=0)
+            if worst < hp * self.HURT_PICK_PCT / 100 or worst < w.stretch_limit():
+                return route
+            dmg = sum(d for _r, d in st_)
+            alt = w.safe_round(tuple(here), tuple(target), level=self.route_level(),
+                               have=have if have is not None else (self.held_items() or set()),
+                               avoid=self.avoid_set() or None)
+            if not alt:
+                return route
+            adm = sum(d for _r, d in w.hurt_stretches(alt, have))
+            if adm > dmg / 4 or len(alt) > 2 * len(route) or len(alt) - len(route) > self.HURT_PICK_EXTRA:
+                return route
+        except Exception as ex:
+            self.log(f"Routing: rooms-that-hurt check skipped ({ex})")
+            return route
+        rooms = max(st_, key=lambda t: t[1])[0]
+        text = f"{len(rooms)} rooms in a row that hurt (up to {worst} damage; you have {hp} max HP)"
+        ok = False
+        if ask is not None:
+            try:
+                ok = bool(ask(len(route), len(alt), text, "hurtpick"))
+            except TypeError:
+                ok = bool(ask(len(route), len(alt), text))
+            except Exception:
+                ok = False
+        if ok:
+            self.log(f"Routing: the short way through {text} ({len(route)} steps) — you said yes")
+            return route
+        self.log(f"Routing: the safe way round {text} — {len(alt)} steps, {len(alt) - len(route)} more"
+                 + (" (you said no or didn't answer)" if ask is not None else " (nobody to ask)"))
+        return alt
 
     def _stretch_counter(self, sb):
         """0.8.224 (Dan): the cheapest shop-sold item that stops every room spell in the blocking run (swamp boots in
@@ -3069,8 +3120,13 @@ class Automation:
                 self._last_mobs = [sh for sh, _r in st.view.monsters][:4]
         self.manual.tick()                     # (ends a hand-fought fight you've walked out of / stopped on)
         self._lair_learn(now)
+        self._take_abil_answer(now)            # an 'abil' answer counts wherever you stand (signs, monsters…)
         pa = getattr(self, "_pending_abil", None)
-        if pa and now - pa[3] > 3 and not self._st_unanswered(pa, now):
+        rd_ = getattr(self, "_abil_read", None)
+        abil_out = bool(rd_ and rd_[0] == "sent" and rd_[1] >= pa[3] - 1 and now - pa[3] < 10) if pa else False
+        if pa and now - pa[3] > 3 and not abil_out and not self._st_unanswered(pa, now):
+            # (waits for the 'abil' answer to be taken in: re-planning at 3 s used the old flags, then the 5-minute
+            # once-per-place limit gave up - Evolution, NeutralQuest 4 -> 5 at the Grey Lord, 2026-11-05)
             self._pending_abil = None
             self.replan(pa[0], then=pa[1], ask=pa[2])
             return
@@ -4594,32 +4650,42 @@ class Automation:
         if leader and leader.lower() != (self.cfg.my_name or "").lower() and leader.lower() not in told:
             self.send(f"/{leader} {{Quest flag: {txt}}}"[:126])
 
+    def _take_abil_answer(self, now) -> bool:
+        """Take in the answer to an 'abil' we sent (4 s after it, once it's all in). Runs every tick, wherever you are:
+        it used to wait for a room with no monsters and no items, so in Town Square (small sign, large sign) the answer
+        was never saved - Evolution asked the Grey Lord 'box' (NeutralQuest 4 -> 5) and every Go to to Annora still
+        planned with 4 (2026-11-05). True = just taken in."""
+        st, cfg = self.st, self.cfg
+        rd = getattr(self, "_abil_read", None)
+        if not (rd and rd[0] == "sent" and now - rd[1] > 4):
+            return False
+        granted = {str(aid): v for (src, aid), (v, t) in st.abil_rows.items() if src == "granted" and t >= rd[1]}
+        if granted:
+            old = dict(cfg.known_abils or {})
+            cfg.known_abils = granted
+            self.s.on_settings_changed()
+            gained = {a: v for a, v in granted.items() if old and old.get(a) != v}
+            if gained or not old:
+                self.s.world.forget_routes()      # quest gates may have opened: plan afresh
+            if gained:
+                self._new_quest_flags(gained, {a: old[a] for a in gained if a in old})
+            elif not getattr(self, "_flags_logged", False):
+                self.log(f"Read your quest flags ({len(granted)}) — routing knows which quest gates you've opened")
+            self._flags_logged = True
+            try:
+                self.s.partysync.quest_read(granted)   # a teammate who doesn't know ours yet gets them once
+            except Exception:
+                pass
+        self._abil_read = ("done", now)
+        return True
+
     def _read_quest_flags(self) -> bool:
         """pMUD: read your whole ability table once a session (quest flags among it) so routing knows which
         quest gates are open before it plans — and keep it for next time."""
-        st, cfg = self.st, self.cfg
         now = time.time()
-        rd = getattr(self, "_abil_read", None)
-        if rd and rd[0] == "sent" and now - rd[1] > 4:
-            granted = {str(aid): v for (src, aid), (v, t) in st.abil_rows.items() if src == "granted" and t >= rd[1]}
-            if granted:
-                old = dict(cfg.known_abils or {})
-                cfg.known_abils = granted
-                self.s.on_settings_changed()
-                gained = {a: v for a, v in granted.items() if old and old.get(a) != v}
-                if gained or not old:
-                    self.s.world.forget_routes()      # quest gates may have opened: plan afresh
-                if gained:
-                    self._new_quest_flags(gained, {a: old[a] for a in gained if a in old})
-                elif not getattr(self, "_flags_logged", False):
-                    self.log(f"Read your quest flags ({len(granted)}) — routing knows which quest gates you've opened")
-                self._flags_logged = True
-                try:
-                    self.s.partysync.quest_read(granted)   # a teammate who doesn't know ours yet gets them once
-                except Exception:
-                    pass
-            self._abil_read = ("done", now)
+        if self._take_abil_answer(now):
             return False
+        rd = getattr(self, "_abil_read", None)
         if rd and rd[0] == "done":
             # read again a few seconds after a quest-style command (say / ask / give / push…), or every half hour:
             # that's how a new quest flag gets noticed
@@ -6225,6 +6291,22 @@ class Automation:
                 if self.end_swap("rested"):
                     return True       # gear back on first; walk/fight next tick
                 return False
+            if not self._swap and not st.in_combat and not getattr(self, "_rest_begun", False) \
+                    and not getattr(self, "_idle_rest", False) and self.ready("typed_rest_swap", 30):
+                # (not a party-wait rest of our own — idle_regen sets _idle_rest; those don't swap, 0.8.224 #11)
+                # a rest we didn't start (Dan typed 'rest' walking around by hand): the swap only ever went with our
+                # own rest command, so it rested in the fighting set — the faded shawl's −100 HP regen (Dan,
+                # 2026-11-22). Swap now, then sit back down (the eq / remove stands you up)
+                kind = "med" if getattr(st, "meditating", False) else "rest"
+                pre, post = self._swap_cmds(kind)
+                if pre.strip() or post.strip() or self.cfg.auto_regen_gear:
+                    self._begin_swap(kind)
+                    if self._swap:
+                        self.log(f"You sat down yourself — {'meditate' if kind == 'med' else 'rest'} gear swap, "
+                                 "then back down")
+                        self.send(cfg.meditate_cmd if kind == "med" else cfg.rest_cmd)
+                        self.status = "Meditating" if kind == "med" else "Resting"
+                        return True
             # HP/mana stuck short of the top for a minute: the prompt's max only ever grows, so a max that dropped
             # (regen gear swapped out a +max ring, a +max bless wore off) leaves us resting for good — 'st' gives the
             # real max (0.8.201, bug hunt: stale max HP)

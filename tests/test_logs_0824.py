@@ -153,7 +153,7 @@ for a, z in [((14, 2350), (14, 10066)), ((14, 4860), (14, 3297)), ((1, 98), (1, 
     r = plan_(a, z, 390, set(w.items))
     check(f"planning with every item, {a} -> {z} crosses the river with a raft ({len(r or [])} steps)", r)
 r = plan_((7, 995), (15, 1137), 533, set(w.items))
-check("…the Lava Tube at 533 HP stays refused", r is None)
+check("0.8.224.2 (Dan): the Lava Tube at 533 HP is walked — rooms that hurt never refuse", r is not None)
 # w1214 #3: one last search round every room that hurts before saying no route
 r = plan_((14, 1923), (14, 9045), 520, set())   # (0.8.224: limit = hang-up line; its way has a 350 trap)
 check(f"14/1923 -> 14/9045 at 520 HP: the dry way ({len(r or [])} steps)", r and

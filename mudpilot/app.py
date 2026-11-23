@@ -1337,12 +1337,6 @@ class App:
         ttk.Label(hl, text="Max attack casts").grid(row=7, column=0, sticky="w", pady=(8, 2))
         ttk.Spinbox(hl, from_=0, to=99, width=5, textvariable=self._var("max_off_casts")).grid(row=7, column=1, sticky="w", padx=4)
         ttk.Label(hl, text="per fight, then melee (0 = no limit)", style="Muted.TLabel").grid(row=7, column=2, sticky="w")
-        for i, (lbl, k, hint) in enumerate((("Heal in a fight", "heal_min_ma_fight", "only above this mana % (0 = any)"),
-                                            ("Heal out of a fight", "heal_min_ma_rest", "only above this mana % (0 = any)")),
-                                           start=8):
-            ttk.Label(hl, text=lbl).grid(row=i, column=0, sticky="w", pady=2)
-            ttk.Spinbox(hl, from_=0, to=100, width=5, textvariable=self._var(k)).grid(row=i, column=1, sticky="w", padx=4)
-            ttk.Label(hl, text=hint, style="Muted.TLabel").grid(row=i, column=2, sticky="w")
         for i, (lbl, k) in enumerate((("Cure blindness", "cure_blind_cmd"), ("Cure poison", "cure_poison_cmd"),
                                       ("Cure disease", "cure_disease_cmd"), ("Freedom", "freedom_cmd"),
                                       ("Room light", "light_cmd"))):
@@ -1877,19 +1871,22 @@ class App:
 
         pct_row(ma, 0, "Rest below MA %", "rest_below_ma", "ma")
         pct_row(ma, 1, "Rest until MA %", "rest_until_ma", "ma")
-        self._check(ma, "use_meditate", "Meditate when only mana is low").grid(row=2, column=0, columnspan=2, sticky="w")
-        ttk.Entry(ma, textvariable=self._var("meditate_cmd"), width=8).grid(row=2, column=2, sticky="w", padx=8)
-        ttk.Label(ma, text="Mana regen spell").grid(row=3, column=0, sticky="w", pady=3)
-        ttk.Entry(ma, textvariable=self._var("ma_regen_cmd"), width=8).grid(row=3, column=1, sticky="w")
-        ttk.Label(ma, text="cast when you rest for mana", style="Muted.TLabel").grid(row=3, column=2, sticky="w", padx=8)
+        # Dan: the heal mana lines sit with the rest lines (0 = heal at any mana)
+        pct_row(ma, 2, "Heal in a fight above MA %", "heal_min_ma_fight", "ma")
+        pct_row(ma, 3, "Heal out of a fight above MA %", "heal_min_ma_rest", "ma")
+        self._check(ma, "use_meditate", "Meditate when only mana is low").grid(row=4, column=0, columnspan=2, sticky="w")
+        ttk.Entry(ma, textvariable=self._var("meditate_cmd"), width=8).grid(row=4, column=2, sticky="w", padx=8)
+        ttk.Label(ma, text="Mana regen spell").grid(row=5, column=0, sticky="w", pady=3)
+        ttk.Entry(ma, textvariable=self._var("ma_regen_cmd"), width=8).grid(row=5, column=1, sticky="w")
+        ttk.Label(ma, text="cast when you rest for mana", style="Muted.TLabel").grid(row=5, column=2, sticky="w", padx=8)
         fx = ttk.Frame(ma)
-        fx.grid(row=4, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        fx.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 0))
         ttk.Button(fx, text="Keep mana regen up…",
                    command=lambda: self.edit_buff(new=True, preset=self._regen_preset())).pack(side="left")
         ttk.Label(fx, text="  your class's spell (flux / ntap / nity), recast whenever its rate drops below the "
                            "minimum you set", style="Muted.TLabel").pack(side="left")
         self._mana_casts = ttk.Label(ma, text="", style="Muted.TLabel", justify="left", wraplength=360)
-        self._mana_casts.grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self._mana_casts.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
         r = 0
         ttk.Label(hp, text="Heal command").grid(row=r, column=0, sticky="w", pady=3, padx=(0, 8))
         ttk.Entry(hp, textvariable=self._var("heal_cmd"), width=10).grid(row=r, column=1, sticky="w"); r += 1
@@ -6596,6 +6593,11 @@ class App:
         if kind == "hurt":
             # 0.8.224 (Dan): a run of rooms that hurts past your limit — go anyway? No is the default
             return self._timed_yesno(f"{area}.\n\nGo anyway?", "No answer → not going")
+        if kind == "hurtpick":
+            # 0.8.224.2 (Dan): the short way hurts, a safe way round isn't much longer — pick
+            return self._timed_yesno(f"The short way goes through {area}.\n\nYes = the short way through them "
+                                     f"({short} steps)\nNo = the safe way round ({scenic} steps, {scenic - short} more)",
+                                     "No answer → the safe way round")
         if scenic is None:
             return self._timed_yesno(f"The only way there goes through {area} ({short} steps).\n\nGo through it?",
                                      "No answer → not going")
