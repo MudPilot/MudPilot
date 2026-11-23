@@ -40,13 +40,14 @@ def at(room, carrying="", pick=10, strength=30, level=40, wealth=None):
     w.forget_routes(); w.refused_doors = {}
     b._cool.pop("goto_st", None)
 
-# 1. Stone Barracks: in by the key door (key in hand), out only by '80 picklocks/strength' doors
+# 1. Stone Barracks: in by the key door (key in hand). 0.8.223 (Dan, regr222 #3): its other side, typed
+#    '(Door [80 picklocks/strength])' (14/6217 E), is the same door — the key opens it, so this walks now
 key = w.item_name(3702)
 at((14, 6159), carrying=key)
 r = b.goto((14, 6220))
-check(f"Stone Barracks with strength 30: not going ({r}; {b.no_route_msg[:90]})",
-      r is False and "no way back out" in b.no_route_msg)
-check("…names the door out", "80 picklocks" in b.no_route_msg)
+check(f"Stone Barracks with the key, strength 30: goes — the way out is the key door's other side ({r}; "
+      f"{b.no_route_msg[:90]})", r and b.walking)
+check("…14/6217 E is that key door's other side", w.key_twin(w.rooms[(14, 6217)].exits["E"]) is not None)
 at((14, 6159), carrying=key, strength=100)
 r = b.goto((14, 6220))
 check(f"…strength 100 bashes the way out: goes ({r}, walking {b.walking})", r and b.walking)
@@ -80,8 +81,7 @@ check("…and the Go to waits for it", b._pending_abil and tuple(b._pending_abil
 at((14, 6159), carrying=key, pick=0, strength=0)
 sent.clear()
 r = b.goto((14, 6220))
-check(f"…and for the way back out: Stone Barracks' doors out need picklocks / strength ({sent})",
-      "st" in sent and not b.walking)
+check(f"…Stone Barracks with the key: no 'st' — the key opens the way back out ({sent})", "st" not in sent)
 at((14, 6233), carrying="astral staff", pick=0, strength=0)
 sent.clear()
 r = b.goto((14, 6234))

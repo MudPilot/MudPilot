@@ -275,7 +275,7 @@ class MessageRules:
 
     REAL_HOLD_RE = re.compile(r"entangl|\bheld\b|\bhold\b|paraly|\bweb|frozen|freez|immobil|can'?t move|cannot move|"
                               r"rooted|stuck|petrif|stone|bola|net\b|snare|bound|pinned|knocked", re.I)
-    HELD_CONFIRM_RE = re.compile(r"^you (?:are|'re) (?:held|paralyzed|unable to move|frozen|stuck)|^you can'?t move|"
+    HELD_CONFIRM_RE = re.compile(r"^you (?:are|'re) (?:held|paralyzed|unable to move|frozen|stuck|engulfed)|^you can'?t move|"
                                  r"^you cannot move|^you struggle,? but can'?t move|"
                                  # weakness only stops you when it leaves you over-encumbered (Dan)
                                  r"too (?:heavy|much|encumbered|weak) to (?:move|walk|go)|"

@@ -1337,6 +1337,12 @@ class App:
         ttk.Label(hl, text="Max attack casts").grid(row=7, column=0, sticky="w", pady=(8, 2))
         ttk.Spinbox(hl, from_=0, to=99, width=5, textvariable=self._var("max_off_casts")).grid(row=7, column=1, sticky="w", padx=4)
         ttk.Label(hl, text="per fight, then melee (0 = no limit)", style="Muted.TLabel").grid(row=7, column=2, sticky="w")
+        for i, (lbl, k, hint) in enumerate((("Heal in a fight", "heal_min_ma_fight", "only above this mana % (0 = any)"),
+                                            ("Heal out of a fight", "heal_min_ma_rest", "only above this mana % (0 = any)")),
+                                           start=8):
+            ttk.Label(hl, text=lbl).grid(row=i, column=0, sticky="w", pady=2)
+            ttk.Spinbox(hl, from_=0, to=100, width=5, textvariable=self._var(k)).grid(row=i, column=1, sticky="w", padx=4)
+            ttk.Label(hl, text=hint, style="Muted.TLabel").grid(row=i, column=2, sticky="w")
         for i, (lbl, k) in enumerate((("Cure blindness", "cure_blind_cmd"), ("Cure poison", "cure_poison_cmd"),
                                       ("Cure disease", "cure_disease_cmd"), ("Freedom", "freedom_cmd"),
                                       ("Room light", "light_cmd"))):
@@ -6587,6 +6593,9 @@ class App:
         if kind == "door":
             return self._timed_yesno(f"{area} — nobody in the party can open it.\n\nTry anyway? ({short} steps)",
                                      "No answer → going round it (or not going)")
+        if kind == "hurt":
+            # 0.8.224 (Dan): a run of rooms that hurts past your limit — go anyway? No is the default
+            return self._timed_yesno(f"{area}.\n\nGo anyway?", "No answer → not going")
         if scenic is None:
             return self._timed_yesno(f"The only way there goes through {area} ({short} steps).\n\nGo through it?",
                                      "No answer → not going")

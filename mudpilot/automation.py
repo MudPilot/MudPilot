@@ -20,6 +20,15 @@ def cfg_auto_get(cfg) -> bool:
     return bool(getattr(cfg, "auto_get_items", True))
 
 
+_ITEM_NUM_RE = re.compile(r"(?<=[A-Za-z'])\((\d{1,5})\)")
+
+
+def path_text(cmd: str) -> str:
+    """A path command as the game takes it: MegaMud loop files write key steps 'use chiseled key(1264) SW' — the item
+    number in brackets is MegaMud's own note, not part of the name (m1617c K1b) → 'use chiseled key SW'."""
+    return _ITEM_NUM_RE.sub("", cmd) if "(" in (cmd or "") else cmd
+
+
 # a step down the spell ladder has to kill the monster for this much less mana, or the harder spell stays (Dan,
 # 2026-11-03: Miserable PVE flipping magma blast / sphere of implosion / forked lightning — a 500 HP monster is 6 magma
 # blasts, 30 mana, one round; 2 spheres, 50 mana, two rounds. A quick spell stops when the monster dies.)
@@ -448,6 +457,11 @@ class Automation:
             return False
         if st.in_combat:
             return self.end_swap("combat")
+        if self._swap_rested and not self.walking and not mobs and \
+                time.time() - (getattr(self, "_last_spell_at", 0) or 0) < 3:
+            # 0.8.224 (Dan, logEVO C): our own spell (a self-mend mid-rest) stood us up — keep the regen gear on, we
+            # sit straight back down (11 ring swaps in one 60 s rest, each 'remove' costing HP)
+            return False
         if self._swap_rested and self._sick() and not self.walking:
             # retching broke the rest: stay in the regen gear and rest again — swapping it all off and back on with
             # every retch was a wall of eq lines (Miserable PVE, 2026-11-06, the rotting beholder's stench)
@@ -493,6 +507,8 @@ class Automation:
                     ok = need[1] or self.cfg.bash_key_doors or self.can_pick_doors()
                     # (a locked door: no key → pick/bash it; good picklocks: pick it — PVE guardian golem)
                 need = (need[0], bool(ok))      # soft = you can pick or bash it yourself: no key run
+            if not need and ex is not None:
+                need = self._twin_need(ex, set(self.held_items() or ()))
             if need and need[0] not in seen:
                 seen.add(need[0])
                 out.append(need)
@@ -502,6 +518,10 @@ class Automation:
                     out.append((n, False))
         if (mp.needed_item or "").strip().isdigit() and int(mp.needed_item) > 0 and int(mp.needed_item) not in seen:
             out.append((int(mp.needed_item), False))
+        for n in getattr(mp, "out_items", None) or ():
+            if n not in seen:                        # (0.8.223: the way back out needs it — a rope out of the Large Hole)
+                seen.add(n)
+                out.append((n, False))
         return out
 
     @staticmethod
@@ -513,6 +533,23 @@ class Automation:
         out += [i for i in ((getattr(ex, "req", None) or {}).get("items") or []) if i not in out]
         return out
 
+    def _twin_need(self, ex, held):
+        """0.8.224 (w1617 #2): the inside of a key door MME types as a plain locked door — its key, (num, soft), when
+        you don't hold it; soft only if your picklocks / strength open it. Started in the Fiery Lair (16/2118)
+        without the key, Go to planned out and stopped at 'the door east is locked'."""
+        w = self.s.world
+        if ex is None or ex.kind != "door":
+            return None
+        try:
+            tw = w.key_twin(ex)
+            tn = w.exit_need(tw) if tw is not None else None
+        except Exception:
+            return None
+        if not tn or tn[0] in held:
+            return None
+        ok = w.door_beaten(ex, set(held) - {tn[0]})
+        return (tn[0], ok is not False)
+
     def _route_items(self, here, route, have) -> set:
         """Items (not soft keys) a route's exits need that you don't carry."""
         w, out = self.s.world, set()
@@ -521,6 +558,9 @@ class Automation:
             hard = need and (not need[1] or (ex.kind == "key" and self.door_doable(ex) is False))
             if hard and need[0] not in have:
                 out.add(need[0])
+            tn = self._twin_need(ex, set(have)) if not need else None
+            if tn and not tn[1]:
+                out.add(tn[0])
             out |= {n for n in self._opener_items(ex) if n not in have}
         return out
 
@@ -702,6 +742,52 @@ class Automation:
         hard += [p for p in (self.carry_pick(s) for s in carry if not s & have) if p not in hard]
         return hard, [n for n, soft in needs if soft and n not in have]
 
+    def _skip_past_target(self, mp: MPath, hard: list) -> list:
+        """0.8.223 (fight3 #4): an item carried against the rooms on the way (a waterskin for the desert) whose
+        nearest source is reached only by walking through the Go to's own target isn't fetched — the walk there crosses
+        the same rooms anyway (12/1747 → 12/977: through 12/977 to Nekojin's store and 30 rooms back, 112 rooms for
+        26). Exit needs (keys, a rope) are always fetched. The items still to fetch."""
+        tgt = getattr(self, "_goto_target", None)
+        here = self.st.room
+        if not tgt or isinstance(tgt, (set, frozenset)) or not here:
+            return hard
+        tgt = tuple(tgt)
+        exit_needs = {n for n, _soft in self.path_needs(mp)}
+        carry = set().union(*self.carry_sets(mp)) if hard else set()
+        w, out = self.s.world, []
+        for n in hard:
+            if n in exit_needs or n not in carry:
+                out.append(n)
+                continue
+            src = self.errands.source_for(n, toward=tgt)
+            room = tuple(src["room"]) if src and src.get("room") else None
+            rt = w.route(tuple(here), room, level=self.route_level(), have=set(self.held_items() or ()),
+                         avoid=self.avoid_set() or None) if room and room != tuple(here) else None
+            if room == tgt or (rt and any(tuple(e.to) == tgt for e in rt)):
+                self.log(f"Not fetching the {w.item_name(n)} first: the way to {src['what']} goes through "
+                         f"{tgt[0]}/{tgt[1]} itself — going straight there")
+                continue
+            out.append(n)
+        return out
+
+    def _party_cant_buy(self, mp: MPath, loop) -> bool:
+        """Leading, before an errand for your own items: what each walker needs that no shop sells (the golden idol)
+        is asked of the party first — it did a whole king-crab run, then said nobody could get the idol (party3
+        #4). Followers known to carry it (party sync, an earlier '@have') aren't asked. True = holding for answers."""
+        if not self.st.party or not self.s.comeback.leading():
+            return False
+        carry = self.carry_sets(mp)
+        if not carry:
+            return False
+        known, er = self.party_carry(), self.errands
+        odd = [c for c in carry if not (frozenset(c) & known)
+               and not any((er.source_for(i) or {}).get("kind") == "shop" for i in c)]
+        if not odd or not er.party_check(mp, loop, odd):
+            return False
+        if er.asking:
+            er.asking["recheck"] = True              # (everyone has it: plan the walk again — the errand comes next)
+        return True
+
     NEVER_AUTO_ON = {"auto_nuke"}
 
     def switches_on(self, why):
@@ -730,6 +816,13 @@ class Automation:
         self._expect_dest = None                     # (a step from the walk before isn't this one's — m1617c E1)
         self.no_route_msg = ""                       # (a walk is going: an old plan's reason isn't @status's answer — flags2 #8)
         self._opening_dir = None                     # (nor the last door opened, on another loop — loopsD D1)
+        sn_ = getattr(self, "_stop_norest", 0)
+        if sn_:
+            # Stop's 'not resting for 2 minutes' was about the rest going on then, not this trip: rests before traps
+            # and when hurt work again (0.8.223, m1315 R4 — a Go to a minute after Stop hung up on the lever traps)
+            self._stop_norest = 0
+            if getattr(self, "_no_rest_until", 0) == sn_:
+                self._no_rest_until = 0
         if getattr(mp, "lair_camp", False):
             # (0.8.201, Dan) a stash / train / bank trip that left from Camp lairs comes back to camping — there's no
             # path to walk; camping picks its next lair from wherever the trip ended
@@ -763,15 +856,47 @@ class Automation:
                 # errand (Buddy, 2026-11-04: in the desert with no waterskin, 'Go to 6/1335 General Store' needed a
                 # waterskin from 6/1335 and detoured there every 5 s without moving)
                 fetching = {t_["num"] for t_ in ea.get("todo") or []}
+                later = []
+                if ea.get("todo") and self.errands._is_leg(ea, mp):
+                    # 0.8.223 (m349 #6): on the errand's walk to one item, an item it gets LATER that this walk needs
+                    # (the log raft for the Silver River on the way to the fang farm) is got first — not walked
+                    # without. Each one moves up once at most (no ping-pong); recipe / farm steps keep their order
+                    cur_ = ea["todo"][0]
+                    rooms_ = {tuple(cur_["room"])} if cur_.get("room") else set()
+                    rooms_ |= {tuple(r_) for r_ in cur_.get("rooms") or []}
+                    now_ = {cur_["num"]} | {t_["num"] for t_ in ea["todo"]
+                                            if t_.get("room") and tuple(t_["room"]) in rooms_}
+                    later = [t_ for t_ in ea["todo"][1:] if t_["num"] in hard and t_["num"] not in now_
+                             and not t_.get("moved_up") and t_.get("kind") in ("shop", "monster", "ask", "stash",
+                                                                                "party")]
+                if later:
+                    ids_ = {id(t_) for t_ in later}
+                    for t_ in later:
+                        t_["moved_up"] = True
+                    ea["todo"] = later + [t_ for t_ in ea["todo"] if id(t_) not in ids_]
+                    ea["at"], ea["tries"] = None, 0
+                    names_ = ", ".join(self.s.world.item_name(t_["num"]) for t_ in later)
+                    self.log(f"'{mp.title}' needs the {names_} this errand gets later — getting "
+                             f"{'it' if len(later) == 1 else 'them'} first")
+                    self.walking = False
+                    self.set_mode("auto")
+                    self.status = f"Getting {names_} first"
+                    return
                 hard = [n for n in hard if n not in fetching]
                 soft = [n for n in soft if n not in fetching]
+            elif hard and mp.title.startswith("Go to "):
+                hard = self._skip_past_target(mp, hard)
             w = self.s.world
             toll = self.path_toll(mp)
             cash = self.st.wealth
             if toll and cash is not None and cash < toll:
+                nrm_ = self.no_route_msg
                 if self.s.trips.withdraw_for(mp, loop, toll - cash):
+                    self.no_route_msg = nrm_         # (its bank search's own "No route: …" isn't this walk's — regr3 #2)
                     return                           # off to the bank first, then this path
-                self.stop(f"Not walking '{mp.title}': the tolls on it come to {toll:,} copper and you have {cash:,}")
+                msg_ = f"Not walking '{mp.title}': the tolls on it come to {toll:,} copper and you have {cash:,}"
+                self.stop(msg_)
+                self.no_route_msg = msg_             # (what @status / diagnose say — not an old plan's door)
                 self.s.on_alert(f"Need {toll:,} copper for a toll")
                 return
             if soft and cfg_auto_get(self.cfg):
@@ -796,6 +921,11 @@ class Automation:
                 # 0.8.201 (Dan): a cheap item that stops the rooms that hurt on the way (hazards.py; capped, off by default)
                 from .hazards import extra_buys
                 hard += [n for n in extra_buys(self, mp) if n not in hard]
+            cb_ = getattr(self, "_counter_buy", None)
+            if cb_ and not ea and time.time() - cb_["t"] < 3 * 3600 and mp.title.startswith("Go to ") and \
+                    tuple(getattr(self, "_goto_target", None) or ()) == cb_["target"] and \
+                    cb_["item"] not in (self.held_items() or set()) and cb_["item"] not in hard:
+                hard.append(cb_["item"])             # (0.8.224: the counter you said yes to fetching — _ask_counter)
             if hard and time.time() - (getattr(self.st, "inv_at", 0) or 0) > 10:
                 # look in your own pack before asking anyone (Dan, 2026-11-05: Buddy handed Evolution the glowing
                 # red amulet, then Evolution asked the party for one and stopped — the pack list was from before)
@@ -811,6 +941,9 @@ class Automation:
             if hard:
                 names = ", ".join(w.item_name(n) for n in hard)
                 if cfg_auto_get(self.cfg):
+                    if not ea and self._party_cant_buy(mp, loop):
+                        self.walking = False         # (the party's idol first, then your errand — party3 #4)
+                        return
                     ok, why = self.errands.plan(mp, loop, hard)
                     if ok:
                         self.walking = False
@@ -835,9 +968,13 @@ class Automation:
                     return
             # leading a party: everyone needs their own raft / idol, or the party drowns behind you
             # (not on the errand's own walk to the shop for them: asking again there replaced the errand, and its
-            # 'then on to' became the shop itself — Buddy stopped dead at the Village Store, 2026-11-04)
+            # 'then on to' became the shop itself — Buddy stopped dead at the Village Store, 2026-11-04. Every other
+            # errand leg asks too, keeping the errand — party3 #2: the leader's raft run walked raftless followers
+            # down the Silver River)
             carry = self.carry_sets(mp)
-            if carry and not self.errands.active and self.errands.party_check(mp, loop, carry):
+            ea_ = self.errands.active
+            shop_leg = bool(ea_ and (ea_.get("todo") or [{}])[0].get("for"))
+            if carry and not shop_leg and self.errands.party_check(mp, loop, carry, leg=bool(ea_)):
                 self.walking = False
                 return
             # a quest flag decides the way (the pyramid's arches): is everyone's flag one that gets through?
@@ -1111,8 +1248,8 @@ class Automation:
         """A much shorter way opens with an item you could fetch (Seher'Sahham: the king crab claw opens 16/2141 —
         133 rooms instead of 308): fetch it and take the short way, when that beats walking round, detour
         included. The route (the path's needed-items check fetches the item) or the one you had."""
-        if route is None or isinstance(target, (set, frozenset)) or not (self.cfg.auto_get_items and
-                                                                          self.cfg.check_needed_items):
+        fetch_ok = self.cfg.auto_get_items and self.cfg.check_needed_items
+        if route is None or isinstance(target, (set, frozenset)) or not (fetch_ok or self.cfg.bash_key_doors):
             return route
         no = self.__dict__.setdefault("_shortcut_no", {})
         now = time.time()
@@ -1125,6 +1262,17 @@ class Automation:
             return route
         need = self._route_items(here, keyed, have)
         if not need:
+            # 0.8.223 (Dan, m12 #5): only key doors your picklocks / strength (or the party's) open on the short way —
+            # take it when it saves 30+ rooms (Silvermere's sewer: 106 rooms round for 10 through 1/1098 W)
+            held = set(self.held_items() or ())
+            doors = [ex for ex in keyed if ex.kind == "key" and not (w.exit_need(ex) and w.exit_need(ex)[0] in held)]
+            if doors and self.cfg.bash_key_doors and all(w.door_beaten(ex, held) is True for ex in doors):
+                self.log(f"Go to: picking / bashing {len(doors)} key door{'s' if len(doors) > 1 else ''} on the way "
+                         f"({len(keyed)} rooms) beats walking round ({len(route)} rooms)")
+                return keyed
+            no[tuple(target)] = now
+            return route
+        if not fetch_ok:
             no[tuple(target)] = now
             return route
         cost = 0
@@ -1163,6 +1311,26 @@ class Automation:
                 self.log(f"Go to: skipping the shortcut — the {rec['name']} for it would do ~{est:.0f} damage")
                 return True
         return False
+
+    def _fight_too_strong(self, recs, here=True) -> float:
+        """0.8.223 (Dan, m349 #5 / m149 N1): '~damage to you' when fighting these could all but kill you (80% of your
+        max HP — _risky_source's line), else 0. here=True: monsters in this room (what you've taken here before
+        counts, as in danger.fight_estimate); False: somewhere else (an item dropper an errand would go and kill)."""
+        hp = self.st.max_hp or 0
+        recs = [r for r in (recs or []) if r]
+        if not hp or not recs:
+            return 0.0
+        try:
+            if here:
+                from .danger import fight_estimate
+                est = fight_estimate(self.s.danger, recs)
+            else:
+                d = self.s.danger
+                rounds = math.ceil(sum(int(m.get("hp") or 100) for m in recs) / max(d.my_dpr(recs[0]), 1))
+                est = sum(d.mob_dpr(m) for m in recs) * rounds * 0.5 * d.party_factor()
+        except Exception:
+            return 0.0
+        return float(est) if est >= hp * 0.8 else 0.0
 
     def _too_small(self, here, target):
         """No route on the party's level, but there is one on yours: the level gates in the way and who's too
@@ -1320,6 +1488,20 @@ class Automation:
             pass
         hps = [h for h in hps if h > 0]
         return min(hps) if hps else 0
+
+    def _weakest_name(self, read_only=False):
+        """Whose max HP _weakest_hp is — a member's name, or None when it's yours (a refusal says "Buddy's whole max
+        HP", not "your whole max HP", when it's his: partyA D4)."""
+        low = self._weakest_hp(read_only)
+        mine = (self.st.max_hp or 0) if (not read_only or getattr(self.st, "max_hp_read", True)) else 0
+        if not low or (mine and mine <= low):
+            return None
+        me = (self.cfg.my_name or "").lower()
+        try:
+            info = self.s.partysync.info()
+        except Exception:
+            return None
+        return next((n for n, i in info.items() if n.lower() != me and int(i.get("hp") or 0) == low), None)
 
     def _danger_note(self, route, target):
         """Say so when the only way still goes through a lair that would maul you."""
@@ -1863,6 +2045,18 @@ class Automation:
             by = " ← ".join(f"{os.path.basename(f.filename)[:-3]}.{f.function}" for f in fr)
         except Exception:
             by = "?"
+        if by.startswith(("app.", "gotodlg.")) and getattr(self, "_too_strong", None):
+            # your own Go to: try again past what we ran from (fight3 #2 — "Go to again to try once more")
+            self._too_strong = {}
+        ts_ = self.too_strong_rooms()
+        if ts_:
+            # rooms we ran from the same monster twice in lately: gone round, like rooms struck off in the preview
+            self.s.world.user_avoid = frozenset(self.s.world.user_avoid or ()) | ts_
+            if not isinstance(target, (set, frozenset)) and tuple(target) in ts_:
+                self.no_route_msg = f"not going back to {self.too_strong_note([tuple(target)])}"
+                self.log(f"Not going to {target[0]}/{target[1]}: {self.no_route_msg}. Go to it yourself to try again.")
+                self.status = "Idle"
+                return False
         if not isinstance(target, (set, frozenset)):
             self.why("goto", target=target, then=getattr(then, "title", None), by=by)
             if not by.startswith(("app.", "gotodlg.")):
@@ -1897,8 +2091,12 @@ class Automation:
             self.log("Can't route: current room unknown — looked and still can't tell. Press Enter, then Go to again.")
             return False
         self.s.world.align_unknown = False
+        self.s.world.stretch_blocks = {}
         route = self.plan_route(here, target, ask)
-        if route is None and getattr(self.s.world, "align_unknown", False) and \
+        # (0.8.223 speed: a way there that hurts for your whole max HP — the target is reachable and that stretch is
+        #  the block; an open alignment gate or a look-alike room won't change it, so don't search the map for those)
+        hurt_block = route is None and not isinstance(target, (set, frozenset)) and             (tuple(here), tuple(target)) in (getattr(self.s.world, "stretch_blocks", None) or {})
+        if route is None and not hurt_block and getattr(self.s.world, "align_unknown", False) and \
                 not getattr(self.st, "alignment", "") and not self.cfg.char_alignment and \
                 not isinstance(target, (set, frozenset)) and self._align_is_the_block(here, target, ask) and \
                 self.ready("align_who", 60):
@@ -1915,7 +2113,10 @@ class Automation:
             self.send("who")
             return True
         ab = getattr(self, "_avoid_blocked", None)
-        if route is None and ab and ab[1] == (tuple(target) if not isinstance(target, (set, frozenset)) else None):
+        if route is None and ab and not hurt_block and \
+                ab[1] == (tuple(target) if not isinstance(target, (set, frozenset)) else None):
+            # (0.8.224, Dan: not when a run of rooms that hurt is the block — "only through Negative Power Plane"
+            #  was the wrong reason; the way round NPP was there, it just hurt too much)
             # the only way there is through an area you're avoiding (you said no, or it's unattended): stop
             # cleanly instead of fetching keys / asking gates / re-prompting (Dan: the popup wouldn't stop)
             self._avoid_blocked = None
@@ -1925,7 +2126,7 @@ class Automation:
             self.log(f"Not going to {where}: the only way is through {ab[0]} (avoided — Settings → Other → Routing)")
             self.s.on_alert(f"Can't reach {where} without going through {ab[0]}")
             return False
-        if route is None and not isinstance(target, (set, frozenset)):
+        if route is None and not hurt_block and not isinstance(target, (set, frozenset)):
             twin = self._reachable_twin(here, target, ask)
             if twin and twin[0] == "needs":
                 return self._no_go(target, twin[1])  # 0.8.222: a way in that needs a monster there — not a look-alike
@@ -1965,7 +2166,7 @@ class Automation:
             self.send("i")
             return True
         if route is None and self.s.telnet.connected and not isinstance(target, (set, frozenset)) \
-                and self._ask_gate_abilities(here, target):
+                and not hurt_block and self._ask_gate_abilities(here, target):
             # exits gated on an ability (quest flags: "Ability: 134 w/value 2 to 999") and we don't know yours yet:
             # ask the game ('abil 134'), then plan again
             self._pending_abil = (target, then, ask, time.time())
@@ -1979,7 +2180,7 @@ class Automation:
             self._avoid_blocked = None               # (one left by another plan — a bank / shop trip's — isn't this one's:
             full = self.keyed_route(here, target, ask)   # flags2 #3, "only through Negative Power Plane" for a Go to it wasn't)
             ab_ = getattr(self, "_avoid_blocked", None)
-            if full is None and ab_ and (ab_[1] is None or tuple(ab_[1]) == tuple(target)):
+            if full is None and ab_ and not hurt_block and (ab_[1] is None or tuple(ab_[1]) == tuple(target)):
                 ab = self._avoid_blocked
                 self._avoid_blocked = None
                 rr = w.room(target)
@@ -1998,18 +2199,31 @@ class Automation:
                 full = self._goto_alt or full
                 r = w.room(target)
                 mp = path_from_route(w, here, full, name=f"Go to {target[0]}/{target[1]} {r.name}")
+                mp.out_items = sorted(getattr(self, "_goto_out", None) or ())
                 self.after_goto = then
                 self._goto_target = tuple(target)
                 self.start_path(mp, loop=False)      # its needed-items check sends us after the keys
                 return True
         if route is None and self.s.telnet.connected and self._bank_way(here, target, then, ask):
             return not self.__dict__.pop("_bank_no", False)   # 0.8.222: off to the bank for a toll / fare first
-        if route is None and self.s.telnet.connected and not isinstance(target, (set, frozenset))                 and self._reread_flags(target):
+        if route is None and self.s.telnet.connected and not isinstance(target, (set, frozenset)) \
+                and not hurt_block and self._reread_flags(target):
             # the quest flags we have may be old (Dan, 2026-11-04: DaoLordQuest was 9 in the game, MudPilot still
             # had 8 — the pyramid's arches throw you about at 8 — and it just didn't go): read them, plan again
             self._pending_abil = (target, then, ask, time.time())
             self.status = "Checking your quest flags before giving up…"
             return True
+        counter_note = ""
+        if route is None and hurt_block and not isinstance(target, (set, frozenset)):
+            sb_ = (getattr(self.s.world, "stretch_blocks", None) or {}).get((tuple(here), tuple(target)))
+            if sb_ and not self._stopped_since(seq0) and self._ask_hurt(target, sb_, ask):
+                return self.goto(target, then, ask, _retry=_retry, _looked=True)
+            cn_ = self._stretch_counter(sb_) if sb_ and not self._stopped_since(seq0) else None
+            if cn_ is not None:
+                if self._ask_counter(target, sb_, cn_, ask):
+                    return self.goto(target, then, ask, _retry=_retry, _looked=True)
+                counter_note = (f" ({cn_[2]} would stop those rooms — {cn_[1] // 100:,} gold in a shop; say yes to "
+                                "fetching one, or buy one and Go to again)")
         if route is None:
             w = self.s.world
             msg = f"No walkable route from {here[0]}/{here[1]} to {target[0]}/{target[1]}"
@@ -2027,12 +2241,23 @@ class Automation:
                         v = self.st.abil_value(int(m.group(1)), "total")
                         return f" — yours: {v[0]}" if v else " — yours isn't known (the game didn't list it)"
                     msg += " — blocked by " + "; ".join(
-                        f"the {DIR_WORDS.get(d, d)} exit of {w.room(r).name} ({r[0]}/{r[1]}): "
-                        f"{self._why_words(why)}{yours(why)}" for r, d, why in bl)
+                        (f"the {DIR_WORDS.get(d, d)} exit of {w.room(r).name} ({r[0]}/{r[1]}): " if d else "")
+                        + f"{self._why_words(why)}{yours(why)}" for r, d, why in bl)
+                    # (a run of rooms that hurt has no one exit: just its reason — 0.8.223)
                     flags = self._flags_text()
                     if flags:
                         msg += f" (your quest flags: {flags})"
-            if " — blocked by " not in msg and not isinstance(target, (set, frozenset)):
+            msg += counter_note
+            sbx = [(k, v) for k, v in (getattr(w, "stretch_blocks", None) or {}).items()
+                   if not isinstance(target, (set, frozenset)) and isinstance(k[1], tuple)
+                   and k[0] == tuple(here) and k[1] != tuple(target)] if " — blocked by " not in msg else []
+            if sbx:
+                # 0.8.224 (Dan): "MME's map has no way into that area" was the wrong reason when the look-alike room
+                # the Go to would use is there, behind a run of rooms that hurt
+                (_h, x_), (rooms_, dmg_) = sbx[0]
+                msg += (f" — the look-alike room {x_[0]}/{x_[1]} is behind {len(rooms_)} rooms that hurt in a row "
+                        f"(up to {dmg_} damage, your limit is {w.stretch_limit()})")
+            elif " — blocked by " not in msg and not isinstance(target, (set, frozenset)):
                 msg += (" — MME's map has no way into that area at all (some entrances aren't in MME). Walk in "
                         "once by hand, or import a MegaMUD path that goes there, and MudPilot learns the way.")
             if self.called_off(target):
@@ -2062,9 +2287,90 @@ class Automation:
         route = self._goto_alt or route
         r = self.s.world.room(target)
         mp = path_from_route(self.s.world, here, route, name=f"Go to {target[0]}/{target[1]} {r.name}")
+        mp.out_items = sorted(getattr(self, "_goto_out", None) or ())
         self.after_goto = then
         self._goto_target = tuple(target) if not isinstance(target, (set, frozenset)) else None
         self.start_path(mp, loop=False)
+        return True
+
+    def _stretch_counter(self, sb):
+        """0.8.224 (Dan): the cheapest shop-sold item that stops every room spell in the blocking run (swamp boots in
+        the bog, a fur cape on the icy path) and that you don't carry — (item, price in copper, name) or None. Not
+        when the limit is a follower's max HP: one bought by the leader doesn't help them."""
+        w = self.s.world
+        if (w.char or {}).get("max_hp_who"):
+            return None
+        from .hazards import counters, shop_price
+        rs = getattr(w, "room_spells", None) or {}
+        spells = {rs.get(tuple(r)) for r in (sb[0] if sb else ())} - {None}
+        if not spells:
+            return None
+        held = self.held_items() or set()
+        best = None
+        common = None
+        for sp in spells:
+            cs = set(counters(w, sp))
+            if cs & held:
+                continue
+            common = cs if common is None else (common & cs)
+        for c in sorted(common or ()):
+            p = shop_price(self, c)
+            if p is not None and (best is None or p < best[1]):
+                best = (c, p, w.item_name(c))
+        return best
+
+    def _ask_counter(self, target, sb, cn, ask) -> bool:
+        """'… swamp boots (25 gold in a shop) stop those rooms — fetch one first and go?' Yes: the item counts as carried
+        for this Go to, and the walk's needed-items check buys it on the way (3 hours)."""
+        if ask is None:
+            return False
+        w = self.s.world
+        rooms, dmg = sb
+        c, p, nm = cn
+        text = (f"The way to {target[0]}/{target[1]} goes through {len(rooms)} rooms that hurt (up to {dmg} damage, your "
+                f"limit is {w.stretch_limit()}). {nm} ({p // 100:,} gold in a shop) would stop them — fetch one first")
+        try:
+            ok = bool(ask(len(rooms), None, text, "hurt"))
+        except TypeError:
+            ok = bool(ask(len(rooms), None, text + "?"))
+        except Exception:
+            ok = False
+        if not ok:
+            return False
+        w.stretch_counter = {**(getattr(w, "stretch_counter", None) or {}), tuple(target): c}
+        self._counter_buy = {"item": c, "target": tuple(target), "t": time.time()}
+        w.forget_routes()
+        self.log(f"Routing: fetching {nm} first for the rooms that hurt on the way to {target[0]}/{target[1]} (you said yes)")
+        return True
+
+    def _ask_hurt(self, target, sb, ask) -> bool:
+        """0.8.224 (Dan): a run of rooms that hurts past your limit — ask, don't just refuse. 'This way does up to N
+        damage (your limit is M) — go anyway?' Yes: walked (and not asked again for 3 hours); No, no answer, or nobody
+        to ask (an errand, a member's @goto): refused as before."""
+        if ask is None:
+            return False
+        w = self.s.world
+        rooms, dmg = sb
+        lim = w.stretch_limit()
+        r = w.room(target)
+        where = f"{target[0]}/{target[1]} {r.name}" if r else f"{target[0]}/{target[1]}"
+        a, b = rooms[0], rooms[-1]
+        text = (f"The way to {where} goes through {len(rooms)} rooms in a row that hurt ({a[0]}/{a[1]} to "
+                f"{b[0]}/{b[1]}): up to {dmg} damage, and your limit is {lim} (down to the hang-up line)")
+        try:
+            ok = bool(ask(len(rooms), None, text, "hurt"))
+        except TypeError:
+            ok = bool(ask(len(rooms), None, text + " — go anyway?"))
+        except Exception:
+            ok = False
+        if not ok:
+            self.log(f"Routing: not taking the {len(rooms)} rooms that hurt ({dmg} damage, limit {lim}) — "
+                     + ("you said no" if ask is not None else "nobody to ask"))
+            return False
+        w.stretch_ok = {**(getattr(w, "stretch_ok", None) or {}), tuple(target): time.time()}
+        w.forget_routes()
+        self.log(f"Routing: going through the {len(rooms)} rooms that hurt anyway ({dmg} damage, limit {lim}) — "
+                 "you said yes")
         return True
 
     def _no_go(self, target, msg) -> bool:
@@ -2111,6 +2417,8 @@ class Automation:
                 d = max(d, w.room_damage(ex.to, held))
             if d and (hp <= 0 or d >= hp):
                 return True
+        if hp > 0 and any(dmg >= hp for _r, dmg in w.hurt_stretches(route, held)):
+            return True                              # (0.8.223: a stretch of rooms that hurt, over the prompt's max HP)
         # (…or on the way back out: with max HP unread the way-out check counts a 600-damage trap as a way out — an L30
         #  warrior was stranded in the Large Cave, 17/3445: regr3 #1)
         if here and route and hp > 0:
@@ -2168,6 +2476,7 @@ class Automation:
         """0.8.222 (Dan's picks from the 11-20 bug hunt), just before a Go to sets off. None = go; otherwise goto()'s
         answer: True = parked for 'st', False = not going (the reason logged and alerted)."""
         w = self.s.world
+        self._goto_out = set()
         if not route or not here:
             return None
         dest = tuple(route[-1].to)
@@ -2216,14 +2525,21 @@ class Automation:
         #  unless you have it or the way in needs it: once inside you can't go and buy one — m12 #2, the low character
         #  in the Stone Tunnel / Webbed Cave pocket 1/1542, whose only way out is the rope exit)
         have = set(self._door_have()) - (set(w.carry_item_set()) - held_)
+        # (0.8.223, Dan — m149 R2: a key you'd have to fetch from outside doesn't count for the way back out — a thief
+        #  picked the jail cell's 101 door in and couldn't pick the 151 door out; the jail key drops outside)
+        keys_ = self._key_items() - held_
+        have -= keys_
         came, prev = set(), tuple(here)
         for ex in route:
             need = w.exit_need(ex) if ex.kind in ("key", "item") else None
-            if need:
-                have.add(need[0])                    # (fetched for the way in: in hand for the way out too)
+            if need and not (ex.kind == "key" and need[0] not in held_ and w.door_beaten(ex, set()) is True):
+                have.add(need[0])                    # (fetched for the way in: in hand for the way out too — not
+                                                     #  when the walk picks / bashes that door instead)
             have |= set(ex.action_items() or ()) | set((getattr(ex, "req", None) or {}).get("items") or ())
             if ex.kind in ("door", "key") and (w.door_beaten(ex, have) is False or
                                                 (tuple(ex.to), ex.dir) in w.OPENS_ANYWAY):
+                # (0.8.223, regr222 #3: a key door's other side typed as a plain locked door — Fiery Lair, Molten River —
+                #  opens with the same key: worlddb.door_beaten / key_twin, not this)
                 # (the way in is already a door beyond the party — said yes to, or the walk tries it: back out through
                 #  it is no worse. A door we CAN open in, with a different one out — Stone Barracks — isn't this)
                 came.add((tuple(ex.to), prev))
@@ -2232,6 +2548,21 @@ class Automation:
             with w._plan_lock:
                 pk = w.pocket(dest, level=self.route_level(), have=have, asked=ask is not None, cap=3000,
                               allow=frozenset(came))
+                for _ in range(4):
+                    # a key whose source is inside where you'd be (the statue key past the orb door): to be had there
+                    if pk is None or tuple(here) in pk:
+                        break
+                    more = set()
+                    for k in pk:
+                        for ex in w.rooms[k].exits.values():
+                            nd = w.exit_need(ex) if ex.kind == "key" and ex.to not in pk else None
+                            if nd and nd[0] in keys_ and nd[0] not in have and self._key_sources(nd[0]) & pk:
+                                more.add(nd[0])
+                    if not more:
+                        break
+                    have |= more
+                    pk = w.pocket(dest, level=self.route_level(), have=have, asked=ask is not None, cap=3000,
+                                  allow=frozenset(came))
         except Exception as ex_:
             self.log(f"Go to: couldn't check the way back out ({ex_})")
             pk = None
@@ -2258,6 +2589,29 @@ class Automation:
                 pk_open = None
             if pk_open is not None and tuple(here) not in pk_open:
                 pk = None
+        if pk is not None and tuple(here) not in pk and self.cfg.auto_get_items and self.cfg.check_needed_items:
+            # (0.8.223: the way back out needs a carried item a shop sells — a rope to climb out of Dark-Elf City's Large
+            #  Hole, 8/460 U: buy it first, as the way in's items are, instead of refusing. Once inside you can't —
+            #  m12 #2 — which is why it's fetched before setting off)
+            buy = set()
+            for k in pk:
+                for ex in w.rooms[k].exits.values():
+                    nd = w.exit_need(ex) if ex.kind == "item" and ex.to not in pk else None
+                    if nd and not nd[1] and nd[0] not in held_ and \
+                            (self.errands.source_for(nd[0]) or {}).get("kind") == "shop":
+                        buy.add(nd[0])
+            if buy:
+                try:
+                    with w._plan_lock:
+                        pk2 = w.pocket(dest, level=self.route_level(), have=have | buy, asked=ask is not None,
+                                       cap=3000, allow=frozenset(came))
+                except Exception:
+                    pk2 = set()
+                if pk2 is None or tuple(here) in pk2:
+                    self._goto_out = buy
+                    self.log(f"Go to: the way back out of {where} needs {', '.join(w.item_name(n) for n in sorted(buy))}"
+                             f" — getting it first")
+                    return None
         if pk is not None and tuple(here) not in pk:
             outs, hurts = [], []
             for k in sorted(pk):
@@ -2288,6 +2642,36 @@ class Automation:
             return self._no_go(target, msg)
         return None
 
+    def _key_items(self) -> set:
+        """Every item a key door ('Key: N') needs."""
+        w = self.s.world
+        c = w.__dict__.get("_key_items_c")
+        if c is None:
+            c = set()
+            for r in w.rooms.values():
+                for ex in r.exits.values():
+                    if ex.kind == "key":
+                        nd = w.exit_need(ex)
+                        if nd:
+                            c.add(nd[0])
+            w._key_items_c = c = frozenset(c)
+        return set(c)
+
+    def _key_sources(self, num) -> set:
+        """Rooms an item can be had in (MME 'obtained': its shops, the monsters that drop it, where it lies)."""
+        w = self.s.world
+        g = (w.gear.get(num) if getattr(w, "gear", None) else None) or {}
+        out = set()
+        for m in re.finditer(r"(Shop|Monster) #(\d+)", g.get("obtained", "") or ""):
+            if m.group(1) == "Shop":
+                out |= {tuple(r) for r in (w.shops.get(int(m.group(2)), {}).get("rooms") or [])}
+            else:
+                out |= {tuple(r) for r in ((w.monsters.get(int(m.group(2))) or {}).get("spawn_rooms") or [])}
+        for rm, items in (getattr(w, "room_items", None) or {}).items():
+            if num in (items or ()):
+                out.add(tuple(rm))
+        return out
+
     def _bank_way(self, here, target, then, ask) -> bool:
         """0.8.222 (Dan, 11-20 bug hunt): the only thing in the way is a toll or a fare your cash won't cover —
         MudPilot doesn't know your bank balance, so plan as if the bank has it and go there first, the way bank runs
@@ -2297,6 +2681,41 @@ class Automation:
         if tr is None or tr.trip or not cfg.toll_bank_run or st.wealth is None or isinstance(target, (set, frozenset)):
             return False
         w = self.s.world
+        # (0.8.224 speed — w1617: the bare search below still cost ~2.5 s on every no-route Go to. No toll or fare on
+        #  the whole map over the cash you carry: money can't be what's in the way)
+        tolls = w.__dict__.get("_toll_exits")
+        if tolls is None:
+            tolls = []
+            for r_ in w.rooms.values():
+                for ex in r_.exits.values():
+                    m = w.TOLL_RE.search(ex.etype or "") if ex.kind == "toll" else None
+                    pr = int(m.group(1)) if m else int((getattr(ex, "req", None) or {}).get("price") or 0)
+                    if pr:
+                        tolls.append((pr, tuple(ex.to)))
+            w._toll_exits = tolls
+        dear = {to for pr, to in tolls if pr > (st.wealth or 0)}
+        if not dear:
+            return False
+        try:
+            if not (dear & w.leads_to(target)):
+                return False                     # (none of them leads on towards the target at all)
+        except Exception:
+            pass
+        # (0.8.223 speed, regr2 #5 / regr3 #3: one bare search first — every item, money no object. No way even so, or
+        #  a way with no toll or fare on it: the money isn't what's in the way, so skip the whole plan below)
+        try:
+            saved = w.char
+            with w._plan_lock:
+                try:
+                    w.char = dict(saved or {}, wealth=10 ** 12)
+                    bare = w.route(here, target, level=self.route_level(), have=self.plan_items(target))
+                finally:
+                    w.char = saved
+            if bare is None or not any(ex.kind == "toll" or (getattr(ex, "req", None) or {}).get("price")
+                                       for ex in bare):
+                return False
+        except Exception:
+            pass
         self._bank_plan = True
         try:
             route = self.plan_route(here, target, ask)
@@ -2398,6 +2817,7 @@ class Automation:
             # nothing walking to stop — it's the resting you want to stop (Buddy, 2026-10-29: Stop ×4 and it went on
             # 'Resting to full'): no auto rest for 2 minutes, so you can take over
             self._no_rest_until = time.time() + 120
+            self._stop_norest = self._no_rest_until   # (a walk you start next ends it: start_path — m1315 R4)
             self._idle_rest = False
             why = "Stopped by you — not resting for 2 minutes"
         self._regoto_at = 0                          # nothing queued from this trip restarts it later
@@ -2626,6 +3046,8 @@ class Automation:
         self._account(now)
         self._info_flush()
         self._late_flush()
+        if getattr(self, "_al_pending", None):
+            self._al_pending_tick(now)
         if not self.walking and getattr(self, "_bring", None) and self._bring.get("typed"):
             self._waiting_for_party_through(now)
         da = getattr(self, "_death_hangup_at", 0)
@@ -2648,7 +3070,7 @@ class Automation:
         self.manual.tick()                     # (ends a hand-fought fight you've walked out of / stopped on)
         self._lair_learn(now)
         pa = getattr(self, "_pending_abil", None)
-        if pa and now - pa[3] > 3:
+        if pa and now - pa[3] > 3 and not self._st_unanswered(pa, now):
             self._pending_abil = None
             self.replan(pa[0], then=pa[1], ask=pa[2])
             return
@@ -2694,7 +3116,12 @@ class Automation:
             if self.ready("refresh_evt", 1.5):
                 st.need_refresh = False
                 self.send("")
+                self._refresh_at = now
             return                             # never act on a stale room (e.g. cast at a mob that just died)
+        ra = getattr(self, "_refresh_at", 0)
+        if ra and now - ra < 2.5 and (not st.view or (st.view.t or 0) < ra):
+            return                             # (0.8.224, real logs — 1,077 rest starts undone 2 s later: the zombie's
+                                               #  parts show up in the room answer; wait for it, 2.5 s at most)
         if not st.room and now - getattr(st, "dark_at", 0) < 20 and self.maybe_locate():
             return                             # Buddy, 2026-10-28: pressed Enter in a dark room for minutes — 'pro'
         if (now - st.view.t > cfg.refresh_secs if st.view else True) and not self.hurrying():
@@ -2744,6 +3171,7 @@ class Automation:
             self._was_stunned = False
             for k in ("cast", "attack", "heal", "run", "pbless"):
                 self._cool[k] = 0               # fresh start: act on what's happening now
+        self._stale_combat(now)
         # 1. run
         if cfg.auto_combat and st.max_hp and cfg.run_pct and st.hp_pct() < cfg.run_pct and (mobs or st.in_combat):
             if self.ready("run", 3):
@@ -2823,8 +3251,12 @@ class Automation:
             mobs.sort(key=lambda m: not self._is_hunted(m[1]))
             self.fight(mobs)
             return
-        if cfg.auto_combat and mobs and not self._step_flag("NOATTACK"):
-            if in_range or (being_hit and cfg.defend_out_of_range):
+        held_fight = bool(not cfg.auto_combat and mobs and being_hit and self._held_now())
+        if held_fight and self.ready("held_fight_said", 30):
+            # 0.8.224 (Dan): held / engulfed with Combat off — you can't walk away, so fight back
+            self.log("Held and being hit with Combat off — fighting back")
+        if (cfg.auto_combat or held_fight) and mobs and not self._step_flag("NOATTACK"):
+            if in_range or (being_hit and cfg.defend_out_of_range) or held_fight:
                 if self.attack_last_hold(mobs, being_hit):
                     return
                 if self.fight(mobs) is not False:
@@ -3057,6 +3489,9 @@ class Automation:
                 continue          # can't be killed (the pyramid's stone sphinx: 9999 HP, 0 exp) — even if it swings
             if rec and not only and not self.hostile(rec) and not self._attacked_me(shown):
                 continue          # guards, the mayor, shopkeepers — leave them alone unless they start it
+            if rec and self._too_strong_mob(rec) and not st.in_combat and not self._attacked_me(shown) \
+                    and time.time() - getattr(self, "_attacked_at", 0) > 6:
+                continue          # ran from it twice lately (fight3 #2): not starting that fight again
             out.append((shown, rec))
         return out
 
@@ -3288,8 +3723,11 @@ class Automation:
     # (0.8.201, bug hunt: "You slap / jumpkick / critically … / surprise …" weren't ours, so the stall watchdog fired
     # mid-fight; any "You <verb> … for N damage!" is our own hit, as combatlog reads it)
     OWN_ATTACK_RE = re.compile(r"^you (?:make a|cast|draw|attempt|hit|miss|swing|slash|stab|bash|smash|punch|kick|"
-                               r"strike|crush|lunge|fire|shoot|backstab|fail|slap|jumpkick|critically|surprise)"
-                               r"|^your (?:spell|attack|blow|strike)|^you (?!gain\b|lose\b)[a-z].* for \d+ damage!",
+                               r"strike|crush|lunge|fire|shoot|backstab|fail|slap|jumpkick|critically|surprise|glow|summon|raise your palm)"
+                               r"|^your (?:spell|attack|blow|strike)|^you (?!gain\b|lose\b)[a-z].* for \d+ damage!"
+                               # 0.8.224 (real logs: 103 of 106 watchdog re-sends came mid-spell): the game's spell lines
+                               r"|^your (?!.*\bheal)[a-z].* for \d+ damage!|^.*\byour foes for \d+ damage"
+                               r"|^you raise your hands|^you move your hands|^your foes .* for \d+ damage",
                                re.I)
 
     def _stall_check(self, now):
@@ -3300,7 +3738,7 @@ class Automation:
         if not secs or not st.in_combat or now - self._attacked_at > 6:
             return
         last = max(getattr(self, "_own_attack_at", 0), getattr(self, "_cast_sent_at", 0),
-                   getattr(self, "_area_armed", 0) or 0)
+                   getattr(self, "_area_armed", 0) or 0, getattr(self, "_last_hit_at", 0) or 0)
         if now - last < secs:
             return
         if self.ready("stall_said", 20):
@@ -3383,6 +3821,8 @@ class Automation:
             if not st.max_ma or st.ma - floor >= cost:
                 if st.in_combat and getattr(self, "_area_armed", 0):
                     return        # the game repeats it every round; re-sending only toggles combat and loses one
+                if not st.in_combat and time.time() - (getattr(self, "_area_armed", 0) or 0) < 3.5:
+                    return        # (0.8.224, real logs — 1,513 times: just sent, no *Combat Engaged* yet)
                 if self.ready("cast", cfg.spell_round_secs if st.in_combat else 2.0):
                     self.status = f"Casting {cfg.multi_spell} ({len(mobs)} mobs)"
                     self.x.counted_cast()
@@ -3515,6 +3955,8 @@ class Automation:
         if self._no_melee(rec):
             # a level-50+ caster never swings unless the monster is immune to all its magic (Dan, 2026-11-14) —
             # out of mana it waits for the next spell rather than punch for 8
+            if self._mana_backoff(mob, rec):
+                return
             self.status = f"Not meleeing {mob[0]} — waiting for mana / a spell that hurts it"
             if self.ready("no_melee_note", 60):
                 self.log(f"Not meleeing {mob[0]}: a caster at your level only swings at a monster immune to all your "
@@ -3612,6 +4054,29 @@ class Automation:
         sb = s.spellbook
         mine = [sp for sp in s.known_spell_dicts() if is_attack_spell(sp) and sp.get("Number") not in sb.refused]
         return any(not sb.useless(rec, sp) for sp in mine)
+
+    def _mana_backoff(self, mob, rec) -> bool:
+        """0.8.223 (Dan, m1617c N1): a level-50+ caster that won't swing (_no_melee) and hasn't the mana for any spell
+        that hurts this monster backs off a room and rests to full — standing there neither swinging, resting nor
+        moving lasted minutes, until a hang-up. Not a follower (that's the leader's call); not with Rest off."""
+        st, cfg, s = self.st, self.cfg, self.s
+        if not cfg.auto_rest or not st.max_ma or st.ma is None:
+            return False
+        if st.party and not self.x.leading():
+            return False
+        from .spells import is_attack_spell
+        sb = s.spellbook
+        costs = [int(sp.get("ManaCost") or 0) for sp in s.known_spell_dicts()
+                 if is_attack_spell(sp) and sp.get("Number") not in sb.refused and not sb.useless(rec, sp)]
+        if not costs or st.ma - int(cfg.spell_mana_reserve or 0) >= min(costs):
+            return False                             # a spell that hurts it is affordable: it casts
+        if not self.ready("mana_backoff", 20):
+            return False
+        self.log(f"Out of mana for {mob[0]} (MA {st.ma}/{st.max_ma}, the cheapest spell that hurts it is {min(costs)}) "
+                 f"— backing off a room to rest")
+        self._msg_rest_full = time.time()            # (rest to full: Rest below MA may be off)
+        self.flee(count=False)
+        return True
 
     def _caster_only(self) -> bool:
         """A class whose melee is hopeless next to its spells (a mage): it casts whatever hurts, never swings
@@ -4206,9 +4671,10 @@ class Automation:
             s = rec["name"] if rec else re.sub(r"^\d+\s+", "", s)
         return s.strip()
 
-    def flee(self, onward=False, retry=False):
+    def flee(self, onward=False, retry=False, count=True):
         """Run. Only ever through an exit the room actually shows right now — a wrong guess
-        ("There is no exit in that direction!") costs a round while you're being hit."""
+        ("There is no exit in that direction!") costs a round while you're being hit. count=False: not a run from
+        something too strong (backing off to rest for mana) — not counted by _note_run."""
         st, cfg = self.st, self.cfg
         if not onward and not retry:
             self.x.on_flee()
@@ -4253,6 +4719,8 @@ class Automation:
             if not onward and not retry:
                 self._run_left = max(int(cfg.run_distance or 1), 1) - 1
                 self._run_from = here
+                if count:
+                    self._note_run(here)
             self.send(dirs[0].lower())                  # n / se / u … like MegaMUD
         else:
             self._run_left = 0
@@ -4265,6 +4733,81 @@ class Automation:
             self._flee_dir = None
             self.log("That way out didn't work — trying another exit")
             self.flee(retry=True)
+
+    RUN_WINDOW = 600            # two runs from the same monster in the same room this close together…
+    TOO_STRONG_SECS = 1800      # …and it's too strong for you for this long
+
+    def _note_run(self, room):
+        """0.8.223 (Dan, fight3 #2): ran from the same monster in the same room twice in 10 minutes — it's too strong
+        for you. For 30 minutes the room is kept out of routes (world.user_avoid) and the monster isn't attacked
+        unless it starts it, instead of run, rest, walk straight back in, run (the dockhands, the Chrono Lord)."""
+        st, now = self.st, time.time()
+        recs = [rec for _s, rec in ((st.view.monsters if st.view else None) or []) if rec]
+        if not room or not recs:
+            return
+        try:
+            worst = max(recs, key=self.s.danger.mob_dpr)
+        except Exception:
+            worst = recs[0]
+        name = worst.get("name") or "monster"
+        runs = {k: v for k, v in (getattr(self, "_runs", None) or {}).items() if now - v[-1] < self.RUN_WINDOW}
+        key = (tuple(room), name.lower())
+        runs[key] = [t for t in runs.get(key, []) if now - t < self.RUN_WINDOW] + [now]
+        self._runs = runs
+        if len(runs[key]) < 2:
+            return
+        runs.pop(key, None)
+        ts = self.__dict__.setdefault("_too_strong", {})
+        ts[tuple(room)] = (now + self.TOO_STRONG_SECS, name)
+        w = self.s.world
+        w.user_avoid = frozenset(getattr(w, "user_avoid", None) or ()) | {tuple(room)}
+        r = w.room(room)
+        self.log(f"Ran from the {name} at {r.name + ' ' if r else ''}{room[0]}/{room[1]} twice — too strong for you: "
+                 f"going round that room and leaving the {name} alone for 30 minutes")
+
+    def too_strong_rooms(self) -> frozenset:
+        """Rooms you ran from the same monster twice in (see _note_run), for the next 30 minutes."""
+        d = getattr(self, "_too_strong", None)
+        if not d:
+            return frozenset()
+        now = time.time()
+        for k in [k for k, v in d.items() if v[0] <= now]:
+            del d[k]
+        return frozenset(d)
+
+    def too_strong_note(self, rooms=None) -> str:
+        """'the dockhand at 14/3799 (too strong for you for 25 more minutes)' for the rooms given (all of them by
+        default), or ''."""
+        d = getattr(self, "_too_strong", None) or {}
+        ks = [k for k in (rooms if rooms is not None else self.too_strong_rooms()) if k in d]
+        if not ks:
+            return ""
+        now = time.time()
+        return ", ".join(f"the {d[k][1]} at {k[0]}/{k[1]}" for k in ks[:3]) + \
+            f" (ran from it twice — too strong for you for {max(1, round((max(d[k][0] for k in ks) - now) / 60))} " \
+            f"more minutes)"
+
+    def _stale_combat(self, now):
+        """0.8.223 (m1018 #2b): our move landed in another room with monsters in it and 'in combat' is still on from
+        the room we left: if none of them has hit us in 6 s and we haven't started a fight here, it's over."""
+        st = self.st
+        mv = getattr(st, "moved_at", None)
+        if not st.in_combat or not mv or mv[0] != st.room or now - mv[1] < 6:
+            return
+        if getattr(st, "combat_on_at", 0) >= mv[1] or getattr(self, "_attacked_at", 0) >= mv[1]:
+            return
+        if any(t >= mv[1] for t in (getattr(self, "_aggro", None) or {}).values()):
+            return                                   # (one swung at us here, even if it missed)
+        st.in_combat = False
+        self.log("Moved away from the fight and nothing here has hit us — not in combat any more")
+
+    def _too_strong_mob(self, rec) -> bool:
+        nm = ((rec or {}).get("name") or "").lower()
+        d = getattr(self, "_too_strong", None)
+        if not nm or not d:
+            return False
+        now = time.time()
+        return any(v[0] > now and v[1].lower() == nm for v in d.values())
 
     # ---------------------------------------------------------- bless / buffs
     # Buff rule (settings.buffs entries):
@@ -4839,6 +5382,12 @@ class Automation:
             # each 'Your command had no effect.'. Three in a row: leave that rule alone for 10 minutes and say why
             # (one could be a knockdown or a hold)
             bc = getattr(self, "_buff_cast", {})
+            recent = [kv for kv in bc.items() if time.time() - kv[1] < 4]
+            if len(recent) > 1:
+                # (0.8.224, real logs: flux — a mage spell — and ntap went out together; ntap, the druid's real one,
+                #  got the blame and was switched off for 10 min. Blame the one that isn't a spell we have, or none)
+                odd = [kv for kv in recent if self._cmd_spell(kv[0], kv[0].split()) is None]
+                bc = dict(odd) if len(odd) == 1 else {}
             if bc:
                 k, t = max(bc.items(), key=lambda kv: kv[1])
                 if time.time() - t < 4:
@@ -4969,6 +5518,10 @@ class Automation:
             self.eco_note_hit(text)
         if low.startswith("your ") and re.search(r"\bfor \d+ damage", low):
             self._last_hit_at = time.time()           # our spell/attack is landing
+        mh_ = self.HEALED_RE.match(low) if low.startswith("you cast ") else None
+        if mh_ and mh_.group(2) == (self.cfg.my_name or "").lower():
+            hs = self.__dict__.setdefault("_heal_seen", {})
+            hs[mh_.group(1)] = (hs.get(mh_.group(1)) or [])[-5:] + [int(mh_.group(3))]
         if re.match(r"^you gain [\d,]+ experience", low):
             self._kill_at = time.time()               # the room list is stale until it's shown again (fight())
         elif not low.startswith(("you ", "your ")) and re.search(
@@ -5074,7 +5627,9 @@ class Automation:
                                            (said_ and said_.group(1).strip() == str(lc_[0]).strip().lower())) \
                 and not lc_[1] and not self._knocked_down_now() \
                 and time.time() - getattr(self, "_step_sent_at", 0) < 5 \
-                and time.time() - getattr(self, "_macro_at", 0) >= 4:
+                and time.time() - getattr(self, "_macro_at", 0) >= 4 \
+                and time.time() - max((getattr(self, "_buff_cast", None) or {}).values(), default=0) >= 4:
+            # (0.8.224, real logs — 40 false 'pro' checks: a bless sent with the step said it, not the step)
             # (0.8.200: and only when the last thing we sent wasn't an attack or a spell. Paradigm says it, too, for
             # an attack on a monster a party member has just killed, a spell that can't go, a 'break' or a 'bash'
             # at a wall — MudPlay's notes. Arriving and swinging at the party's kill read as "wrong room".)
@@ -5089,6 +5644,17 @@ class Automation:
             if self.locate_now("the path's command had no effect"):
                 self.log("'Your command had no effect.' — the path thinks this is another room; checking where we are")
             self._drop_bad_learned()
+        if self.walking and self.path and low.strip() == "your command had no effect." \
+                and time.time() - getattr(self, "_step_sent_at", 0) < 5 and not getattr(self, "_chance_need", None):
+            # a '(Chance)' step that needs an item ('dig grave' needs a shovel): "no effect" = the item's gone (the dig
+            # takes the shovel now and then) — read the pack; _resend_guard decides (m12 #4: dug on, grave to grave)
+            k_ = self._resends[0] if self._resends else None
+            cx_ = self._chance_exit(k_[0], k_[1]) if (k_ and k_[0]) else None
+            nd_ = self.s.world.exit_need(cx_) if cx_ is not None else None
+            need_ = ([nd_[0]] if nd_ else []) + (self._opener_items(cx_) if cx_ is not None else [])
+            if need_:                                # (MME: 'dig grave' is a text exit whose req items has the shovel)
+                self._chance_need = {"seq": st.inv_seq, "t": time.time(), "num": need_[0], "move": k_[1]}
+                self.send("i")
         ac_ = getattr(self, "_attack_cmd", None)
         if said_ and ac_ and said_.group(1).strip() == str(ac_[0]).strip().lower() and time.time() - ac_[1] < 5:
             # (0.8.202, Wayfarer: 'You say "bash wizard"' — the game took the attack as speech: blind, or no such
@@ -5403,11 +5969,22 @@ class Automation:
         return max(0, min(n, room // per))
 
     # ---------------------------------------------------------- rest
+    def _rest_broken_here(self) -> bool:
+        """0.8.224 (Dan, logEVO): 3 rests a fight broke up in this room in the last 2 minutes — something keeps
+        spawning on us (the Abandoned Temple hallway: "a fight broke it up" 6 times in 3 minutes, then a hang-up)."""
+        room = tuple(self.st.room) if self.st.room else None
+        now = time.time()
+        rb = [(t, r) for t, r in (getattr(self, "_rest_broken", None) or []) if now - t < 120]
+        self._rest_broken = rb
+        return bool(room) and sum(1 for _t, r in rb if r == room) >= 3
+
     def _rest_elsewhere(self, mobs) -> bool:
         """Walking a loop and this is a lair (monsters spawn here)? Keep going to the next room
         without one — at most cfg.safe_rest_steps ahead — unless HP is getting low."""
         cfg, st, w = self.cfg, self.st, self.s.world
         n = int(cfg.safe_rest_steps or 0)
+        if not n and self._rest_broken_here():
+            n = 3                             # (0.8.224: a room that keeps breaking rests up — see _rest_broken_here)
         if getattr(self, "_danger_hp", 0):
             return False                      # resting up for a dangerous lair next: rest right here
         if not n or not self.walking or not self.path or not st.room or self._fled or st.in_combat:
@@ -5418,7 +5995,7 @@ class Automation:
             return False                      # not the mana for the next room's fight: rest at your rest % (Dan,
             # 2026-11-03: PVE walked on at 37% into three crabs and was down to 129 mana)
         here = w.room(st.room)
-        if not here or not here.lair:
+        if not here or not (here.lair or self._rest_broken_here()):
             return False
         steps = self.path.steps
         for k in range(n):
@@ -5454,9 +6031,8 @@ class Automation:
         # the rest/meditate gear goes on for these too — unless we're already over 'rest until': then the next tick
         # calls it rested, swaps the gear straight back and stands us up, and 6 s later it all starts again
         # (0.8.208: Miserable PVE swapped 4 rings/capes on and off every 6 s while waiting on Buddy — Dan, 2026-11-19)
-        over = hp >= cfg.rest_until_hp and (not st.max_ma or not cfg.rest_below_ma or ma >= cfg.rest_until_ma)
-        if not over:
-            self._begin_swap("med" if medi else "rest")
+        # 0.8.224 (Dan): no gear swap at all for these — they're short and the party walks on any second (Miserable
+        # PVE's regen set on and off for every wait; once the game said "slow down"). A real rest swaps as usual
         self.send(cfg.meditate_cmd if medi else cfg.rest_cmd)
 
     def _shortfall(self):
@@ -5664,6 +6240,16 @@ class Automation:
         if (low_hp or low_ma or self._fled) and not topped:
             if cfg.auto_combat and mobs and in_range:
                 return False  # fight first
+            if not cfg.auto_combat and mobs and getattr(self, "_being_hit", False) and not st.resting:
+                # 0.8.224 (Dan, logEVO): Combat off and being hit — sitting down only gets broken up again (5 rests
+                # at the Crimson Fortress with demonhunters hitting for 60-150, then a hang-up). Walking: walk on;
+                # standing: don't sit down here
+                if self.ready("hit_no_rest_said", 20):
+                    self.log("Not resting: being hit with Combat off" + (" — walking on" if self.walking else ""))
+                if self.walking:
+                    return False
+                self.status = "Being hit with Combat off — not resting here"
+                return True
             if self._rest_elsewhere(mobs):
                 return False  # a lair room: rest a step or two on, where nothing spawns on you
             act = self._smart_act(dh, full, mobs)
@@ -5730,6 +6316,32 @@ class Automation:
         return False
 
     # ---------------------------------------------------------- healing
+    HEALED_RE = re.compile(r"^you cast (.+?) on (\w+), healing (\d+) damage")
+
+    def _heal_too_small(self, cmd) -> bool:
+        """0.8.224 (Dan, logMB): a heal far smaller than what's coming in — 'mihe' healed 5-14 HP a round while 3
+        nightshades did 100-420, and each cast is a round with no attack. In a heavy fight (the last rounds took 10%+
+        of your max HP), skip a self-heal whose last few casts averaged under a quarter of the damage per round."""
+        st = self.st
+        sp = self._cmd_spell(cmd, (cmd or "").split())
+        name = (sp.get("Name") or "").lower() if sp else ""
+        seen = (getattr(self, "_heal_seen", None) or {}).get(name) or []
+        if len(seen) < 3 or not st.max_hp:
+            return False                         # (not enough casts seen yet: heal as set)
+        cl = getattr(self.s, "combatlog", None)
+        now = time.time()
+        rounds = [r for r in list(getattr(cl, "rounds", None) or []) if now - r.get("last", r.get("t", 0)) < 15][-2:]
+        if not rounds:
+            return False
+        taken = sum(r.get("taken", 0) for r in rounds) / len(rounds)
+        avg = sum(seen) / len(seen)
+        if taken < 0.10 * st.max_hp or avg >= 0.25 * taken:
+            return False
+        if self.ready("heal_small_said", 30):
+            self.log(f"Not healing: {name or cmd} heals ~{avg:.0f} and the fight's taking ~{taken:.0f} a round — "
+                     "attacking instead")
+        return True
+
     def heal_tick(self) -> bool:
         """Heal yourself or the party member who needs it most (MegaMUD Spells + Party tabs):
         minor / major heals by HP %, an area heal when enough of the party is hurt, priority
@@ -5750,15 +6362,24 @@ class Automation:
                 return True
             sp = self.s.spellbook.find(w[1] if w[0].lower() in ("cast", "c") and len(w) > 1 else w[0])
             return not sp or int(sp.get("ManaCost") or 0) <= st.ma
+        # Dan: heal only above a mana % — low in a fight, higher out of one so there's mana left to move on and
+        # bless. Someone under 30% HP gets healed whatever the mana
+        ma_line = int((cfg.heal_min_ma_fight if st.in_combat else cfg.heal_min_ma_rest) or 0)
+        ma_low = bool(ma_line and st.max_ma and 100 * st.ma < ma_line * st.max_ma)
+
+        def mana_ok(hp_pct):
+            return not ma_low or hp_pct < 30
         broke = False       # wanted to heal yourself but can't pay for it
         if st.max_hp:
             hp = st.hp_pct()
             b = bonus if me in pri else 0
-            if cfg.major_heal_cmd and hp < cfg.major_heal_pct and afford(cfg.major_heal_cmd):
+            if not mana_ok(hp):
+                pass
+            elif cfg.major_heal_cmd and hp < cfg.major_heal_pct and afford(cfg.major_heal_cmd):
                 mine = (hp - b, None, cfg.major_heal_cmd)
             elif cfg.heal_cmd and hp < cfg.heal_pct and afford(cfg.heal_cmd):
                 mine = (hp - b, None, cfg.heal_cmd)
-            broke = not mine and bool((cfg.major_heal_cmd and hp < cfg.major_heal_pct) or
+            broke = not mine and mana_ok(hp) and bool((cfg.major_heal_cmd and hp < cfg.major_heal_pct) or
                                       (cfg.heal_cmd and hp < cfg.heal_pct))
             if mine and cfg.smart_rest and not st.in_combat and hp >= int(cfg.smart_rest_safe_hp or 0) \
                     and not self.attackable():
@@ -5788,6 +6409,8 @@ class Automation:
                     hurt += 1
                 b = bonus if low in pri else 0
                 minor = (cfg.party_heal_cmd or "").strip() or (f"{cfg.heal_cmd} {{name}}" if cfg.heal_cmd else "")
+                if not mana_ok(hp):
+                    continue
                 if cfg.party_major_cmd and hp < cfg.party_major_pct + b and afford(cfg.party_major_cmd):
                     cands.append((hp - b, name, cfg.party_major_cmd))
                 elif minor and hp < cfg.party_heal_pct + b and afford(minor):
@@ -5795,7 +6418,7 @@ class Automation:
             if st.max_hp and st.hp_pct() < cfg.party_area_pct:
                 hurt += 1
         # area heal
-        if cfg.party_heal and cfg.party_area_cmd and hurt >= max(2, cfg.party_area_count):
+        if cfg.party_heal and cfg.party_area_cmd and hurt >= max(2, cfg.party_area_count) and                 (not ma_low or any(c[0] < 30 for c in cands)):
             major_needed = any(c[2] in (cfg.party_major_cmd, cfg.major_heal_cmd) for c in cands if c[2])
             if cfg.area_over_major or not major_needed:
                 if self.slot_free() and self.ready("heal", 3):
@@ -5825,6 +6448,8 @@ class Automation:
         hp_now = st.hp_pct() if who is None else (st.party.get(who) or {}).get("hp", 100)
         urgent = cmd in (cfg.major_heal_cmd, cfg.party_major_cmd) and bool(cmd) and hp_now < 30
         if st.in_combat and not urgent and not self.early_in_round():
+            return False
+        if who is None and st.in_combat and self._heal_too_small(cmd):
             return False
         if not self.ready("heal", 3):
             return False
@@ -5956,6 +6581,13 @@ class Automation:
         self.fight(mobs)
         return True
 
+    def _held_now(self) -> bool:
+        """Held, webbed or engulfed (a minute at most since the line — a missed 'you can move again' can't leave
+        it on)."""
+        a = getattr(self.x, "ailments", None) or {}
+        t = a.get("held")
+        return bool(t) and time.time() - t < 60
+
     def attack_last_hold(self, mobs, being_hit) -> bool:
         """Attack last no longer holds the attack back (Revolution, 2026-10-31: "it's waiting for others to attack
         first — I want it to attack immediately, then attack again if someone attacks after me"). The attack goes at
@@ -5967,6 +6599,21 @@ class Automation:
         man = getattr(self, "manual", None)
         fighting = bool(self.cfg.auto_combat or getattr(self, "hunt_target", None))   # (an event's boss: Combat or not)
         return not self.paused and fighting and not (man is not None and getattr(man, "active", False))
+
+    AL_OPENER_SECS = 1.5
+
+    def _al_pending_tick(self, now):
+        """Attack last: a party member joined before our own opening cast landed — re-send once it's had the time."""
+        p = getattr(self, "_al_pending", None)
+        if not p:
+            return
+        ac = getattr(self, "_attack_cmd", None)
+        if not ac or ac[1] != p[1] or not self.st.in_combat or now - p[1] > 10:
+            self._al_pending = None      # (we've attacked again meanwhile, or the fight's over: nothing to re-send)
+            return
+        if now - p[1] >= self.AL_OPENER_SECS:
+            self._al_pending = None
+            self._attack_after_party(p[0])
 
     def _attack_after_party(self, name):
         """Attack last: a party member just joined the fight after us — attack again, so we're the last to."""
@@ -5980,6 +6627,13 @@ class Automation:
         done = self.__dict__.setdefault("_al_answered", set())
         if name.lower() in done or len(done) >= 6:
             return                  # (no time gap: Evolution joining 1 s after Buddy went unanswered — Dan, 2026-10-31)
+        if now - ac[1] < self.AL_OPENER_SECS:
+            # 0.8.224 (Dan: "fix it please this is big" — PVEREV, 5,781 toggles a week): our attack's first cast lands
+            # ~0.4 s after *Combat Engaged*; a re-send before that is *Combat Off* / *Engaged* and the opening cast is
+            # thrown away (1,867 of 2,093 re-sends in one trace came before our first cast). Wait till it's had time
+            # to land, then re-send (tick: _al_pending_tick)
+            self._al_pending = (name, ac[1])
+            return
         period = float(getattr(getattr(self.s, "clock", None), "period", 5.0) or 5.0)
         recent = [t for t in getattr(self, "_al_times", []) if now - t < period]
         if len(recent) >= 5:
@@ -6039,6 +6693,63 @@ class Automation:
     JOIN_WAIT = 40                       # seconds the walk waits for someone invited to start following
 
     PARTY_BASH = 4                       # bashes each helper sends per ask
+    HELP_SECS = 60                       # a door only a follower can open: their go before trying round it
+    HELP_MAX = 180                       # ...and in all, when it's the only way
+    HELP_ASK_WAIT = 20                   # nobody to ask (not here, not a MudPilot) this long: as before
+
+    def _door_helpers(self, room, d, hands, ex, now) -> bool:
+        """A locked door only followers can bash / pick (partyB P4, party3 D3, partyA #4): ask them ('@do bash east'
+        / '@do pick east', again every 20 s — _party_bash), try 'open' every few seconds while they work, and only
+        after HELP_SECS fetch its key (when something drops / sells it) or go round; the only way: keep at it till
+        HELP_MAX. True = handled this tick; False = nobody could be asked, the usual tries go on."""
+        hd = getattr(self, "_help_door", None)
+        if not hd or hd["at"] != (room, d) or now - hd["seen"] > 15:
+            hd = self._help_door = {"at": (room, d), "t0": now, "seen": now, "next": 0.0, "asked": False,
+                                    "round": False, "off": False, "op0": getattr(self, "_opened", None)}
+        hd["seen"] = now
+        if hd["off"]:
+            return False
+        op = getattr(self, "_opened", None)
+        if op and op != hd["op0"] and op[1] == d:
+            self._help_door = None                   # they got it open: the walk goes through
+            return True
+        word = DIR_WORDS.get(d, d)
+        self._party_bash(d, hands)
+        hb = getattr(self, "_bash_help", None)
+        if hb and hb[0] == room and hb[1] == d and now - hb[2] < 25:
+            hd["asked"] = True
+        el = now - hd["t0"]
+        if not hd["asked"] and el >= self.HELP_ASK_WAIT:
+            hd["off"] = True
+            return False
+        names = ", ".join(hands)
+        if hd["asked"] and el >= self.HELP_SECS and not hd["round"]:
+            hd["round"] = True
+            w = self.s.world
+            need = w.exit_need(ex) if ex is not None else None
+            # its key, if there's somewhere to get one (not "quest item?" — that ended the Go to with Revolution there
+            # to bash it: partyB P4)
+            if need and self.errands.source_for(need[0], near=room) and self._fetch_door_key(room, d, ex):
+                self._help_door = None
+                return True
+            if self.route_around(room, d, f"the door {word} didn't open for {names}"):
+                self._help_door = None
+                return True
+            self.log(f"The door {word} is the only way — {names} keep at it")
+        if el >= self.HELP_MAX:
+            self._help_door = None
+            self.stop(f"Stopped: the door {word} is locked — {names} couldn't open it in {self.HELP_MAX // 60} min")
+            return True
+        if hd["asked"] and now >= hd["next"]:
+            hd["next"] = now + 3.0
+            self._opening_dir = d
+            self.send(f"open {word.lower()}")        # (try it while they work: a picked lock still needs opening)
+        self._locked_dir = d                         # (back here next tick: the "locked" answer doesn't pace this)
+        verb = "picking" if (ex is not None and not re.search(r"/strength", ex.etype or "", re.I)) else "bashing"
+        self.status = (f"Door {word} locked — {names} {verb} it" if hd["asked"]
+                       else f"Door {word} locked — waiting for {names} to {verb[:-3]} it")
+        self._last_progress = now
+        return True
 
     def _party_bash(self, d, strong=None):
         """Leading and bashing a door: the party's MudPilots in the room bash it too (Dan, 2026-10-30) — every
@@ -6124,7 +6835,12 @@ class Automation:
     def _step_flag(self, name) -> bool:
         if not self.walking or not self.path or self.idx >= len(self.path.steps):
             return False
-        stp = self.path.steps[self.idx]
+        i = self.idx
+        if name in ("NOATTACK", "DONTREST") and i > 0 and any(p and p[0] == "move" for p in self.st.pending) and \
+                (not self.st.view or (self.st.view.t or 0) < (self._step_sent_at or 0)):
+            i -= 1          # (0.8.224, real logs — 1,925 chai cast at a No-attack room's monsters on the way out: the
+                            #  move is on its way, so we still stand in the room the last step left from)
+        stp = self.path.steps[i]
         on = stp.flag(name) or (name in ("NOATTACK", "DONTREST") and bool(stp.room)
                                 and stp.room in self._runthru_rooms())
         # a run-through room (loop editor, 0.8.211): no fighting, no resting — straight out the other side
@@ -6226,6 +6942,27 @@ class Automation:
                 return j
         return None
 
+    def _loop_rooms_near(self, here, mp, depth=3) -> bool:
+        """A room of this path within `depth` moves of here, on MME's map."""
+        w = self.s.world
+        rooms = {tuple(s.room) for s in mp.steps if s.room}
+        if not rooms or not here:
+            return False
+        seen, frontier = {tuple(here)}, [tuple(here)]
+        for _ in range(depth):
+            nxt = []
+            for k in frontier:
+                r = w.room(k)
+                for ex in (r.exits.values() if r else []):
+                    to = tuple(ex.to) if getattr(ex, "to", None) else None
+                    if to and to not in seen:
+                        if to in rooms:
+                            return True
+                        seen.add(to)
+                        nxt.append(to)
+            frontier = nxt
+        return False
+
     def _anchor(self) -> bool:
         """If we're in a room whose hash matches a step but the path was resolved to a
         look-alike area, re-resolve it from where we really are."""
@@ -6237,6 +6974,10 @@ class Automation:
             # 'this look-alike room must be step 150' — the Great Pyramid is all the same room
             return False
         if any(s.room == here for s in mp.steps):
+            return False
+        if self._loop_rooms_near(here, mp):
+            # a room of the path a step or three away (started beside the loop on the Ocean Floor's open grid): walk
+            # back to it — re-anchoring here slid the whole lap onto a parallel look-alike column (m1617c R1, OCDWLOOP)
             return False
         h = self.s.world.room(here).mega_hash
         n = len(mp.steps)
@@ -6376,9 +7117,14 @@ class Automation:
             d, self._locked_dir = self._locked_dir, None
             n = self._lock_tries.get(d, 0) + 1
             self._lock_tries[d] = n
-            if n > self.TIMED_TRIES and n <= 40 and self.route_around(
-                    st.room, d, f"the door {DIR_WORDS.get(d, d)} didn't open ({n - 1} tries)"):
-                return                                 # another way round: don't stand here trying for 2 minutes
+            tr_ = self.__dict__.setdefault("_timed_round_at", {})
+            if n > self.TIMED_TRIES and n <= 40 and now - tr_.get((st.room, d), 0) >= self.TIMED_ROUND_SECS:
+                # 0.8.224 (Dan, regression walks): the pyramid's timed doors are spliced back into the new route, so
+                # going round put the same door back and it re-planned every tick (~12 log lines a second for minutes).
+                # Once every TIMED_ROUND_SECS; 'open' every 2 s in between, as before the retries ran out
+                tr_[(st.room, d)] = now
+                if self.route_around(st.room, d, f"the door {DIR_WORDS.get(d, d)} didn't open ({n - 1} tries)"):
+                    return                             # another way round: don't stand here trying for 2 minutes
             if n > 40:
                 if not self.route_around(st.room, d, f"the door {DIR_WORDS.get(d, d)} never opened"):
                     self.stop(f"Stopped: the door {DIR_WORDS.get(d, d)} never opened (tried 'open' for 2 minutes)")
@@ -6402,6 +7148,13 @@ class Automation:
             d, self._locked_dir = self._locked_dir, None
             n = self._lock_tries.get(d, 0)
             key = self._door_key(st.room, d)
+            lk_ = self.__dict__.setdefault("_lock_keys", {})
+            if key and lk_.get((st.room, d)) != key:
+                # the key turned up while we stood here (dropped, or handed over): it gets its go — the tries so far
+                # were counted without it, and n landed past 'use … key' (partyA #5, the Black House door)
+                n = 0
+                self._lock_tries.pop(d, None)
+            lk_[(st.room, d)] = key
             k = 1 if key else 0                       # pMUD: the key first, then pick, then bash
             picks = int(cfg.attempt_pick or 0) if (cfg.pick_locks or self.can_pick_doors()) else 0
             bashes = int(cfg.attempt_bash or 0)
@@ -6442,9 +7195,23 @@ class Automation:
                 and self.door_hands(dx_)
             # too weak for it yourself, someone in the party isn't: they bash, you try the door
             self._bash_by = weak if (weak and not key and not pick_ok) else None
+            # only a follower can open it (too strong for you to bash, or picklocks-only and yours don't cover it):
+            # they bash / pick it, paced on them — not on the instant "locked" answers to your 'open', which used the
+            # tries up in ~1 s and called the Go to off (partyB P4, party3 D3, partyA #4)
+            mine_ok = pick_ok or bool(dm and dm.group(1).isdigit() and dm.group(2)
+                                      and (st.strength or 0) >= int(dm.group(1)))
+            # (your strength not read: you bash it yourself, as before — test_only_door, the Darkwood tree house)
+            known_ = bool(st.strength) if (dm and dm.group(2)) else bool(st.strength or st.picklocks)
+            hands = self.door_hands(dx_) if (dm and dm.group(1).isdigit() and known_ and not key and not mine_ok
+                                             and not acts
+                                             and not unbashable and getattr(cfg, "party_bash_help", True)
+                                             and self.x.leading()) else []
+            if hands and self._door_helpers(st.room, d, hands, dx_, now):
+                return
             if acts:
                 # MME knows the room command that unlocks it ('turn stand'): that, then the door — never a bash
-                order = ["^M".join(acts), "open {dir}", "^M".join(acts), "open {dir}"]
+                order = ["^M".join(acts), "open {dir}"] * max(
+                    [2] + [int(a.get("tries") or 0) for a in dx_.actions])   # (the crowbar's strength test: 4)
             else:
                 order = [cfg.pick_cmd] * picks if pick_ok else []
                 order += [f"use {key} {{dir}}"] * k
@@ -6660,6 +7427,12 @@ class Automation:
                     return
                 targets = {s.room for s in mp.steps if s.room}
                 route = self.back_route(here, targets)
+                if route and self.loop and step.room and step.room != here:
+                    # knocked off mid-lap: back to the step we were on when that's only a little further, not the
+                    # nearest loop room anywhere — that skipped a whole spur of the lap (dark3 D2, JTVELOO2)
+                    own = self.back_route(here, step.room)
+                    if own and len(own) <= len(route) + 3:
+                        route = own
                 if route:
                     self.log(f"Off path at {here[0]}/{here[1]} — {len(route)}-step detour back")
                     self.detour = route
@@ -6668,6 +7441,13 @@ class Automation:
                 self.stop("Stopped: lost and no route back to the path")
                 return
             else:
+                if here and not mp.resolved and now - self._last_progress > 6:
+                    # 0.8.224 (Dan, logEVO): a MegaMUD loop that isn't matched to MME's map can't be found again from
+                    # a room off it — say so now, not after 60 s of Enter
+                    self.stop(f"Stopped: off '{mp.title}' at {here[0]}/{here[1]}, and that loop isn't matched to "
+                              "MME's map, so MudPilot can't find its way back — walk to the loop's start and start "
+                              "it again")
+                    return
                 if self.ready("lost", 3):
                     self.status = "Lost — looking around"
                     self.send("")
@@ -6741,7 +7521,7 @@ class Automation:
                          + ", ".join(f"{r[0]}/{r[1]}" for r in sorted(ar)[:3]))
                 continue
             if not SEARCH_CMD_RE.match(c):
-                self.send(c)
+                self.send(path_text(c))
                 self._action_sent_at = now          # a room action (ask sphinx / push block): watch its answer
                 if c.lower().startswith("use ") and step.dir:
                     self._pre_door_dir = step.dir   # 'use lion key w': an unlock of the door this step goes through
@@ -6815,7 +7595,7 @@ class Automation:
                     return                           # reading the inventory after "Nothing happens."
                 self._dig_at = now
             for c in step.pre:
-                self.send(c)
+                self.send(path_text(c))
             self._stay_sent = (step, now)
             self.status = "Doing: " + ", ".join(step.pre or ["(nothing)"])
             self._last_progress = now
@@ -7448,7 +8228,7 @@ class Automation:
             return False
         kt[(here, d_)] = (n_ + 1, t0_)
         for c in keys:
-            self.send(c)
+            self.send(path_text(c))
         self._pre_door_dir = self._opening_dir = d_
         self._door_wait_until = now + 2.5
         self.status = f"Unlocking the door {DIR_WORDS.get(d_, d_).lower()}"
@@ -7491,6 +8271,10 @@ class Automation:
         if not ex:
             return None
         need = self.s.world.exit_need(ex)
+        if not need and ex.kind == "door":
+            # (0.8.223, regr222 #3: the inside of a key door, typed as a plain locked door — the same door, same key)
+            tw = self.s.world.key_twin(ex)
+            need = self.s.world.exit_need(tw) if tw is not None else None
         if not need:
             return None
         have = self.held_items() or set()
@@ -7519,13 +8303,43 @@ class Automation:
         except Exception:
             return route
 
+    ROUND_SAME_SECS = 180  # one exit 'gone round' over and over (a spliced segment door): this long, then stop
+    TIMED_ROUND_SECS = 10  # a timed door that won't open: go round it at most this often (0.8.224)
+
     def route_around(self, here, d, why) -> bool:
         """An exit on the path won't work: remember it, and take another way to where the path goes next
         (Go to: plan the whole trip again without it). False = there's no other way."""
         if not here or not self.path:
             return False
+        # the same exit 'gone round' again and again: board_fixes' splice puts a pyramid segment's door back into the
+        # new route (that's how the timed doors get their retries), so a door that never opened was re-planned every
+        # ~3 s forever (m12pyr L1). A few minutes of that per door, then "no other way" — the caller stops, saying why.
+        # (Back-to-back only: the same door failing once a lap on a loop, minutes apart, isn't this)
+        now_ = time.time()
+        rt_ = self.__dict__.setdefault("_round_tries", {})
+        n_, t0_, last_ = rt_.get((here, d), (0, now_, now_))
+        if now_ - last_ > 30:
+            n_, t0_ = 0, now_
+        if n_ >= 3 and now_ - t0_ > self.ROUND_SAME_SECS:
+            if self.ready("round_same", 30):
+                self.log(f"…the {DIR_WORDS.get(d, d).lower()} exit of {here[0]}/{here[1]} keeps coming back as the way "
+                         f"({n_} times in {int(now_ - t0_)} s) — not going round it again")
+            rt_[(here, d)] = (n_, t0_, now_)
+            return False
+        rt_[(here, d)] = (n_ + 1, t0_, now_)
         w = self.s.world
         w.fail_edge(here, d)
+        try:
+            # (0.8.224, real logs — 1/160: 'ask Lord code', 'ask Lord code word', 'ask Lord codeword'… each tried 7
+            #  times, 5 min standing still. A text exit that failed: its other wordings to the same room fail too)
+            r_ = w.room(here)
+            ex_ = r_.exits.get(d) if r_ else None
+            if ex_ is not None and ex_.kind == "text":
+                for d2, e2 in r_.exits.items():
+                    if d2 != d and e2.kind == "text" and tuple(e2.to) == tuple(ex_.to):
+                        w.fail_edge(here, d2)
+        except Exception:
+            pass
         self.log(f"{why} — going round it")
         # on the bottom bar too, while it walks the long way (Dan: "it doesn't say why")
         self.route_note = (f"Went round: {why.lower()} at {here[0]}/{here[1]}", time.time())
@@ -7781,6 +8595,39 @@ class Automation:
             return True
         return False
 
+    CHANCE_TRIES = 40      # a '(Chance)' exit ('dig grave'): this many tries in its room, then stop
+
+    def _chance_exit(self, here, move):
+        """The '(Chance)' exit this move takes from here (it works now and then: 'dig grave'), or None."""
+        r = self.s.world.room(here) if here else None
+        m = str(move).strip()
+        for ex in (r.exits.values() if r else []):
+            if getattr(ex, "chance", False) and (ex.dir.lower() == m.lower() or ex.accepts(m)):
+                return ex
+        return None
+
+    def _chance_item_gone(self, cn) -> bool:
+        """A chance step's item ('dig grave' → the shovel) isn't in the pack any more: a Go to plans again (its
+        needed-items check fetches another); anything else stops, saying what's missing."""
+        nm = self.s.world.item_name(cn["num"]) or "item it needs"
+        mp = self.path
+        self._resends = (None, 0)
+        if mp and mp.title.startswith("Go to ") and mp.steps and mp.steps[-1].dest and cfg_auto_get(self.cfg):
+            self.log(f"'{cn['move']}' had no effect and the {nm} isn't in your pack any more — planning again to get one")
+            self.goto(mp.steps[-1].dest, then=self.after_goto, _retry=True)   # (it says why if it can't)
+            return True
+        self.stop(f"Stopped: '{cn['move']}' needs the {nm}, and it isn't in your pack any more")
+        self.s.on_alert(f"Need the {nm} for '{cn['move']}'")
+        return True
+
+    def _st_unanswered(self, pa, now) -> bool:
+        """A Go to parked for 'st' (_goto_check): wait for the answer, up to 10 s. Re-planning at 3 s without it set off
+        with the HP wall / door stats still unknown, and the 30 s 'st' cooldown wouldn't ask again (regr3 #5)."""
+        if abs(self._cool.get("goto_st", 0) - pa[3]) > 1 or now - pa[3] > 10:
+            return False
+        st = self.st
+        return not (st.max_hp_read and (st.picklocks or st.strength))
+
     def _move_kind(self, here, move) -> str:
         r = self.s.world.room(here) if here else None
         m = str(move).strip()
@@ -7799,6 +8646,14 @@ class Automation:
                 (norm_dir(str(k)) or str(k).upper()) for k in self._lock_tries}:
             return False                         # picking/bashing this door: retrying the move is the point
                                                  # (not a door left from somewhere else — loopsD D1: 'n' blocked forever)
+        cn_ = getattr(self, "_chance_need", None)
+        if cn_:
+            if self.st.inv_seq == cn_["seq"] and time.time() - cn_["t"] < 10:
+                self.status = "Checking your pack…"
+                return True                          # the 'i' is on its way
+            self._chance_need = None
+            if self.st.inv_seq != cn_["seq"] and cn_["num"] not in (self.held_items() or set()):
+                return self._chance_item_gone(cn_)
         key = (here, str(move).lower())
         last, n = self._resends
         if last == key and here and self._move_kind(here, move) in ("toll", "party"):
@@ -7821,6 +8676,15 @@ class Automation:
             self.send("")
             self._step_sent_at = time.time()
             return True
+        if n >= 8 and self._chance_exit(here, move) is not None:
+            # a '(Chance)' exit (a ~5% dig): failing is what it does — keep at it here, never 'round it' to the next
+            # graveyard room with the same dig (m12 #4: 52 digs in 400 s, grave to grave); CHANCE_TRIES, then stop
+            if n >= self.CHANCE_TRIES:
+                self._resends = (None, 0)
+                self.stop(f"Stopped: '{move}' from {here[0]}/{here[1]} didn't take me anywhere in {n} tries "
+                          "(it only works now and then)")
+                return True
+            return False
         if n >= 8:
             self._resends = (None, 0)
             d = next((ex.dir for ex in (self.s.world.room(here).exits.values() if self.s.world.room(here) else [])
@@ -7963,6 +8827,13 @@ class Automation:
         # the Altar of Blood's teleport is the only way out of there)
         ga = getattr(self, "_guard_at", None)
         if not ga or ga[0] != here:
+            est = self._fight_too_strong(guards)
+            if est and not st.in_combat:
+                # (0.8.223, m349 #5: an L10 took on the 1000-HP ancient willow — the same 'can I win this?' check as
+                #  any fight we choose)
+                self.stop(f"Stopped: {names} guards '{mv}' here — too strong for you (~{est:.0f} damage to you, max HP "
+                          f"{st.max_hp}); not fighting it")
+                return True
             self._guard_at = (here, now)
             self.log(f"{names} guards '{mv}' here — fighting it first")
         elif now - ga[1] > 300:

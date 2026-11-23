@@ -230,9 +230,22 @@ class EventManager:
     def fire(self, ev, why="manual"):
         if any(q[0] is ev for q in self._queue) or (self.hunt and self.hunt.ev is ev):
             return
-        ev["last_run"] = time.time()
+        ev["last_run"] = now = time.time()
         self._queue.append((ev, why))
-        self.s.log(f"Event '{ev.get('name') or describe(ev)[1]}' fired ({why})")
+        if why == "timer":
+            # 0.8.224 (Dan, log noise): PVEREV's 'par' every 6 s wrote 12,432 "fired" lines — a timer event says so
+            # the first time, then once every 30 minutes with a count
+            q = self.__dict__.setdefault("_timer_said", {})
+            k = id(ev)
+            last, n = q.get(k, (0, 0))
+            if now - last < 1800:
+                q[k] = (last, n + 1)
+            else:
+                q[k] = (now, 0)
+                self.s.log(f"Event '{ev.get('name') or describe(ev)[1]}' fired (timer)"
+                           + (f" — {n + 1} times in the last {(now - last) / 60:.0f} min" if last else ""))
+        else:
+            self.s.log(f"Event '{ev.get('name') or describe(ev)[1]}' fired ({why})")
         self.on_change()
 
     def tick(self):

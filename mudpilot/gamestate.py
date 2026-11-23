@@ -63,7 +63,7 @@ GATE_REFUSE = (r"do not have enough to cover the toll|alignment prevents you fro
 MOVE_FAIL_RE = re.compile(
     r"no exit in that direction|can'?t go that way|you cannot go that way|door is closed|is locked|"
     r"gate is closed|blocks your (?:way|path)|path is blocked|too exhausted|can'?t move|"
-    r"you are held|unable to move|a strange power holds you back|"
+    r"you are held|you are engulfed|unable to move|a strange power holds you back|"
     r"you can(?:not|'t) go (?:there|any further|in that direction)|portal is closed|you fumble in confusion|"
     r"you are too afraid|you look around stupidly|may not do that while you are mortally wounded|"
     # 0.8.200, from MudPlay's notes: refusals the step used to sit waiting on until it timed out
@@ -862,6 +862,7 @@ class GameState:
             self.ma, self.max_ma = int(m.group(1)), int(m.group(2))
         if COMBAT_ON_RE.search(text):
             self.in_combat = True
+            self.combat_on_at = time.time()
             self.resting = False
             self._event("combat", True)
         if COMBAT_OFF_RE.search(text):
@@ -1105,6 +1106,16 @@ class GameState:
                 out.append(n)
         return out
 
+    def _moved_in(self, key):
+        """0.8.223 (Dan, m1018 #2b): our own move landed in another room. Moving away ends the fight, but the game
+        (the practice server at least) doesn't always print *Combat Off* — a stale 'in combat' ran the run check over
+        and over with nothing hitting (81 runs in 4 minutes). Cleared here when nothing's in the new room; with
+        monsters here the bot clears it a few seconds on if none of them hits us (Automation._stale_combat)."""
+        self.moved_at = (key, time.time())
+        if self.in_combat and not (self.view and self.view.monsters):
+            self.in_combat = False
+            self._event("combat", False)
+
     def _locate(self, entry, name, shown):
         if entry and entry[0] == "move" and getattr(self, "_sneak_move", False):
             self._sneak_move = False
@@ -1123,6 +1134,8 @@ class GameState:
             if pred:
                 self.candidates = self._narrow(pred, prev)
                 self.steps_walked += 1
+                if not prev or pred[0] not in prev:
+                    self._moved_in(pred[0])
                 self.history.append(pred[0])
                 return
         # look / unexpected display / failed prediction: did we stay put?

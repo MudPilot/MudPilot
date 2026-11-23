@@ -33,7 +33,11 @@ try:
 finally:
     s.remote._in_do = False
 check(f"'@do invite miserable': invites ({out})", "invite miserable" in out)
-# Buddy
+out.clear(); s.remote._joined = {}
+s.remote.c_join("Miserable", "")
+check(f"0.8.224 (Dan): an @join inside the 5-minute pause after the disband: not joined ({out})", "join Miserable" not in out)
+# Buddy (who didn't disband)
+s._party_hold_until = 0
 out.clear(); s.remote._joined = {}
 s.remote.c_join("Miserable", "")
 check(f"first join goes out ({out})", "join Miserable" in out)

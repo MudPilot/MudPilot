@@ -109,7 +109,7 @@ HELP = [
     ("inventory", "@unstash", "Searches this room and picks its stashed raft back up", "/Miserable @unstash"),
     ("invite", "@invite", "Invites you to its party", "/Miserable @invite"),
     ("invite", "@join", "Joins your party", "/Miserable @join"),
-    ("invite", "@disband", "Disbands its party — and doesn't auto-invite anyone back for a minute",
+    ("invite", "@disband", "Disbands its party — and doesn't regroup automatically for 5 minutes",
      "/Revolution @disband"),
     ("move", "@goto", "Walks to a room (name or map/room)", "/Miserable @goto 10 297"),
     ("move", "@loop", "Starts a loop by name ('last' = the last one)", "/Miserable @loop rotting glade"),
@@ -260,7 +260,13 @@ class RemoteControl:
         if cmd == "@ptrain" and getattr(self.s, "training", None) is not None and self.s.training.expects(sender):
             pass       # (on a training trip: a member dropped from the party / the leader whose trip it is — 0.8.200)
         elif not self.allowed(sender, need, cmd):
-            self.s.log(f"Remote: {sender} not allowed {cmd}")
+            # 0.8.224 (Dan, log noise): a member who's just left the party sent '@comeback' 22 times — the same
+            # refusal is logged once every 10 minutes per sender and command
+            q = self.__dict__.setdefault("_denied_said", {})
+            k = (sender.lower(), cmd)
+            if time.time() - q.get(k, 0) > 600:
+                q[k] = time.time()
+                self.s.log(f"Remote: {sender} not allowed {cmd}")
             if cfg.remote_warn_denied and need != "party" and self._deny_ok(sender):
                 self.reply(channel, sender, self._denied())
             return
@@ -1174,7 +1180,7 @@ class RemoteControl:
         finally:
             self._in_do = False
         self.s.log(f"{s}: @disband")
-        return "disbanded - no auto-invites for a minute"
+        return "disbanded - no auto-regrouping for 5 minutes"
 
     INVITED_RE = re.compile(r"^(\w+) has invited you to (?:follow|join) (?:him|her|them|it)\b", re.I)
 
@@ -1478,6 +1484,8 @@ class RemoteControl:
             if kind == "door":
                 # 0.8.201 (Dan): a door nobody in the party can open — try anyway? No is the default
                 q = f"{area} - nobody in the party can open it. try anyway? reply y or n"
+            elif kind == "hurt":
+                q = f"{area}. go anyway? reply y or n"      # 0.8.224 (Dan): rooms that hurt past your limit
             elif scenic is None:
                 q = f"the only way goes through {area} ({short} rooms). take {area}? reply y or n"
             else:

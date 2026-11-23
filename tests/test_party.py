@@ -58,18 +58,24 @@ s.bot._cool.clear(); s.bot._last_spell_at = 0; sent.clear()
 for _ in range(3): s.bot.tick()
 check(f"attack last: attacks straight away ({sent})", any(c.startswith(("a ", "attack")) or "rat" in c for c in sent))
 s.state.in_combat = True
+ac0 = s.bot._attack_cmd
 sent.clear(); feed("Miserable moves to attack giant rat.")
-check(f"…and again when a party member joins in after ({sent})", any("rat" in c for c in sent))
+check(f"0.8.224: joined before our opening cast could land — not re-sent yet ({sent})", not any("rat" in c for c in sent))
+s.bot._attack_cmd = (ac0[0], time.time() - 2); s.bot._al_pending = ("Miserable", s.bot._attack_cmd[1])
+sent.clear(); s.bot.tick()
+check(f"…and again when a party member joins in after, once it's had time ({sent})", any("rat" in c for c in sent))
+def aged():
+    s.bot._attack_cmd = (s.bot._attack_cmd[0], time.time() - 2)
 sent.clear(); feed("Miserable swings at the giant rat with his vortex staff!")
 check(f"…once per member, not on every swing ({sent})", not any("rat" in c for c in sent))
 sent.clear(); feed("Lyra moves to attack giant rat.")
 s.state.party["Lyra"] = {"hp": 100, "t": time.time()}
-sent.clear(); feed("Lyra moves to attack giant rat.")
+aged(); sent.clear(); feed("Lyra moves to attack giant rat.")
 check(f"…and again right away for the next member to join ({sent})", any("rat" in c for c in sent))
 # two MudPilots both on attack last: their answers would bounce forever — at most 5 a round
 sent.clear()
 for i in range(12):
-    s.bot._al_answered = set(); feed("Lyra moves to attack giant rat.")
+    s.bot._al_answered = set(); aged(); feed("Lyra moves to attack giant rat.")
 check(f"at most 5 re-attacks in a round ({len(sent)})", 1 <= len([c for c in sent if "rat" in c]) <= 5)
 s.bot._al_times = []
 # the re-attack's own *Combat Off* / *Combat Engaged* isn't the fight ending: Lyra stays answered
@@ -90,6 +96,7 @@ st.party_rank = "front"
 par(["  Tester Abil                   (Druid)      [M:100%] [H:100%] - Backrank",
      "  Miserable Par                 (Mage)       [M: 90%] [H: 95%]M - Frontrank"])
 s.state.in_combat = False
+s.state.need_refresh = False; s.bot._refresh_at = 0     # (0.8.224: the room's been shown again since the fight)
 sent.clear()
 for _ in range(3):
     s.bot._cool = {"par": time.time(), "par_solo": time.time()}; s.bot.tick()

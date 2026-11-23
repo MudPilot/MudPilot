@@ -21,7 +21,7 @@ check(f"takes a dry way that keeps out of avoided areas ({len(r)} rooms; direct 
       f"{sum(e.to in av for e in direct)} avoided)", r and not b._needy_rooms((1, 1813), r, set())
       and not any(e.to in av for e in r))
 mp_needs = b._needy_rooms((1, 1813), direct, set())
-check(f"…the direct way did need a raft ({len(mp_needs)} water rooms)", mp_needs)
+check(f"…the plain route keeps out of the water too now (0.8.223: rooms that hurt cost; {len(mp_needs)} water rooms)", not mp_needs)
 # Dan, 2026-10-30: you carry a raft, the party doesn't (they're heavy) — still the dry way
 raft = next(n for n, it in w.items.items() if it.get("name") == "log raft")
 b.held_items = lambda: {raft}

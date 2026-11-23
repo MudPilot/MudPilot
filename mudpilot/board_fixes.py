@@ -39,6 +39,25 @@ SHUT_ZONE = (12, 2002, 2085)          # map, first and last room where the other
 # matters). MME's text has it lower-case.
 EXIT_ACTIONS = {((12, 2085), "U"): ["ask sphinx E"]}
 
+# doors a command in their own room opens with an item: (room, dir) → (room name has, commands, item, tries).
+# 0.8.223 (m12 #3): the warehouse door 1/1104 N ('[1000 picklocks/strength]', 18 rooms behind it, the 2/26 boss lair
+# among them) opens with 'use crowbar' (MME's own textblock 287: checkitem 570, a strength test, remoteaction 1104).
+# MME keeps the door's action with no command, so it read as a door nothing opens. The strength test can fail: a few
+# tries. MME's data, not a Paradigm quirk: every board where the room fits.
+DOOR_ACTIONS = {((1, 1104), "N"): ("warehouse door", ["use crowbar"], 570, 4)}
+
+
+def _door_actions(world):
+    for (room, d), (name, cmds, item, tries) in DOOR_ACTIONS.items():
+        r = world.rooms.get(room)
+        e = r.exits.get(d) if r and name in (r.name or "").lower() else None
+        if e is None or e.kind != "door":
+            continue
+        if not e.actions:
+            e.actions.append({"n": 1})
+        for a in e.actions:
+            a.update({"cmds": list(cmds), "item": item, "room_cmd": True, "tries": tries})
+
 # items a party never routes on: Dan, 2026-10-28 — the amber talisman way into Dark-Elf City has you jumping
 # roofs, likely to fall and break up the party; the Fungus Tunnel way needs no talisman
 PARTY_SPLIT_ITEMS = ("amber talisman",)
@@ -98,6 +117,7 @@ def apply(world, realm=None) -> int:
     """Check each segment against this map; keep the ones that fit. Returns how many apply.
     realm: lair_camp.realm_of(session) — not Paradigm (and not Paradigm's MME data): nothing applies."""
     world.paradigm = is_paradigm(world, realm)
+    _door_actions(world)
     if not world.paradigm:
         world.segments, world.room_tasks, world.seg_progress = [], {}, {}
         world.segment_exits, world.shut_doors, world.carry_exits = set(), set(), {}

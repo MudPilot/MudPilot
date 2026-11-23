@@ -59,7 +59,9 @@ class Comeback:
 
     def note_sent(self, cmd):
         if re.match(r"^\s*(?:leave|disband|follow|join)\b", cmd or "", re.I):
-            self._self_left = time.time()           # we left on purpose: no @comeback
+            # we left on purpose: no @comeback — and after a disband you meant, none for the whole regroup pause
+            # (0.8.224, Dan; the checks are 'more than 10 s since')
+            self._self_left = max(time.time(), getattr(self.s, "_party_hold_until", 0) - 10)
         elif re.match(r"^\s*\.?\s*@party\s+\S", cmd or "", re.I):
             self.party_move()                        # the leader takes the party through: '@party go hole'
 
@@ -598,7 +600,10 @@ class Comeback:
             if m.get("why") != "dropped" or (self.fetch and self.fetch.get("name") == n):
                 continue
             back = any(p.lower() == n.lower() and (rec or {}).get("t", 0) > m["t"] for p, rec in party.items())
-            if back or self._here(n):
+            v = self.s.state.view
+            # (0.8.224, real logs 9 of 9: the room display from BEFORE the disconnect still listed them — only one
+            #  drawn since counts as "standing here")
+            if back or (self._here(n) and v is not None and (getattr(v, "t", 0) or 0) > m["t"]):
                 self.s.log(f"Comeback: {n} is back with us — not waiting any more")
                 del self.missing[n]
 

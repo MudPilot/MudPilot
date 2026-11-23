@@ -47,7 +47,8 @@ nb = next(tuple(ex.to) for k in asy for ex in w.rooms[k].exits.values() if ex.to
 r = go(nb, asy[len(asy) // 2])
 check(f"Warped Asylum (random-drop ways out): walks {r[:2]} {r[2][:80]}", r[0] and r[1])
 r = go((14, 6159), (14, 6220), lvl=40, pick=10, strg=30, carrying=w.item_name(3702))
-check(f"Stone Barracks with strength 30: still refused ({r[2][:70]})", r[0] is False and "no way back out" in r[2])
+check(f"Stone Barracks with its key, strength 30: goes — 0.8.223, the way out is the key door's other side ({r[:2]})",
+      r[0] and r[1])
 r = go((8, 559), (8, 560), pick=300)
 check(f"Dark-Elf Castle: the moat way, not the '1000' door at 8/559 S ({r[:2]}, {len(b.path.steps) if b.path else 0} steps)",
       r[0] and r[1] and b.path and len(b.path.steps) > 1)
@@ -58,11 +59,14 @@ into = next((tuple(e.to) for k in pk_ for e in w.rooms[k].exits.values()
              if e.kind == "item" and tuple(e.to) not in pk_ and tuple(e.to) in w.rooms), None)   # (just outside it)
 if into:
     r = go(into, (1, 1542), lvl=10, pick=0, strg=30)
-    check(f"rope pocket 1/1542 without a rope: refused, names the rope exit ({r[2][:110]})",
-          r[0] is False and "no way back out" in r[2] and "don't carry" in r[2])
-# the warehouse door: the stop says how the game opens it
+    # 0.8.223: the rope the way back out needs is bought first (Dark-Elf City's Large Hole), not refused
+    check(f"rope pocket 1/1542 without a rope: gets a rope first ({r[:2]} {sorted(getattr(b.path, 'out_items', []) or [])})",
+          r[0] and (191 in (getattr(b.path, "out_items", None) or []) or
+                    any("way back out" in l and "getting it first" in l for l in s.logs[-15:])))
+# the warehouse door: 0.8.223 board fix — 'use crowbar' opens it, so a Go to fetches a crowbar (tests/test_errands_0823.py)
 r = go((1, 1104), (1, 1327))
-check(f"warehouse door 1/1104 N: says 'use crowbar' ({r[2][:120]})", r[0] is False and "crowbar" in r[2])
+check(f"warehouse door 1/1104 N: fetches a crowbar for 'use crowbar' ({r[:2]} {r[2][:120]})",
+      r[0] and 570 in {t_["num"] for t_ in (b.errands.active or {}).get("todo") or []})
 
 # speed: planning with every item and a max HP set
 w.char = dict(w.char or {}, max_hp=156)

@@ -56,9 +56,13 @@ check("player-seen off by default", not closed)
 
 # 3. Stay offline window
 s, sent, closed, feed = make(hangup_stay_offline=10)
-feed("Bob swings at you with his longsword!")
+s.safety.hangup("message: the boss is up")        # (0.8.224: not a PvP one — those never come back in by themselves)
 check("stay-offline blocks reconnect", closed and not s.safety.may_reconnect() and s._want_connected)
 check("…and after it, goes back in (not held at the MajorMUD menu)", not getattr(s, "hold_realm", False))
+s, sent, closed, feed = make(hangup_stay_offline=10)
+feed("Bob swings at you with his longsword!")
+check("0.8.224 (Dan): a PvP hang-up never comes back in, stay-offline or not",
+      closed and getattr(s, "hold_realm", False) and not s._want_connected)
 s, sent, closed, feed = make()
 feed("Bob swings at you with his longsword!")
 check("stay offline 0: held at the menu until you go in", getattr(s, "hold_realm", False) and not s._want_connected)

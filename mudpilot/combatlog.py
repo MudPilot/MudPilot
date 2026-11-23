@@ -127,6 +127,12 @@ class CombatLog:
         if not r:
             return
         self.rounds.append(r)
+        if r["done"] > 0:
+            # 0.8.224 (Dan): what you really do a round, for danger.my_dpr — a melee character was guessed at 60 a round
+            # whatever their gear (a key's dropper "too strong" for an L60 warrior as much as an L30 thief)
+            n = self.my_rounds = getattr(self, "my_rounds", 0) + 1
+            a = getattr(self, "my_round_avg", 0.0) or 0.0
+            self.my_round_avg = a + (r["done"] - a) / min(n, 50)
         if r.get("mon") and r["done"]:
             m = self._mob(r["mon"])
             m["rounds"] += 1

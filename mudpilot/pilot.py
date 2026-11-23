@@ -58,6 +58,7 @@ class Pilot:
         self.asked = None          # a 'pro' waiting for its answer: {t, ok}
         self.pending = None        # a remote action we're on our way to: {key, at, cmds}
         self._noask_seq = None     # 'pro' didn't answer for this room display: don't ask again for it
+        self._arrive_asked = False # asked the board once before calling a dark look-alike target 'arrived' (dark3 D3)
         self._fallback_at = 0.0
 
     # ------------------------------------------------------------ helpers
@@ -115,6 +116,26 @@ class Pilot:
         if not self._can_ask() or self._noask_seq == self.st.view_seq:
             return False                              # no 'pro' on this board: go by the tracker
         self._ask(f"about to '{step.move}' in {here[0]}/{here[1]}, which looks like other rooms")
+        return True
+
+    def _check_dark_arrival(self, here) -> bool:
+        """About to say "Arrived" in a dark room that looks like others, placed only by the move that should have got
+        there: one 'pro' first (dark3 D3: the last move S landed in 1/9382, both 'Stonework Tunnel' N, S — it said
+        Arrived at 1/9448). Once per Go to. True = asked (this tick is taken)."""
+        a, st, w = self.a, self.st, self.w
+        if self._arrive_asked:
+            return False
+        lc = getattr(st, "located", None)
+        moved = self.last["t"] if self.last else 0
+        if lc and lc[0] == here and lc[1] >= moved:
+            return False                              # the board said so since the last move
+        v = st.view
+        r = w.room(here)
+        dark = (v is not None and v.name == "(dark)") or (r is not None and int(getattr(r, "light", 0) or 0) < 0)
+        if not dark or not w.look_alike(here) or not self._can_ask() or self._noask_seq == st.view_seq:
+            return False
+        self._arrive_asked = True
+        self._ask(f"{here[0]}/{here[1]} is dark and looks like other rooms — making sure before arriving")
         return True
 
     def _ask(self, why):
@@ -472,6 +493,8 @@ class Pilot:
         if here is None:
             return True
         steps, i = self.mp.steps, a.idx
+        if here == self.target and self._check_dark_arrival(here):
+            return True
         if here == self.target:
             if not (i >= len(steps) and (not steps or steps[-1].dest == here)):
                 steps[:] = []                         # got here early (or by a way round): that's arriving
@@ -562,6 +585,15 @@ class Pilot:
             if a._drifted("detour"):
                 self.need_plan = True
                 return True
+        try:
+            ts_ = frozenset(a.too_strong_rooms())
+        except Exception:
+            ts_ = frozenset()
+        if ts_ and self.target and tuple(self.target) in ts_:
+            # (0.8.223, fight3 #2: ran from the same monster at the target twice — not run, rest, walk back in again)
+            a.stop(f"Stopped: not going back to {a.too_strong_note([tuple(self.target)])} — Go to it yourself to try "
+                   "again")
+            return True
         plan = self._build(here)
         if plan is None and a.parked():
             return True                               # goto() is waiting on 'i' / 'abil' / 'who': it carries on then
@@ -579,7 +611,9 @@ class Pilot:
                 if a.goto(self.target, then=a.after_goto):
                     self._fallback_at = fb
                     return True
-            a.stop(f"Stopped: no route from {here[0]}/{here[1]} to {self.target[0]}/{self.target[1]}")
+            past = a.too_strong_note() if ts_ else ""
+            a.stop(f"Stopped: no route from {here[0]}/{here[1]} to {self.target[0]}/{self.target[1]}"
+                   + (f" that keeps clear of {past}" if past else ""))
             return True
         self.mp.steps[:] = plan
         self.mp.rush = self._rush                     # (the old plan's step numbers would point anywhere)

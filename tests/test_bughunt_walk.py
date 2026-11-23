@@ -213,7 +213,8 @@ check("Stop: the trip is cancelled", s.trips.trip is None)
 
 # --- (16) warehouse door, one invite line, recipe text, a target that throws you out
 d = w.room((1, 1104)).exits["N"]
-check(f"1/1104 N (an action with no command) costs 60 ({w.exit_cost(d)})", w.exit_cost(d) >= 60)
+# (0.8.223: the board fix gives it 'use crowbar' (item 570) — an item exit now, not a stuck '1000' door)
+check(f"1/1104 N opens with 'use crowbar' now ({d.action_cmds()})", any("crowbar" in c for c in d.action_cmds()))
 cfg.my_name = "Revolution"
 cfg.remote_players = {"Miserable": {"party": True}}
 b.walking, b.loop, b.path = True, True, loop

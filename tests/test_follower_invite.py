@@ -32,7 +32,7 @@ check(f"never invites the leader it's rejoining ({sent})", not any(x.startswith(
 s.send("join Revolution", from_bot=True)
 sent.clear()
 s._line([("You must disband your own party first!", Style())])
-check(f"'disband your own party first' → disband, join ({sent})", sent[:2] == ["disband", "join Revolution"])
+check(f"'disband your own party first' → disband party, join ({sent})", sent[:2] == ["disband party", "join Revolution"])
 # @join: just join and check the party — no telepath back
 s.remote._channel = "telepath"
 st.remote_players = {"Revolution": ["query", "location", "invite", "move"]}

@@ -1192,6 +1192,27 @@ class WorldDB:
     def item_name(self, num) -> str:
         return (self.items.get(num) or {}).get("name") or f"item #{num}"
 
+    def npc_holder(self, num) -> str:
+        """0.8.223 (m58 #2): who carries an item MME only gets from an NPC ('NPC #348' — the moldy key's sleazy
+        shopkeeper, 8/486): 'the sleazy shopkeeper (8/486)', or '' when it's sold, dropped or not an NPC's. MudPilot
+        never kills an NPC for it — the reason a Go to can't fetch it says who has it."""
+        ob = ((getattr(self, "gear", None) or {}).get(num) or {}).get("obtained") or ""
+        if not ob or re.search(r"\b(?:Shop|Monster) #\d+", ob):
+            return ""
+        names = []
+        for m in re.finditer(r"\bNPC #(\d+)", ob):
+            mon = (getattr(self, "monsters", None) or {}).get(int(m.group(1))) or {}
+            rm = (mon.get("spawn_rooms") or [None])[0]
+            nm = (mon["name"] if mon["name"][:1].isupper() else f"the {mon['name']}") if mon.get("name") \
+                else f"NPC #{m.group(1)}"                # (Morukai, Inquisitor Thorand: no 'the')
+            names.append(nm + (f" ({rm[0]}/{rm[1]})" if rm else ""))
+        return " or ".join(names[:2])
+
+    def item_need_text(self, num) -> str:
+        """'moldy key from the sleazy shopkeeper (8/486)' for an NPC's item, else just its name."""
+        who = self.npc_holder(num)
+        return f"{self.item_name(num)} from {who}" if who else self.item_name(num)
+
     def bosses_by_room(self) -> dict:
         if getattr(self, "_boss_rooms", None) is None:
             out = {}
@@ -1228,6 +1249,8 @@ class WorldDB:
                 if nd < dist.get(ex.to, 1e18):
                     dist[ex.to], prev[ex.to] = nd, (c, dr, ex)
                     heapq.heappush(pq, (nd, ex.to))
+        sb = (getattr(self, "stretch_blocks", None) or {}).get((tuple(start), goal)) if not isinstance(goal, set) \
+            else None
         if goal not in prev:
             return []
         out, node = [], goal
@@ -1241,7 +1264,9 @@ class WorldDB:
                     what = "a trap" if ex.kind == "trap" and self.TRAP_RE.search(ex.etype or "") and \
                         int(self.TRAP_RE.search(ex.etype or "").group(1)) >= hp else \
                         f"{self.rooms[ex.to].name} ({ex.to[0]}/{ex.to[1]})"
-                    why = f"{what} can do up to {hw} damage — your whole max HP ({hp}) or more"
+                    why = f"{what} can do up to {hw} damage — {self._hp_whose()} whole max HP ({hp}) or more"
+                elif (gw_ := self.gate_why(ex)):
+                    why = gw_                        # (who the class / race / alignment gate stops: partyA D4, P5)
                 elif ex.kind == "hidden" and ex.needs_actions and not ex.action_cmds():
                     why = "a hidden exit that needs an action MME doesn't list"
                     far = [(rm, t) for rm, t in getattr(self, "remote_opens", {}).get(c, [])]
@@ -1253,11 +1278,12 @@ class WorldDB:
                     # 0.8.189: the fare too — Kingsport's 'secure passage to port blackwater' (2,000,000 copper) was
                     # reported as "needs level 1+" when the money was what was missing (realm walk sweep)
                     bits = ([f"level {q['level']}+"] if q["level"] and not (level and level >= q["level"]) else []) + \
-                           [f"{self.item_name(i)}" for i in q["items"]] + \
+                           [f"{self.item_need_text(i)}" for i in q["items"]] + \
                            [f"ability {a} ≥ {v}" for a, v in q["abil"]] + \
                            ([f"{q['price']:,} copper (you have {wealth:,})" if wealth is not None
                              else f"{q['price']:,} copper"] if q.get("price") else []) + \
-                           ([f"{self.req_monster_names(q)} there"] if q.get("monster") else [])
+                           ([f"{self.req_monster_names(q)} there"] if q.get("monster") else []) + \
+                           self.req_who_bits(q)
                     why = f"'{ex.text_command}' needs " + (", ".join(bits) or "something")
                     for a, v in q["abil"]:
                         h = self.quest_hint(a, v)
@@ -1265,10 +1291,12 @@ class WorldDB:
                             why += f" ({h})"
                             break
                 elif ex.action_items():
-                    why = "an action that needs " + ", ".join(self.item_name(i) for i in ex.action_items())
+                    why = "an action that needs " + ", ".join(self.item_need_text(i) for i in ex.action_items())
                 elif ex.kind in ("key", "item"):
                     num = self.exit_need(ex)
-                    why = f"needs {self.item_name(num[0])}" if num else why
+                    why = f"needs {self.item_need_text(num[0])}" if num else why
+                    if num and self.npc_holder(num[0]):
+                        why += " — MudPilot won't kill an NPC for it; get it yourself, then Go to again"
                 elif avoid and ex.to in avoid:
                     why = "goes through an area you avoid"
                 elif self._sea(ex.to):
@@ -1279,13 +1307,94 @@ class WorldDB:
                 out.append((c, dr, why))
             node = c
         out = list(reversed(out))
+        if sb:
+            rooms, dmg = sb
+            hp = int((self.char or {}).get("max_hp") or 0)
+            a, b = rooms[0], rooms[-1]
+            lim = self.stretch_limit()
+            line = f"more than the {lim} HP {self._hp_whose()} hang-up line leaves" if lim < hp else \
+                f"{self._hp_whose()} whole max HP ({hp}) or more"
+            out.insert(0, (a, "", f"{len(rooms)} rooms that hurt in a row ({a[0]}/{a[1]} to {b[0]}/{b[1]}) can do up to "
+                                  f"{dmg} damage — {line}, with nowhere to rest between"))
         # (a max-HP wall first: it's this character's hard stop, and it was cut off behind three key doors the key run
         #  would sort out — m58 bug 1, 8/1835's 200-damage trap)
-        out = sorted(out, key=lambda t: 0 if "whole max HP" in (t[2] or "") else 1)[:limit]
+        out = sorted(out, key=lambda t: 0 if ("whole max HP" in (t[2] or "") or "hang-up line" in (t[2] or ""))
+                     else 1)[:limit]
         for k in ([goal] if not isinstance(goal, (set, frozenset)) else []):
             for wv in (getattr(self, "npc_ways", {}).get(k) or [])[:1]:
                 rm = wv["rooms"][0] if wv["rooms"] else None
                 out.append((rm or k, "", f"{wv['name']} takes you there if you talk to it about '{wv['topic']}'"))
+        return out
+
+    def _hp_whose(self) -> str:
+        """'your', or 'Buddy's' when the max HP the wall used is a follower's (partyA D4)."""
+        who = (self.char or {}).get("max_hp_who")
+        return f"{who}'s" if who else "your"
+
+    def _who_fails(self, kind, bad) -> list:
+        """'you (Mage)', 'Revolution (Mage)' — everyone walking whose class / race / alignment `bad(value)` says can't.
+        kind: 'class', 'race' or 'align'."""
+        c = self.char or {}
+        if kind == "align":
+            mine, theirs, name = c.get("align"), c.get("party_aligns"), (lambda v: str(v).capitalize())
+        else:
+            table = self.classes if kind == "class" else self.races
+            mine = c.get(kind)
+            theirs = c.get("party_classes" if kind == "class" else "party_races")
+            name = (lambda v: ((table or {}).get(v) or {}).get("Name") or f"#{v}")
+        out = []
+        if mine not in (None, "") and bad(mine):
+            out.append(f"you ({name(mine)})")
+        for who, v in zip(c.get("party_names") or [], theirs or []):
+            if v not in (None, "") and bad(v):
+                out.append(f"{who} ({name(v)})")
+        return out
+
+    def gate_why(self, ex):
+        """A class / race / alignment gate in words, naming who it stops (partyA D4, partyB P5): "Druids only —
+        Revolution (Mage) can't go through" rather than MME's "(Class: 13 OK, 0 NO)". None = not such a gate, or it
+        isn't what's in the way."""
+        et = getattr(ex, "etype", "") or ""
+        m, ma = self.GATE_RE.search(et), self.ALIGN_RE.search(et)
+        if not (m or ma) or self.gate_ok(ex) is not False:
+            return None
+        c = self.char or {}
+        if m:
+            kind, ok_n, no_n = m.group(1).lower(), int(m.group(2)), int(m.group(3))
+            table = self.classes if kind == "class" else self.races
+            nm = lambda v: ((table or {}).get(v) or {}).get("Name") or f"#{v}"
+            what = f"{nm(ok_n)}s only" if ok_n else f"no {nm(no_n)}s"
+            who = self._who_fails(kind, lambda v: (ok_n and v != ok_n) or (no_n and v == no_n))
+            if not c.get(kind):
+                return f"{what} — your {kind} isn't known"
+        else:
+            order = self.ALIGN_ORDER
+            lo, hi = ma.group(1).lower(), ma.group(2).lower()
+            what = f"{ma.group(1).capitalize()} to {ma.group(2).capitalize()} only"
+            if lo not in order or hi not in order:
+                return None
+            a, b = sorted((order.index(lo), order.index(hi)))
+            who = self._who_fails("align", lambda v: str(v).lower() in order and
+                                  not a <= order.index(str(v).lower()) <= b)
+            if not c.get("align"):
+                return f"{what} — your alignment isn't known"
+        if not who:
+            return None
+        return f"{what} — {' and '.join(who) if len(who) <= 2 else ', '.join(who)} can't go through"
+
+    def req_who_bits(self, q) -> list:
+        """A room command's class / race limit, naming who it stops: "a Bard (Revolution (Warrior) isn't)" (party3 #3's
+        barmaid). [] when nobody walking is stopped by it."""
+        out = []
+        for kind, key in (("class", "classes"), ("race", "races")):
+            ok_ = list(q.get(key) or [])
+            if not ok_:
+                continue
+            who = self._who_fails(kind, lambda v: v not in ok_)
+            if who:
+                table = self.classes if kind == "class" else self.races
+                names = " or ".join(((table or {}).get(v) or {}).get("Name") or f"#{v}" for v in ok_)
+                out.append(f"{names} ({', '.join(who)} {'isn' if len(who) == 1 else 'aren'}'t)")
         return out
 
     ALIGN_ORDER = ["saint", "good", "lawful", "neutral", "seedy", "outlaw", "criminal", "villain", "fiend"]
@@ -1753,27 +1862,44 @@ class WorldDB:
         """Map-only, no rules: does any chain of exits at all lead from start to target, and does one of them need a
         monster there ('req monster')? (reachable, via_monster). A cheap backwards walk from the target, so a Go to a
         room nothing leads into skips the whole-realm searches (m1018 #1: 40-150 s for 11/38, 10/260, 10/48)."""
-        rev = getattr(self, "_rev_exits", None)
+        rev = getattr(self, "_rev_lead", None)
         if rev is None:
-            rev = {}
+            rev = {}                                 # (0.8.223 speed: the 'req monster' flag worked out once)
             for k, r in self.rooms.items():
                 for ex in r.exits.values():
                     if ex.to in self.rooms:
-                        rev.setdefault(tuple(ex.to), []).append((k, ex))
-            self._rev_exits = rev
+                        rev.setdefault(tuple(ex.to), []).append(
+                            (k, bool((getattr(ex, "req", None) or {}).get("monster"))))
+            self._rev_lead = rev
         start, target = tuple(start), tuple(target)
-        seen, todo, mon, found = {target}, [target], False, False
+        seen, todo, mon = {target}, [target], False
         while todo:
-            k = todo.pop()
-            for frm, ex in rev.get(k, ()):
-                if (getattr(ex, "req", None) or {}).get("monster"):
+            for frm, m in rev.get(todo.pop(), ()):
+                if m:
                     mon = True
-                if frm == start:
-                    found = True
                 if frm not in seen:
                     seen.add(frm)
                     todo.append(frm)
-        return found, mon
+        return start in seen, mon
+
+    def leads_to(self, target) -> set:
+        """Every room some chain of exits leads from to target (map only, no rules) — remembered for the last few."""
+        target = tuple(target)
+        c = self.__dict__.setdefault("_leads_to_c", {})
+        if target in c:
+            return c[target]
+        self.leads_in(target, target)            # (builds the reverse map)
+        rev = self._rev_lead
+        seen, todo = {target}, [target]
+        while todo:
+            for frm, _m in rev.get(todo.pop(), ()):
+                if frm not in seen:
+                    seen.add(frm)
+                    todo.append(frm)
+        if len(c) > 8:
+            c.clear()
+        c[target] = seen
+        return seen
 
     def req_monster_names(self, req) -> str:
         """'needs <monster> there': the monster(s) MME's 'req monster' wants in the room (0.8.222)."""
@@ -1896,7 +2022,7 @@ class WorldDB:
         if self.limited_use_item(mv):
             return False                             # 'use silverm': the token has 5 uses a day — yours to spend
         if (tuple(src), mv.lower(), tuple(dst)) in getattr(self, "forgotten", set()):
-            return False                             # tried and failed this session
+            return False                             # tried and failed (0.8.224: remembered across sessions)
         if self.look_alike(src) and self.look_alike(dst):
             # both ends look like other rooms (the pyramid): a MegaMUD path's hash or the tracker matched a
             # twin — 'ask sphinx fire' got pinned on the 12/1830 dead end that way. Not a fact; don't map it
@@ -1944,6 +2070,13 @@ class WorldDB:
             # (a door a room command or lever opens isn't picked or bashed. 0.8.201, walk check: action_cmds(), not
             #  ex.actions — 1/1104 N's warehouse door has one action with no command, which made it cost 1, not 60)
             return None
+        if ex.kind == "door" and have:
+            tw = self.key_twin(ex)
+            if tw is not None:
+                need = self.exit_need(tw)
+                if need and need[0] in have and need[0] not in self.ghost_keys():
+                    return True                      # 0.8.223 (Dan, regr222 #3): the other side of a key door you have
+                                                     # the key for — the same door (Fiery Lair 16/2118 E, Molten River)
         m = re.search(r"\[(?:or\s+)?(any|\d+)\s+picklocks(/strength)?", ex.etype or "", re.I)
         if not m:
             return None
@@ -1961,6 +2094,22 @@ class WorldDB:
             return None
         pick, strength = dp
         return (pick or 0) >= n or bool(m.group(2) and (strength or 0) >= n)
+
+    def key_twin(self, ex):
+        """The key door on the other side of a plain locked door (MME types the inside of the Fiery Lair's key door
+        16/2117 W as '(Door [71 picklocks/strength])', 16/2118 E), or None."""
+        tw = self.__dict__.get("_key_twins")
+        if tw is None:
+            tw = {}
+            for k, r in self.rooms.items():
+                for e in r.exits.values():
+                    if e.kind == "door" and e.to in self.rooms:
+                        back = next((b for b in self.rooms[e.to].exits.values()
+                                     if b.kind == "key" and tuple(b.to) == tuple(k)), None)
+                        if back is not None:
+                            tw[id(e)] = back
+            self._key_twins = tw
+        return tw.get(id(ex))
 
     def door_hopeless(self, ex, have=None) -> bool:
         """0.8.201 (Dan): a door nobody in the party can pick or bash, and no key for it in hand or to be fetched
@@ -2008,16 +2157,31 @@ class WorldDB:
     OPENS_ANYWAY = {((9, 1425), "W")}
     # '1000' doors the game opens with a command MudPilot doesn't send yet: the reason a Go to stops for them (m12 #3,
     # flags2 #6 — the warehouse door 1/1104 N opens with 'use crowbar' in its room's own textblock; 18 rooms behind it,
-    # the 2/26 boss lair among them)
-    DOOR_OPENERS = {((1, 1327), "N"): "'use crowbar' (with a crowbar) in that room"}
+    # the 2/26 boss lair among them). 0.8.223: empty — board_fixes.DOOR_ACTIONS gives the warehouse door its 'use crowbar'
+    # (needs the crowbar), so it's walked like any door a room command opens. Kept for _goto_check's lookup.
+    DOOR_OPENERS = {}
 
     def hp_wall(self, ex, have=None) -> int:
         """0.8.222 (Dan's 0.8.190 rule, 11-20 bug hunt): a trap, or a room's spell, that can do your whole max HP (the
         weakest member's, leading) in one go is never walked into — the damage, or 0. An L12 with 156 HP walked onto a
         200-damage trap from full and hung up at 1 HP (8/1835). Your HP not known yet: 0."""
+        hc = self.__dict__.get("_hc")
+        if hc is not None and ex is not None:
+            v = hc.get(id(ex))                       # (0.8.223 speed: answered once per search — int keys here,
+            if v is not None:                        #  hurt_cost's are room tuples)
+                return v
         hp = int((self.char or {}).get("max_hp") or 0)
         if hp <= 0 or ex is None or (self.char or {}).get("gate_any") or getattr(self, "_hp_wall_off", False):
-            return 0                                 # (gate_any: the map-only "any way in?" check — m1617 #4)
+            v = 0                                    # (gate_any: the map-only "any way in?" check — m1617 #4)
+        elif ex.kind != "trap" and ex.to not in (getattr(self, "room_spells", None) or ()):
+            v = 0                                    # (0.8.223 speed: most exits — no trap, no room spell)
+        else:
+            v = self._hp_wall(ex, have, hp)
+        if hc is not None:
+            hc[id(ex)] = v
+        return v
+
+    def _hp_wall(self, ex, have, hp) -> int:
         carried = (self.char or {}).get("carried")
         if carried is not None:
             have = carried                           # (what you carry: the key planner's 'every item' has the phoenix
@@ -2100,7 +2264,140 @@ class WorldDB:
         return seen
 
     def exit_cost(self, ex, cur=None, have=None) -> float:
-        """Steps an exit 'costs' for routing: traps and tolls are walked round when it's cheap to."""
+        """Steps an exit 'costs' for routing: traps and tolls are walked round when it's cheap to — and, 0.8.223 (Dan,
+        11-21 bug hunt m14c), the room it leads into when that room's spell hurts (a bog, magma, a river without a raft),
+        weighed against your HP like a trap: an L30 thief (390 HP) was planned 181 steps through 20+ Quagmire rooms,
+        1,840 damage, over a 219-step dry way."""
+        c = self._exit_cost(ex, cur, have)
+        if ex.to in (self.__dict__.get("room_spells") or ()):   # (speed: most rooms have no spell)
+            c += self.hurt_cost(ex.to, have)
+        return c
+
+    def hurt_cost(self, room, have=None) -> float:
+        """Extra 'steps' for walking into a room whose spell hurts: 150 x damage / what you can spare (your max HP
+        down to the hang-up line, the weakest member's leading) — the trap scale, without the wall (hp_wall is that).
+        HP not known: damage / 10."""
+        rs = getattr(self, "room_spells", None)
+        if not rs or room not in rs:
+            return 0
+        hc = self.__dict__.get("_hc")
+        if hc is not None:
+            v = hc.get(room)
+            if v is None:
+                v = hc[room] = self._hurt_cost(room, have)
+            return v
+        return self._hurt_cost(room, have)
+
+    def _boat_items(self) -> frozenset:
+        """Items a shop sells that stop a room spell (log raft, river punt…): what an errand can fetch for a river."""
+        rv = self.__dict__.get("_boats")
+        if rv is None:
+            rv = set()
+            try:
+                from .loopbuild import shop_items
+                si = set(shop_items(self))
+                for sp in set((getattr(self, "room_spells", None) or {}).values()):
+                    try:
+                        rv |= set(self.spell_items(int(sp)) or ())
+                    except Exception:
+                        pass
+                rv &= si
+            except Exception:
+                rv = set()
+            rv = self._boats = frozenset(rv)
+        return rv
+
+    def _hurt_cost(self, room, have=None) -> float:
+        carried = (self.char or {}).get("carried")
+        d = self.room_damage(room, carried if carried is not None else (have or ()))
+        if not d:
+            return 0
+        c = self.char or {}
+        hp = int(c.get("max_hp") or 0)
+        if hp <= 0:
+            return min(50, d / 10)
+        spare = max(1.0, hp * (1 - min(90, int(c.get("hangup_pct") or 0)) / 100))
+        return round(150 * min(d, spare) / spare, 1)
+
+    def hurt_stretches(self, route, have=None):
+        """[(rooms, damage)] for each unbroken run of a route's steps that hurt: traps and rooms whose spell hurts, the
+        way the walker counts it before resting (automation._stretch_damage) — a trap into a room that doesn't hurt
+        ends the run (you can rest there)."""
+        rs = getattr(self, "room_spells", None) or {}
+        carried = (self.char or {}).get("carried")
+        plan = have or ()
+        have = carried if carried is not None else plan
+        boats = self._boat_items() if plan else frozenset()
+        sc = getattr(self, "stretch_counter", None) or {}
+        if sc and route:
+            # 0.8.224 (Dan): you said yes to fetching a counter (swamp boots, a fur cape) for this Go to — it counts as
+            # carried here; the walk's needed-items check buys it first
+            cn = sc.get(tuple(route[-1].to))
+            if cn is not None:
+                have = set(have or ()) | {cn}
+        out, rooms, total = [], [], 0
+        for ex in route or ():
+            d = 0
+            if ex.kind == "trap":
+                m = self.TRAP_RE.search(ex.etype or "")
+                d += int(m.group(1)) if m else 30
+            sd = 0
+            if ex.to in rs:
+                # (0.8.224 — regression walks: a raft the walk would fetch first, as carry_needs does, stops the river:
+                #  "N rooms that hurt in a row" refused every Silver River Go to 0.8.222 got a log raft for. Only
+                #  shop-sold boat items — not a phoenix feather dropped somewhere, regr222 #2)
+                si = boats & set(self.spell_items(rs[ex.to]) or ()) & set(plan) if boats else ()
+                sd = self.room_damage(ex.to, (set(have) | set(si)) if si else have)
+            d += sd
+            if d:
+                rooms.append(tuple(ex.to))
+                total += d
+            if not d or (ex.kind == "trap" and not sd):
+                if rooms:
+                    out.append((rooms, total))
+                rooms, total = [], 0
+        if rooms:
+            out.append((rooms, total))
+        return out
+
+    def stretch_limit(self) -> int:
+        """0.8.224 (Dan): what a run of rooms that hurt may do — down to the hang-up line, not your whole max HP (a
+        thief planned through 375 damage with 390 HP and a 30% hang-up). No hang-up set: the whole max HP."""
+        c = self.char or {}
+        hp = int(c.get("max_hp") or 0)
+        if hp <= 0:
+            return 0
+        return max(1, int(hp * (1 - min(90, int(c.get("hangup_pct") or 0)) / 100)))
+
+    def stretch_allowed(self, goal) -> bool:
+        """You said yes to 'this way does up to N damage — go anyway?' for this target (3 hours)."""
+        ok = getattr(self, "stretch_ok", None) or {}
+        try:
+            g = tuple(goal) if not isinstance(goal, (set, frozenset)) else None
+        except TypeError:
+            return False
+        import time as _t
+        return g is not None and _t.time() - ok.get(g, 0) < 3 * 3600
+
+    def stretch_wall(self, start, route, have=None):
+        """0.8.223 (Dan, m1315 R6): the first unbroken stretch of the route that hurts for your whole max HP or more
+        (the Lava Tube: 9 rooms of 60 = 540 against a paladin's 533 — hung up at 6/1217), as (rooms, damage), or None.
+        Not when you start inside one already (walking out is the point), nor with your max HP unknown."""
+        c = self.char or {}
+        hp = self.stretch_limit()
+        if hp <= 0 or c.get("gate_any") or getattr(self, "_hp_wall_off", False) or not route:
+            return None
+        first = True
+        start_hurts = bool(start and self.room_damage(tuple(start), c.get("carried") if c.get("carried") is not None
+                                                      else (have or ())))
+        for rooms, dmg in self.hurt_stretches(route, have):
+            began_here = first and start_hurts and rooms and rooms[0] == tuple(route[0].to)
+            first = False
+            if dmg >= hp and not began_here:
+                return rooms, dmg
+        return None
+
+    def _exit_cost(self, ex, cur=None, have=None) -> float:
         if ex.kind == "trap":
             m = self.TRAP_RE.search(ex.etype)
             return self.trap_cost(int(m.group(1)) if m else 30)
@@ -2270,7 +2567,7 @@ class WorldDB:
         if ex.kind == "door" and ex.actions and have is not None and ex.action_items() and \
                 not all(i in have for i in ex.action_items()):
             return False                         # a door its room command opens only with an item (signet ring)
-        if self.hp_wall(ex, have):
+        if (ex.kind == "trap" or ex.to in (self.__dict__.get("room_spells") or ())) and self.hp_wall(ex, have):
             return False                         # 0.8.222: could do your whole max HP in one go (why_no_route says so)
         return True
 
@@ -2279,6 +2576,7 @@ class WorldDB:
     def forget_routes(self):
         """Something changed under the routes (a wall, a door that wouldn't open, the party, a quest step)."""
         self._memo = {}
+        self._stretch_refused = {}
 
     def _memo_key(self, *parts):
         c = self.char or {}
@@ -2329,15 +2627,93 @@ class WorldDB:
                 off = self.room_damage(tuple(start), cr if cr is not None else (have or ())) >= hp
             prev_off = getattr(self, "_hp_wall_off", False)
             self._hp_wall_off = prev_off or off      # (in the White Forest at L8: walk out, as 0.8.221 did — regr222 #1)
+            prev_hc = getattr(self, "_hc", None)
+            self._hc = {}                            # (0.8.223 speed: hurt / HP-wall answers for this search)
             try:
                 r = self._route_uncached(start, goal, passable, max_nodes, avoid, level, have)
+                r = self._round_stretches(start, goal, r, passable, max_nodes, avoid, level, have)
             finally:
                 self._hp_wall_off = prev_off
+                self._hc = prev_hc
             if key is not None:
                 if len(self._memo) > 4000:
                     self._memo = {}
                 self._memo[key] = (_t.time(), tuple(r) if r is not None else None)
             return r
+
+    def _round_stretches(self, start, goal, r, passable, max_nodes, avoid, level, have):
+        """0.8.223 (Dan, m1315 R6): a route with an unbroken stretch that hurts for your whole max HP is planned again
+        round every such stretch (twice at most); no way round: no route — why_no_route names the stretch."""
+        if r and self.stretch_allowed(goal):
+            return r                             # (0.8.224: you said go anyway)
+        sw = self.stretch_wall(start, r, have) if r else None
+        if not sw:
+            return r
+        goals = goal if isinstance(goal, (set, frozenset)) else {tuple(goal)}
+        # 0.8.224 (Dan, speed): the same refusal again in this Go to (keyed_route, _bank_way, plan_route… each ask with
+        # their own avoid set) — at once, not two more full-map searches round it
+        try:
+            bk = (tuple(start), goal if not isinstance(goal, set) else frozenset(goal),
+                  frozenset(have) if have else None, self._memo_key("s"))
+        except TypeError:
+            bk = None
+        import time as _t
+        rc = self.__dict__.setdefault("_stretch_refused", {})
+        if bk is not None and _t.time() - rc.get(bk, (0, None))[0] < self.MEMO_SECS:
+            try:
+                self.__dict__.setdefault("stretch_blocks", {})[(bk[0], bk[1])] = rc[bk][1]
+            except TypeError:
+                pass
+            return None
+        hp = self.stretch_limit()
+        av = set(avoid or ())
+        for _ in range(2):
+            bad = set()
+            for rooms, dmg in self.hurt_stretches(r, have):
+                if dmg >= hp:
+                    bad |= set(rooms)
+            bad -= set(goals) | {tuple(start)} | av
+            if not bad:
+                break
+            av |= bad
+            r = self._route_uncached(start, goal, passable, max_nodes, frozenset(av), level, have)
+            if r is None:
+                break                            # (and the search below avoids even more: no use — 0.8.224 speed)
+            sw2 = self.stretch_wall(start, r, have)
+            if not sw2:
+                return r
+            sw = sw2
+        # (0.8.224 — regression walks, w1214 #3: a thief refused 14/1923 -> 14/9045 with a 254-room dry way there.
+        #  Before giving up: one search round every room that hurts at all)
+        try:
+            if r is None:
+                raise LookupError                # (no way round even the walled rooms: none round them all)
+            c = self.char or {}
+            plan = set(have or ())
+            hv = set(c.get("carried")) if c.get("carried") is not None else plan
+            boats = self._boat_items() if plan else frozenset()
+            rs = getattr(self, "room_spells", None) or {}
+            hot = set()
+            for rm, sp in rs.items():
+                si = boats & set(self.spell_items(sp) or ()) & plan if boats else ()
+                if self.room_damage(rm, (hv | set(si)) if si else hv):
+                    hot.add(rm)
+            hot -= set(goals) | {tuple(start)}
+            r = self._route_uncached(start, goal, passable, max_nodes, frozenset(av | hot), level, have)
+            if r is not None and not self.stretch_wall(start, r, have):
+                return r
+        except Exception:
+            pass
+        try:
+            self.__dict__.setdefault("stretch_blocks", {})[
+                (tuple(start), goal if not isinstance(goal, set) else frozenset(goal))] = sw
+        except TypeError:
+            pass
+        if bk is not None:
+            if len(rc) > 200:
+                rc.clear()
+            rc[bk] = (_t.time(), sw)
+        return None
 
     def _route_uncached(self, start: Room, goal, passable: set | None = None, max_nodes: int = 200000,
                         avoid: set | frozenset | None = None, level: int | None = None, have: set | None = None):
@@ -2593,6 +2969,7 @@ class WorldDB:
         q = [(0.0, 0, start)]
         n = 0
         bg = threading.current_thread() is not threading.main_thread()
+        rs_ = self.__dict__.get("room_spells") or ()
         while q and n < max_nodes:
             cost, _tie, cur = heapq.heappop(q)
             if cost > best.get(cur, 1e18):
@@ -2615,7 +2992,9 @@ class WorldDB:
                     continue
                 if failed and (cur, ex.dir) in failed:
                     continue                         # this exit just failed us (locked, search missed…)
-                c2 = cost + self.exit_cost(ex, cur, have)
+                c2 = cost + self._exit_cost(ex, cur, have)   # (exit_cost, inlined for speed — 0.8.223)
+                if ex.to in rs_:
+                    c2 += self.hurt_cost(ex.to, have)
                 if c2 < best.get(ex.to, 1e18):
                     best[ex.to] = c2
                     prev[ex.to] = (cur, ex)

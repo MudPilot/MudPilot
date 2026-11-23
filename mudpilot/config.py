@@ -300,6 +300,8 @@ class Settings:
     heal_pct: int = 50
     major_heal_cmd: str = ""            # major heal, cast below major_heal_pct
     major_heal_pct: int = 35
+    heal_min_ma_fight: int = 0          # heal in a fight only while mana is at or above this % (0 = any mana)
+    heal_min_ma_rest: int = 0           # out of a fight (resting, walking) only at or above this % (0 = any mana)
     hp_regen_cmd: str = ""              # cast when you start resting (HP low)
     ma_regen_cmd: str = ""              # cast when you start meditating/resting for mana
     hp_full_cmd: str = ""               # cast once when HP tops out

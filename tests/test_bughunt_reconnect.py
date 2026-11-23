@@ -33,7 +33,7 @@ def make(name="Miserable"):
 s, st = make()
 st.relog_instead_of_hang, st.reconnect_delay, st.auto_reconnect = True, 60, True
 st.hangup_low_hp = False
-s.safety.hangup("PvP: Zed attacked")
+s.safety.hangup("message: the boss is up")      # (0.8.224: a PvP hang-up never relogs by itself)
 kept = s._closed_at
 s._on_closed("hung up")                       # the reader's "closed" arrives after the hang-up
 check(f"relog: _closed_at kept ({time.time() - s._closed_at:.0f} s ago, want ~55)", s._closed_at == kept

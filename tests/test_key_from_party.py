@@ -45,7 +45,7 @@ check(f"nobody has one: stops and says so ({b.status})", not er.active and "nobo
 # solo: as before
 g.party = {}
 okk, why = er.plan(mp, False, [KEY])
-check(f"solo: can't fetch, as before ({why})", not okk and "can't fetch" in why)
+check(f"solo: can't fetch, as before ({why})", not okk and ("can't fetch" in why or "won't kill an NPC" in why))
 # a stale party wait doesn't outlive the walk
 b.x.waiting_on = ["Evolution"]
 b.stop("Stopped by you")

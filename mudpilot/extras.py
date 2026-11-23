@@ -43,8 +43,9 @@ STATUS_RES = {
               re.compile(r"(?:you can|able to) see again|no longer blind|your (?:sight|vision) (?:returns|clears)", re.I)),
     "disease": (re.compile(r"you (?:are|have been|feel) diseased|you feel (?:feverish|a disease)|disease (?:takes|spreads)", re.I),
                 re.compile(r"no longer diseased|disease (?:wears off|is cured|leaves)|fever breaks", re.I)),
-    "held": (re.compile(r"you are (?:held|paralyz|webbed|entangled|stuck)|you can'?t move|holds you in place", re.I),
-             re.compile(r"you can move again|you (?:are|break) free|no longer (?:held|paralyz|webbed|entangled)", re.I)),
+    "held": (re.compile(r"you are (?:held|paralyz|webbed|entangled|stuck|engulfed)|you can'?t move|holds you in place", re.I),
+             re.compile(r"you can move again|you (?:are|break) free|no longer (?:held|paralyz|webbed|entangled|engulfed)|"
+                        r"you (?:are released|escape|struggle free)", re.I)),
     "confused": (re.compile(r"you (?:are|feel) confused", re.I), re.compile(r"no longer confused|mind clears", re.I)),
     "knocked": (re.compile(r"you are knocked (?:off your feet|down|to the ground)|you are flat on your back", re.I),
                 re.compile(r"you (?:get|climb|scramble|struggle) back (?:on|onto|to) your feet|you stand (?:back )?up", re.I)),
@@ -788,6 +789,10 @@ class Extras:
         reasons = self.__dict__.setdefault("_hold_reasons", set())
         reasons.discard(why)
         self.__dict__.setdefault("_hold_labels", {}).pop(why, None)
+        if self._sent_wait and not reasons and (getattr(self, "care", None) is not None and
+                                                 self.care._reported & {"held", "knocked"}):
+            return                               # (0.8.224, real logs — 83 times: still flat on our back, the leader
+                                                 #  walked off on our @ok and the party broke; the next tick tries again)
         if self._sent_wait and not reasons:
             # whoever we told @wait hears the @ok — even with the party broken for the moment (a telepath gets there
             # anyway): Revolution's confusion wore off while the fear had split the party, nothing was said, and

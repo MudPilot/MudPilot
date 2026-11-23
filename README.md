@@ -129,6 +129,103 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.224
+
+Found by re-walking 0.8.223 against 0.8.222 and by going through a week of the six characters' real logs.
+
+New setting
+- **Heal only above a mana %** (Spells tab): one line for in a fight, one for out of a fight (resting, walking). In a fight you might heal down to 15%; out of one, keep 60% for moving on and blessing. Below the line no heal goes out (yours or the party's) unless someone is under 30% HP. 0 = any mana, as before.
+
+Rooms that hurt in a row (Dan's answers)
+- **A question, not a wall.** A run of rooms that hurts past your limit asks "this way does up to N damage (your limit is M) — go anyway?". Yes walks it, and the same Go to isn't asked again for 3 hours. No, no answer, or nobody to ask (an errand, a member's @goto) refuses it, as before.
+- **The limit is your hang-up line, not your whole max HP.** With 500 HP and a 30% hang-up, a run may do up to 350.
+- **A cheap item that stops them is offered.** If a shop sells something that stops every room in the run (swamp boots in the bog, a fur cape on the icy path), you're asked whether to fetch one first. Yes buys it on the way and walks.
+- **The right reason.** When rooms that hurt are what's in the way, it no longer says "only through Negative Power Plane", reads your quest flags again, or says "MME has no way into that area". A look-alike room cut off that way is named.
+- **Faster refusals.** The same refusal again in one Go to comes back at once, and no search is made that can't succeed (Misty Bog from town: 9 s to 4 s).
+
+Routing (0.8.223 regressions)
+- **Raft errands are back.** 0.8.223's "rooms that hurt in a row" check refused every Silver River Go to that 0.8.222 got a log raft for. A boat a shop sells (log raft, river punt, skiff, canoe, waterskin) now counts when the walk would fetch it first. The Lava Tube, the bogs and magma still need a yes (below).
+- **A dry way is found before "no route".** A thief was refused 14/1923 to 14/9045 with a 254-room dry way there. Go to now makes one last search round every room that hurts before giving up.
+- **Starting inside a key door without its key** (the Fiery Lair): Go to fetches the key. It used to plan out and stop at "the door east is locked".
+- **An errand leg's party check asks the quest flags too.** The pyramid walk no longer leaves a follower at a flag gate.
+- **The bank-trip check is quicker.** When no toll over your cash leads towards the target, it skips its search.
+
+Fighting
+- **The stall watchdog knows the game's spell lines.** These include "Your flaming magma blast strikes…", "…blasts your foes for N damage", "You move your hands…", "You glow…", "You summon…" and "You raise your palm…". In the logs, 9 in 10 of its "No attack of ours… attacking again" re-sends came while our spell was landing every round, and each one cost a round.
+- **The area spell isn't sent again before *Combat Engaged*.** That happened 1,513 times in a week, and each one toggled combat off.
+- **Leaving a No-attack room, no spell at that room's monsters.** While the move is on its way, the step you're leaving counts. There were 1,925 chai casts on the way out of the Zombie pen's run-through rooms.
+- **After a kill, MudPilot waits for the room to show again before resting** (2.5 s at most). It no longer swaps on the regen gear and rests with the zombie's parts still there.
+- **'no effect' is blamed on the right bless.** When two go out at once, the one that isn't your spell gets the blame (a druid's flux, not his ntap). A bless's "no effect" just after a step no longer reads as "wrong room".
+
+Party
+- **A follower still flat on its back doesn't tell the leader "@ok — ready to go".** The leader walked off on it, and the party broke (83 times).
+- **"X dropped — waiting here" isn't called off straight away.** The room display from before the disconnect no longer counts as them being back.
+- **"You are engulfed!"** reads as being held, not as a wall that stops the walk.
+- Joining someone sends 'disband party', not the gang command 'disband'.
+
+Dan's answers: fighting and party
+- **Attack last no longer throws away your opening cast** (PVEREV: 5,781 combat toggles a week). The re-attack went out before your first cast had landed, so *Combat Off* / *Engaged* cancelled it (1,867 of 2,093 in one trace). It now waits until the cast has had time to land (1.5 s).
+- **A low-HP hang-up in a party comes back in after a minute** to see whether the party cleared the room. Monsters still there means it hangs up again at once. It tries twice at most, then stays offline. After a PvP hang-up it never comes back in by itself, whatever Relog / Stay offline say.
+- **Heals much smaller than the damage coming in are skipped in heavy fights.** 'mihe' healed 5-14 a round while three nightshades did 100-420, and each cast is a round with no attack. A self-heal whose last casts averaged under a quarter of a round's damage (when rounds take 10%+ of your max HP) gives way to attacking.
+- **Held or engulfed with Combat off, it fights back.**
+- **Being hit with Combat off, it doesn't sit down.** Walking, it walks on; standing, it stays up.
+- **A disband you meant: no automatic regrouping for 5 minutes,** no invites and no joins (it was 60 s, invites only). Someone who takes an invite from before the disband is disbanded again. Invites and joins you type still go.
+- "The 'par' timer event fired" and "X not allowed @comeback" are logged once, then every 30 / 10 minutes (12,432 lines in one log).
+
+Dan's answers: resting and walking
+- **A short rest while waiting on the party doesn't swap gear.**
+- **A self-mend mid-rest no longer swaps the regen ring off and back on** (11 swaps in one 60 s rest).
+- **A room that keeps breaking rests up** (three times in 2 minutes) means resting a few rooms on, as in a lair.
+- **A MegaMUD loop that isn't matched to MME's map stops at once when you're off it,** saying why, instead of pressing Enter for 60 s.
+- **Wrong learned ways stay forgotten across sessions** (forgotten_exits.json next to learned_exits.json). 10/179 NE was re-learned and failed every start.
+- **A pyramid timed door that won't open is gone round at most every 10 s** (it re-planned every tick, ~12 log lines a second).
+- **"Too strong for you" for a key's dropper uses what you really do a round,** not 60 for anyone without an attack spell (the fire knight read the same for an L30 thief and an L60 warrior).
+
+Smaller fixes
+- The low-HP hang-up re-arms 3% over the line, so your own ring swap no longer hangs you up.
+- A text exit with several wordings ('ask Lord code', 'ask Lord codeword'…): when one fails, all of them are gone round.
+- "Reset session stats" mid-lap no longer saves a 0-exp lap into the loop stats.
+
+## 0.8.223
+
+Dan's answers to the 2026-11-21 bug hunt's "for Dan" list (everything but the start-room rule for rooms that hurt):
+
+Routing
+- **Go to counts rooms that hurt.** A bog, magma or a river without a raft now costs a route according to how much of your HP it would take. An L30 thief (390 HP) was walked 181 steps through 20+ Quagmire rooms (1,840 damage) when a 219-step dry way existed. Now it takes the dry way. A strong character still takes the short way through rooms that only scratch it.
+- **A run of rooms that hurt for your whole max HP, with nowhere to rest between, isn't walked.** Go to finds a way round. If there isn't one, it stops and says so ("30 rooms that hurt in a row (7/996 to 15/1137) can do up to 1800 damage — your whole max HP (533) or more"). A paladin hung up in the middle of the Lava Tube this way.
+- **The "no way back out" check counts only keys you can really get.** A key counts if you hold it, if the walk in fetches it, or if it can be had where you'd be. A thief who picked the jail cell's 101 door in couldn't pick the 151 door out (the jail key drops outside), and is now told before going in.
+- **The inside of a key door is the same door.** MME types the inside of the Fiery Lair's, Molten River's and Mage Tower's key doors as plain locked doors ('[71 picklocks/strength]'). With the key, Go to walks in and back out through them, and uses the key on the way out.
+- **The way back out needs a rope? It's bought first.** Dark-Elf City by the Large Hole, the Webbed Cave. It isn't refused, and you aren't sent in without one.
+- **A key door your picklocks or strength open is used when it saves 30+ rooms.** Through Silvermere's sewer door 1/1098 W it's 10 rooms, not 106 round.
+- **Planning is quicker.** On Go tos that find no route, 0.8.222 was 25-40% slower than 0.8.221. It's now within about a fifth of it, counting the new room-damage costs. The bank-trip check does one quick search first, the max-HP and room-damage answers are worked out once per search, and a way blocked only by rooms that hurt skips the look-alike-room and alignment searches.
+
+Party
+- **Errands ask the party too.** When a Go to first sends you on an errand (a key, a drop, your own raft), the walk there now asks the party `@have` for the rafts, waterskins, rope or idol it needs, and buys theirs first. It used to walk raftless followers down the Silver River on the leader's raft run. The golden idol is asked about before any errand.
+- **A door only a follower can open: they're asked, and given time.** When a member's picklocks or strength will do and yours won't, MudPilot asks them (`@do pick south` / `@do bash south`, again every 20 s) and tries the door while they work. It waits a minute before going round or fetching the key, and up to 3 minutes when it's the only way. It used to give up within a second. A key that turns up at its door gets used.
+- **Refusals say who.** "Buddy's whole max HP (90)" when it's a follower's. Class and alignment gates say who can't pass: "Druids only — Revolution (Mage) can't go through".
+
+Fighting and resting
+- **Ran from the same monster twice in a few minutes? It's too strong for 30 minutes.** MudPilot goes round that room and leaves that monster alone unless it attacks. It no longer runs, rests and walks straight back. A Go to you start yourself tries again.
+- **After moving away from a fight, MudPilot no longer thinks it's still fighting** (it ran over and over with nothing hitting it).
+- **Guards and item droppers get the "can I win this?" check.** One that would all but kill you isn't fought (an L10 sent after Sheriff Lionheart for the jail key), and the log says why.
+- **Stop no longer blocks resting on your next trip.** A level 50+ caster out of mana with a monster in the room backs off a room and rests.
+
+Errands, doors and keys
+- **The warehouse door in Slum Street (1/1104 north) opens.** MudPilot sends 'use crowbar' and tries a few times (a strength test). Without a crowbar, Go to buys one first. Behind it are 18 rooms, including the Warehouse Loft boss lair (2/26).
+- **A key only an NPC has: Go to says who.** For example, "the sleazy shopkeeper (8/486) has the moldy key — MudPilot won't kill an NPC for it".
+- **Errands fetch things in the order the walk needs them.** The log raft now comes before the fang farm's Silver River crossing, and the errand still runs to the end. There's no waterskin run through the Go to's own target (112 rooms for a 26-room Go to).
+- **"Can't fetch <key>" names the trap when that's the real block.**
+
+Smaller fixes
+- A pyramid door that never opens is no longer "gone round" forever (a few minutes of retries for the timed doors, then it stops and names the door).
+- 'dig grave' digs on in the same grave (up to 40 tries), and notices a broken shovel.
+- A loop started one room beside it in open country walks back onto it instead of shifting onto a look-alike row. Knocked off a loop, it rejoins where it was when that's only a little further, so a spur isn't skipped.
+- Go to checks 'pro' before "Arrived" in a dark room that looks like others.
+- Loop key steps written `use chiseled key(1264) SW` work.
+- A Go to that reads 'st' first waits for the answer (up to 10 s).
+- @status shows a toll you can't cover, not an old door reason.
+- The low-picklocks "only through Black Wasteland" for Dark-Elf City wasn't a bug: every other way needs a door that character can't open. It now names the real block.
+
 ## 0.8.222
 
 (includes the 0.8.221.1-0.8.221.3 hotfixes: the item-spell crash fix; a parked character no longer walks off to a leader it stopped following hours ago (Evolution walked 481 steps to the zombie pen); commands use the monster's / item's full name — 'smash large stitched zombie', 'use large iron key')

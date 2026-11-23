@@ -84,7 +84,8 @@ class Danger:
         # of times on the window's thread (Miserable PVE locking up for 8 s at a time, 2026-11-12)
         try:
             key = (mon.get("num"), cfg.char_level or st.level or 1, s.bot.spellcasting() // 5,
-                   tuple(cfg.attack_spells or ()), len(st.known_spells or ()), cfg.spell_dmg_bonus, cfg.spell_min_pct)
+                   tuple(cfg.attack_spells or ()), len(st.known_spells or ()), cfg.spell_dmg_bonus, cfg.spell_min_pct,
+                   int(self._seen_dpr() // 25))
         except Exception:
             key = None
         c = self.__dict__.setdefault("_my_cache", {})
@@ -106,10 +107,22 @@ class Danger:
                                             cfg.spell_dmg_bonus)
                 good = [r[2] for r in rows if r[3] >= cfg.spell_min_pct / 100]
                 if good:
-                    return float(max(good))
+                    return float(max(max(good), self._seen_dpr()))
         except Exception:
             pass
-        return 60.0
+        seen = self._seen_dpr()
+        if seen:
+            return seen
+        # (0.8.224: no attack spell and nothing seen yet — a guess that grows with level, not a flat 60; the six
+        #  characters' real rounds were 107-445 at L41-61)
+        return float(max(60, 5 * int(cfg.char_level or st.level or 1)))
+
+    def _seen_dpr(self) -> float:
+        """Your own damage a round in this session's fights (10 rounds seen at least), else 0."""
+        cl = getattr(self.s, "combatlog", None)
+        if cl is None or getattr(cl, "my_rounds", 0) < 10:
+            return 0.0
+        return float(getattr(cl, "my_round_avg", 0.0) or 0.0)
 
     def assess(self, room) -> dict | None:
         """{'count', 'mob', 'dmg' (expected damage to you), 'rounds'} for the worst likely spawn."""

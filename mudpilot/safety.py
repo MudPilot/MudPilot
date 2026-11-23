@@ -323,8 +323,10 @@ class Safety:
                       "it re-arms once HP is back over the line")
                 return
         if pct >= thr:
-            self._hp_armed, self._hp_floor = True, None
-            return
+            if self._hp_armed or self._hp_floor is None or pct >= thr + 3:
+                self._hp_armed, self._hp_floor = True, None
+            return          # (0.8.224, real logs: re-armed at 25.9%, then our own regen swap's 'remove platinum
+                            #  ring' (+10 max HP) took it to 24.5% and hung up in an empty room — re-arm 3% over)
         if pct <= 0:
             return
         if self._hp_armed:
@@ -337,6 +339,8 @@ class Safety:
     def on_room(self, state):
         """'Also here:' list after a room display."""
         if not state.view or not self.s.telnet.connected:
+            return
+        if getattr(self, "_party_relog", None) and self._party_relog_look(state):
             return
         fr = self.friends()
         bad = [m.lower() for m in (self.cfg.hangup_monsters or []) if m.strip()]
@@ -383,10 +387,46 @@ class Safety:
                         self.s.telnet.send_line(f"/{n} *Attacked*{where} — {reason[5:60]} — hanging up!")
                     except Exception:
                         pass
+        me_ = (cfg.my_name or "").lower()
+        in_party = any(n.lower() != me_ for n in (self.s.state.party or {}))
         self.s.remember_party()
         self.s.bot.stop(f"Hung up ({reason})")
         self.s.telnet.close()
         self.s.show_down(f"HUNG UP — {reason}")
+        if self.is_pvp_reason(reason) and not manual:
+            # 0.8.224 (Dan): NEVER back in by itself after a PvP hang-up — not with Relog instead of hanging, not
+            # after Stay offline N minutes
+            self.s.hold_realm = True
+            self.s._want_connected = False
+            self.hung_up_until = float("inf")
+            self._party_relog = None
+            return
+        pr = getattr(self, "_party_relog", None)
+        if pr and time.time() - pr.get("t", 0) > 600:
+            pr = self._party_relog = None        # (an old one: this is a new bout)
+        if reason.startswith("HP") and not manual and (in_party or pr):
+            # 0.8.224 (Dan): a low-HP hang-up in a party — the party may well finish the fight (Miserable hung up
+            # just as the last stonecap shattered and sat at the menu 3 h 45 min). Back in after a minute to look:
+            # monsters still in the room = hang up again at once; twice at most, then offline for good
+            n = (pr or {}).get("n", 0)
+            if n < self.PARTY_RELOG_TRIES:
+                self._party_relog = {"n": n + 1, "t": time.time(), "looked": False}
+                self.s.hold_realm = False
+                self.s._want_connected = True
+                self.hung_up_until = time.time() + self.PARTY_RELOG_SECS
+                self.s._closed_at = time.time() + self.PARTY_RELOG_SECS - cfg.reconnect_delay
+                self.s._closed_at_kept_until = time.time() + 10
+                self.s.log(f"Low-HP hang-up in a party — back in {self.PARTY_RELOG_SECS} s to see whether the party "
+                           f"cleared the room (try {n + 1} of {self.PARTY_RELOG_TRIES}); monsters still there = "
+                           "straight back out")
+                return
+            self._party_relog = None
+            self.s.hold_realm = True
+            self.s._want_connected = False
+            self.hung_up_until = float("inf")
+            self.s.log(f"Low-HP hang-up again after {self.PARTY_RELOG_TRIES} looks — staying offline until you "
+                       "come back in yourself")
+            return
         if not cfg.relog_instead_of_hang and float(cfg.hangup_stay_offline or 0) <= 0:
             # next connect waits at the MajorMUD menu for you. Not with "Stay offline N minutes" set: that's you
             # saying come back in after N minutes (2026-11-18: it reconnected and sat at the menu instead, so the
@@ -412,6 +452,27 @@ class Safety:
         else:
             self.s._closed_at = time.time() + mins * 60 - cfg.reconnect_delay
             self.s._closed_at_kept_until = time.time() + 10     # (0.8.201, bug hunt: as above)
+
+    PARTY_RELOG_SECS = 60
+    PARTY_RELOG_TRIES = 2
+
+    @staticmethod
+    def is_pvp_reason(reason) -> bool:
+        r = (reason or "").lower()
+        return r.startswith(("pvp", "attacked by", "player seen", "enemy seen"))
+
+    def _party_relog_look(self, state) -> bool:
+        """Back in after a party low-HP hang-up: the first room display decides — monsters still here: out again."""
+        pr = getattr(self, "_party_relog", None)
+        if not pr or pr.get("looked") or not state.view:
+            return False
+        pr["looked"] = True
+        mobs = [sh for sh, _r in (state.view.monsters or [])]
+        if mobs:
+            return bool(self.hangup(f"HP: {', '.join(mobs[:3])} still here after the relog") or True)
+        self._party_relog = None
+        self.s.log("Back in after the low-HP hang-up — the room's clear")
+        return False
 
     def may_reconnect(self) -> bool:
         return time.time() >= self.hung_up_until

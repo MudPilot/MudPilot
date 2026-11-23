@@ -66,6 +66,12 @@ class Errands:
             else:
                 mon = w.monsters.get(n) or {}
                 what = f"drop: {mon.get('name') or f'monster #{n}'}" + (f" {pct}%" if pct else "")
+                tsf = getattr(self.bot, "_fight_too_strong", None)
+                est = tsf([mon], here=False) if (mon and callable(tsf)) else 0
+                if isinstance(est, (int, float)) and est > 0:
+                    # (0.8.223, m149 N1: an L10 sent to kill Sheriff Lionheart for the jail key — not a fight to plan)
+                    self.__dict__.setdefault("too_strong", {})[num] = (mon.get("name") or f"monster #{n}", est)
+                    continue
                 for rm in mon.get("spawn_rooms") or []:
                     cands.append(("monster", tuple(rm), what, {}))
                 if not mon.get("spawn_rooms") and not (getattr(w, "summons", {}) or {}).get(n):
@@ -288,9 +294,40 @@ class Errands:
                     "nomonsters": rc["nomonsters"], "dist": 0, "what": what_})
         return out
 
+    def _hp_wall_why(self, nums, near=None):
+        """Why an item can't be fetched when it's only the HP wall (a trap or room that can do your whole max HP —
+        0.8.222): "can't fetch X: the way to it crosses …". None when that isn't it."""
+        w, b = self.s.world, self.bot
+        c = getattr(w, "char", None)
+        hp = int((c or {}).get("max_hp") or 0)
+        here = b.st.room
+        if hp <= 0 or not here or not nums:
+            return None
+        from .worlddb import DIR_WORDS
+        for num in nums:
+            c["max_hp"] = 0                          # (no max HP known = no HP wall: is that all that's in the way?)
+            try:
+                src = self.source_for(num, None, set(), None, near=near)
+                rt = w.route(tuple(here), src["room"], level=b.route_level(),
+                             have=(set(b.every_item()) - {num})) if src else None
+            except Exception:
+                src = rt = None
+            finally:
+                c["max_hp"] = hp
+            cur = tuple(here)
+            for ex in rt or []:
+                dmg = w.hp_wall(ex)
+                if dmg:
+                    return (f"can't fetch {w.item_name(num)}: the way to it ({src['what']}) crosses the "
+                            f"{DIR_WORDS.get(ex.dir, ex.dir).lower()} exit of {cur[0]}/{cur[1]}, which can do {dmg} "
+                            f"damage — your whole max HP ({hp})")
+                cur = tuple(ex.to)
+        return None
+
     def plan(self, mp, loop, missing: list, near=None) -> tuple[bool, str]:
         w = self.s.world
         todo, bad = [], []
+        self.too_strong = {}                          # (item droppers source_for left out this time: too strong)
         have_ = self.bot.held_items() or set()
         for num in list(missing):
             if self.source_for(num, None, set(), None, near=near):
@@ -329,8 +366,24 @@ class Errands:
                 todo.insert(0, {"num": n, "kind": "party", "room": None, "what": "from the party", "dist": 0})   # (asked first: partyA #2)
             bad = []
         if bad:
-            return False, (f"can't fetch {', '.join(bad)} automatically (quest item, or no known source "
-                           f"you can walk to)")
+            # an NPC carries it (the moldy key: the sleazy shopkeeper, 8/486 — m58 #2): say who; MudPilot never kills
+            # an NPC for it (Dan, 0.8.223)
+            npc = [(w.item_name(n), w.npc_holder(n)) for n in missing if w.item_name(n) in bad
+                   and hasattr(w, "npc_holder") and w.npc_holder(n)]
+            rest = [b_ for b_ in bad if b_ not in {x[0] for x in npc}]
+            ts_ = getattr(self, "too_strong", None) or {}
+            strong = [(w.item_name(n), ts_[n]) for n in missing if n in ts_ and w.item_name(n) in rest]
+            rest = [b_ for b_ in rest if b_ not in {x[0] for x in strong}]
+            parts = ([", ".join(f"{who} has the {nm}" for nm, who in npc) + " — MudPilot won't kill an NPC for it; "
+                      "get it yourself, then Go to again"] if npc else []) + \
+                ([", ".join(f"the {nm} drops off the {m_}, too strong for you (~{e_:.0f} damage to you)"
+                            for nm, (m_, e_) in strong) + " — not going to fight it for that"] if strong else []) + \
+                ([self._hp_wall_why([n for n in missing if w.item_name(n) in rest], near) or
+                  f"can't fetch {', '.join(rest)} automatically (quest item, or no known source you can walk to)"]
+                 if rest else [])
+            # (the HP wall alone in the way — a trap / room that can do your whole max HP: say that, not "quest item";
+            #  m14c M14C-3, the large brass key past 14/8542 W's 400-damage trap at 390 HP)
+            return False, "; ".join(parts)
         outer = self.active
         if outer and outer.get("todo") and self._is_leg(outer, mp):
             # (0.8.201, realm walk: the errand's own walk to its item room needs something too — the bloodstone orb
@@ -384,9 +437,11 @@ class Errands:
             self.bot.hunt_target = None
 
     # ------------------------------------------------------------ the party's own rafts / idols
-    def party_check(self, mp, loop, carry) -> bool:
+    def party_check(self, mp, loop, carry, leg=False) -> bool:
         """Leading a party down a path where each walker needs their own item (a raft for the river, the golden
-        idol): ask everyone '@have <item>' and buy one for whoever hasn't. True = holding the walk for it."""
+        idol): ask everyone '@have <item>' and buy one for whoever hasn't. True = holding the walk for it.
+        leg: `mp` is an errand's own walk (party3 #2) — what's bought goes in front of the errand, which carries on,
+        and a give-up names the errand's walk, not the leg."""
         bot, w = self.bot, self.s.world
         me = (self.s.settings.my_name or "").lower()
         members = [n for n in (self.s.state.party or {}) if n.lower() != me]
@@ -397,14 +452,18 @@ class Errands:
             n = 0
         picks = [bot.carry_pick(c, own=False) for c in carry]   # (the members' own: they buy, not our stash)
         sets = [frozenset(c) for c in carry]
+        ea = self.active if (leg and self.active) else None
+        g_mp = (ea.get("then") or (mp, loop))[0] if ea else mp
+        g_after = ea.get("after") if ea else bot.after_goto
+        g_target = ea.get("target") if ea else (getattr(bot, "_goto_target", None) if mp.title.startswith("Go to ")
+                                                else None)
         if n >= 2:
             # not 'walking on' without them (Evolution, 2026-11-09: to the Ancient Ruin with no rafts for the
             # party after two rounds of hand-overs that never happened): don't go, say why — a boss hunt or a Go to
             # off a loop goes back to the loop (next tick: start_path holds the walk when this returns True)
             what = "; ".join(" or ".join(w.item_name(i) for i in [p] + sorted(c - {p})) for p, c in zip(picks, sets))
-            self.giving_up = (f"Not walking '{mp.title}': asked the party twice for {what} and someone still has "
-                              f"none", mp, bot.after_goto,
-                              getattr(bot, "_goto_target", None) if mp.title.startswith("Go to ") else None)
+            self.giving_up = (f"Not walking '{g_mp.title}': asked the party twice for {what} and someone still has "
+                              f"none", g_mp, g_after, g_target)
             bot.status = "Not walking — the party is missing what the way needs"
             return True
         # (a round counts only once it comes back short — _asking_tick: a round everyone passed, or one you
@@ -414,8 +473,8 @@ class Errands:
         # and got a waterskin bought for him (Dan, 2026-11-04)
         asks = list(picks) + sorted({i for c in sets for i in c} - set(picks))
         self.asking = {"mp": mp, "loop": loop, "picks": picks, "sets": sets, "t": time.time(), "ans": {},
-                       "q": {m: list(asks) for m in members}, "after": bot.after_goto,
-                       "target": getattr(bot, "_goto_target", None) if mp.title.startswith("Go to ") else None}
+                       "q": {m: list(asks) for m in members}, "after": g_after, "target": g_target,
+                       "leg": ea is not None, "gmp": g_mp}
         names = "; ".join(" or ".join(w.item_name(i) for i in [p] + sorted(c - {p})) for p, c in zip(picks, sets))
         for m in members:
             for p in asks:
@@ -498,7 +557,11 @@ class Errands:
             self._rounds.pop(mp.title, None)
             bot.log("Party items: everyone has " + "; ".join(" or ".join(w.item_name(i) for i in [p] + sorted(c - {p}))
                                                              for p, c in zip(a["picks"], sets)))
-            bot.start_path(mp, loop, checked=True)
+            # (asked before your own errand — the idol, party3 #4: plan the walk again, the errand comes next)
+            if not a.get("recheck") and bot.partyflags.check(mp, loop):
+                return True                      # (0.8.224 — wparty W2: 'checked' skipped the party's quest-flag check;
+                                                 #  the pyramid walk left Revolution at the 12/1189 gate)
+            bot.start_path(mp, loop, checked=not a.get("recheck"))
             return True
         n, t = self._rounds.get(mp.title, (0, 0))
         self._rounds[mp.title] = ((0 if time.time() - t > 600 else n) + 1, time.time())
@@ -514,8 +577,18 @@ class Errands:
         if bad:
             # not stood there idle (Evolution, 2026-11-09, 06:02: after the crimson mist, on the way back): a Go to
             # with a loop after goes back to it, a boss hunt is given up; nothing to go back to — stop and say why
-            bot.give_up(f"Not walking '{mp.title}': the party needs {', '.join(bad)} — no shop we can get to sells "
-                        f"it, get it by hand", mp, a.get("after"), a.get("target"))
+            gmp = a.get("gmp") or mp
+            bot.give_up(f"Not walking '{gmp.title}': the party needs {', '.join(bad)} — no shop we can get to sells "
+                        f"it, get it by hand", gmp, a.get("after"), a.get("target"))
+            return True
+        outer = self.active
+        if a.get("leg") and outer and outer.get("todo"):
+            # an errand's own leg (party3 #2): buy theirs first, then on with the errand — it keeps its then / target
+            outer["todo"] = todo + outer["todo"]
+            outer["at"], outer["tries"] = None, 0
+            bot.log("Party items: buying " + "; ".join(f"{w.item_name(t['num'])} for {t['for']} ({t['what']})"
+                                                      for t in todo) + " — then on with the errand")
+            bot.set_mode("auto")
             return True
         self.active = {"todo": todo, "then": (mp, loop), "started": time.time(), "at": None, "tries": 0,
                        "after": a["after"], "target": a["target"]}

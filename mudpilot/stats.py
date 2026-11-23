@@ -118,6 +118,8 @@ class SessionStats:
         elif not st.resting and self._was_resting and self._rest:
             if st.in_combat:
                 end = "a fight broke it up"
+                if st.room:                        # (0.8.224: automation._rest_broken_here)
+                    bot._rest_broken = (getattr(bot, "_rest_broken", None) or [])[-20:] + [(now, tuple(st.room))]
             else:
                 end = getattr(bot, "_rest_end", None) or "got up"
             bot._rest_end = None

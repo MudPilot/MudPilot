@@ -36,5 +36,6 @@ b.idle_regen([])
 check(f"waiting, over 'rest until': rests in what's on ({sent})", "eq runed cape" not in sent and b._swap is None)
 g.hp = 500; sent.clear(); b._cool.pop("idle_regen", None)
 b.idle_regen([])
-check(f"waiting and actually short: the rest gear goes on ({sent})", "eq runed cape" in sent)
+check(f"0.8.224 (Dan): waiting and actually short: still no gear swap for a party-wait rest ({sent})",
+      "eq runed cape" not in sent and "rest" in sent)
 print("ALL PASS" if ok else "SOME FAILED"); sys.exit(0 if ok else 1)

@@ -20,7 +20,8 @@ from .worlddb import WorldDB
 RESOLVER_VERSION = 2       # bump when path matching changes (2: bridges moves MME doesn't have)
 
 
-PARTY_HOLD_SECS = 60          # after a disband you meant: no automatic invites for this long
+PARTY_HOLD_SECS = 300         # after a disband you meant: no automatic invites / joins for this long (0.8.224, Dan:
+                              # "it shouldn't regroup for a few minutes" — it was 60 s, invites only)
 # 0.8.200 (auto-train, Dan: CP can't be unspent): the train stats form holds every automatic command — par, telepath
 # replies, triggers, all of it — from the moment 'train stats' goes out (MudPlay: a 'par' typed into the Family Name
 # box made a character's last name "par"). Not seen yet after FORM_HOLD_WAIT → no form came; seen → never longer
@@ -184,8 +185,23 @@ class Session:
         _reset = self.state.reset_stats
 
         def reset_all():
+            # (0.8.224, real logs — Buddy x2: "Reset session stats" mid-lap saved "Lap 3: 9.4 min, 0 exp, 0 kills"
+            #  into the loop stats. The lap's progress so far is carried over the reset)
+            ls = getattr(self, "loopstats", None)
+            lap = getattr(ls, "_lap", None) if ls is not None else None
+            done = None
+            if lap:
+                try:
+                    done = (self.state.exp_gained - lap["exp"], self.state.kills - lap["kills"],
+                            self.stats.rests - lap["rests"])
+                except Exception:
+                    done = None
             _reset()
             self.stats.reset()
+            if lap and done:
+                lap["exp"] = self.state.exp_gained - done[0]
+                lap["kills"] = self.state.kills - done[1]
+                lap["rests"] = self.stats.rests - done[2]
         self.state.reset_stats = reset_all
         self.practice = False            # connected to the local practice server
         self.paths: list[MPath] = []
@@ -464,8 +480,15 @@ class Session:
             # invites for a minute, or they'd be pulled straight back (Dan, 2026-11-01: "with MegaMUD you gotta be
             # quick as fuck and sometimes try it 2 times")
             self._party_hold_until = time.time() + PARTY_HOLD_SECS
-            self.log(f"Disbanded — no automatic invites for {PARTY_HOLD_SECS} s, so the party can re-form "
-                     "under someone else")
+            self._party_hold_from = time.time()
+            self.log(f"Disbanded — no automatic invites or joins for {PARTY_HOLD_SECS // 60} minutes, so nobody "
+                     "regroups straight away (type invite / join yourself to)")
+        mjh = re.match(r"^\s*join\s+(\w+)", cmd or "", re.I) if from_bot else None
+        if mjh and time.time() < getattr(self, "_party_hold_until", 0) and not asked:
+            if self.bot.ready("party_hold_join_note", 15):
+                self.log(f"Not joining {mjh.group(1)} — automatic regrouping paused "
+                         f"({int(self._party_hold_until - time.time())} s) after the disband")
+            return
         mi = re.match(r"^\s*invite\s+(\w+)", cmd or "", re.I) if from_bot else None
         if mi and time.time() < getattr(self, "_party_hold_until", 0) and not asked:
             if self.bot.ready("party_hold_note", 15):
@@ -473,6 +496,7 @@ class Session:
                          f"({int(self._party_hold_until - time.time())} s) after the disband")
             return
         if mi:
+            self.__dict__.setdefault("_invited_at", {})[mi.group(1).lower()] = time.time()
             lead = self.my_leader().lower()
             if lead and mi.group(1).lower() == lead and not asked:
                 self.log(f"Not inviting {mi.group(1)} — they lead; I join them")
@@ -1081,7 +1105,9 @@ class Session:
                   # follower was refused and left behind. From Game Data → Players ('who' / look); unknown = skipped
                   "party_races": [num(w.races, m.get("race")) for m in pinfo] if leading else [],
                   "party_aligns": [m.get("alignment") or ("Neutral" if m.get("last_who") else "")
-                                   for m in pinfo] if leading else []}
+                                   for m in pinfo] if leading else [],
+                  # (who those are, in the same order: a refusal names the member a gate stops — partyA D4, partyB P5)
+                  "party_names": [str(n).split()[0] for n in st.party if n.lower() != me] if leading else []}
         # 0.8.190 (Dan): traps weighed by the weakest member's HP down to the hang-up line, locked doors by the
         # party's best picker / basher, guarded portals only with Combat on, the idol teleport only when every
         # follower is known to carry one
@@ -1089,6 +1115,7 @@ class Session:
         try:
             w.char.update({"top_level": b.route_top_level() if leading else None,
                            "max_hp": b._weakest_hp(read_only=True) or None,
+                           "max_hp_who": b._weakest_name(read_only=True) if leading else None,   # (partyA D4)
                            # (leading: only what every member carries counts against a room's damage — a 50-HP
                            #  follower was walked through 23 rooms of magma on the leader's phoenix feather: partyB P2)
                            "carried": (frozenset(b.held_items() or ()) & frozenset(b.party_carry() or ())) if leading
@@ -1135,6 +1162,22 @@ class Session:
             self.log(f"{name} hasn't joined — @join again (try {w['tries']})")
             self.send(jc.replace("{name}", name), from_bot=True)
 
+    def _late_joiner(self, text):
+        """0.8.224 (Dan): an invite still pending when you disbanded — they accept it afterwards and the party you
+        meant to break up is back. Someone joining from an invite sent before the disband, inside the pause: disband
+        again (once)."""
+        if time.time() >= getattr(self, "_party_hold_until", 0):
+            return
+        m = re.match(r"^(\w+) started to follow you\.?\s*$", text.strip())
+        if not m:
+            return
+        t = getattr(self, "_invited_at", {}).get(m.group(1).lower(), 0)
+        if not t or t >= getattr(self, "_party_hold_from", 0):
+            return                               # (invited since — by you or an @invite: that one's meant)
+        self._invited_at.pop(m.group(1).lower(), None)
+        self.log(f"{m.group(1)} took an invite from before the disband — disbanding again")
+        self.send("disband party", from_bot=True)
+
     DISBAND_FIRST_RE = re.compile(r"^You must disband your own party first", re.I)
 
     def _disband_then_join(self, text) -> bool:
@@ -1154,7 +1197,7 @@ class Session:
             return True                              # (did that a moment ago — 18 disband/joins in a second)
         self._disbanded_at = time.time()
         self.log(f"Disbanding my own party to join {js[0]}")
-        self.send("disband", from_bot=True)
+        self.send("disband party", from_bot=True)
         self.send(f"join {js[0]}", from_bot=True)
         return True
 
@@ -1311,6 +1354,7 @@ class Session:
         self.comeback.feed_line(text)
         self.hangup_items.note_line(text)
         self._disband_then_join(text)
+        self._late_joiner(text)
         self.msgrules.feed_line(text)
         for _x in (self.sounds, self.tracker, self.leaderboard, self.eightball, self.quests):
             try:
@@ -2160,8 +2204,48 @@ class Session:
         except Exception as ex:
             self.log(f"Map fixes: {ex}")
 
+    @property
+    def forgotten_file(self):
+        return os.path.join(config.board_dir(self.settings.board), "forgotten_exits.json")
+
+    def _load_forgotten(self):
+        """0.8.224 (Dan, logEVO D): wrong learned ways that failed when walked stay forgotten across sessions — path
+        bridging re-learned the same 10/179 NE every start, a failed step and a replan (and an 8 s freeze) each time."""
+        import json
+        try:
+            with open(self.forgotten_file, encoding="utf-8") as f:
+                rows = json.load(f)
+        except (OSError, ValueError):
+            rows = []
+        got = set()
+        for r in rows if isinstance(rows, list) else []:
+            try:
+                src, mv, dst = r
+                got.add((tuple(src), str(mv).lower(), tuple(dst)))
+            except (TypeError, ValueError):
+                continue
+        self.world.forgotten = set(getattr(self.world, "forgotten", set()) or set()) | got
+        self._forgotten_saved = len(self.world.forgotten)
+
+    def _save_forgotten(self):
+        import json
+        fg = getattr(self.world, "forgotten", None) or set()
+        if len(fg) == getattr(self, "_forgotten_saved", 0):
+            return
+        rows = sorted([list(s), m, list(d)] for s, m, d in fg)[-500:]
+        os.makedirs(os.path.dirname(self.forgotten_file), exist_ok=True)
+        tmp = self.forgotten_file + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(rows, f)
+        os.replace(tmp, self.forgotten_file)
+        self._forgotten_saved = len(fg)
+
     def _load_learned(self):
         import json
+        try:
+            self._load_forgotten()
+        except Exception as ex:
+            self.log(f"Map: forgotten ways: {ex}")
         try:
             with open(self.learned_file, encoding="utf-8") as f:
                 rows = json.load(f)
@@ -2195,6 +2279,10 @@ class Session:
 
     def save_learned(self):
         import json
+        try:
+            self._save_forgotten()
+        except OSError:
+            pass
         rows = getattr(self.world, "learned", [])
         if len(rows) == getattr(self, "_learned_saved", 0):
             return
