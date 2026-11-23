@@ -61,6 +61,21 @@ jobs:
             echo "::warning::this source predates the Mac build: the zip would build but not open"
           fi
 
+      - name: Report address (runner copy only)
+        env:
+          REPORT_ENDPOINT: ${{ secrets.REPORT_ENDPOINT }}
+        run: |
+          # Help -> Report a problem sends to the developer's private channel, as the Windows/Linux builds do. The
+          # address is the repo secret REPORT_ENDPOINT; it's written into this runner's checkout only (never
+          # committed, never printed). No secret (a fork) = the file stays blank and reports are saved locally.
+          f=mudpilot/report_endpoint.txt
+          {
+            printf '%s\n' '# Developer bug-report address (Discord webhook URL, https://discord.com/api/webhooks/...).'
+            printf '%s\n' '# Put it on the first non-# line. Blank = reports are only saved locally.'
+            if [ -n "$REPORT_ENDPOINT" ]; then printf '%s\n' "$REPORT_ENDPOINT"; fi
+          } > "$f"
+          if [ -n "$REPORT_ENDPOINT" ]; then echo "report address: set"; else echo "report address: none (reports stay local)"; fi
+
       - name: Build tools
         run: |
           python -m pip install --upgrade pip
