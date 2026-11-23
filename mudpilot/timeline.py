@@ -53,6 +53,10 @@ class Timeline:
         if st.in_combat:
             return "fighting"
         if st.resting:
+            # (0.8.225, HUNT_1123 #34: a party-wait rest that began topped up is waiting on the party, not resting —
+            #  Miserable showed 0% waiting while 14% of his day went on Revolution's mana)
+            if getattr(b, "_idle_rest", False) and st.max_hp and st.hp_pct() >= s.settings.rest_until_hp and                     (not st.max_ma or not s.settings.rest_below_ma or st.ma_pct() >= s.settings.rest_until_ma):
+                return "waiting"
             return "resting"
         if s.remote.holding() or b.x.waiting_on or getattr(b, "_pace_until", 0) > time.time():
             return "waiting"

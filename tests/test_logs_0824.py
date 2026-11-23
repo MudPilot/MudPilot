@@ -144,7 +144,7 @@ check("not ours: Your defenses are vulnerable!", not Automation.OWN_ATTACK_RE.ma
 saved_char = dict(w.char or {})
 def plan_(a, z, hp, have):
     w.char = dict(saved_char, max_hp=hp, hangup_pct=30, carried=frozenset(), gate_any=False)
-    w.forget_routes(); w.stretch_blocks = {}
+    w.forget_routes()
     return w.route(a, z, level=30, have=have)
 check("boat items are the shop-sold ones (log raft in, no phoenix feather)",
       any(w.item_name(i) == "log raft" for i in w._boat_items()) and

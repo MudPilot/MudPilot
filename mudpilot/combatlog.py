@@ -127,7 +127,7 @@ class CombatLog:
         if not r:
             return
         self.rounds.append(r)
-        if r["done"] > 0:
+        if r["done"] > 0 or r.get("taken", 0) > 0:     # (0.8.225, #17: a round you missed in counts too)
             # 0.8.224 (Dan): what you really do a round, for danger.my_dpr — a melee character was guessed at 60 a round
             # whatever their gear (a key's dropper "too strong" for an L60 warrior as much as an L30 thief)
             n = self.my_rounds = getattr(self, "my_rounds", 0) + 1

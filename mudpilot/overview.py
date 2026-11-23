@@ -662,10 +662,7 @@ class OverviewPane:
     def _share_changed(self):
         cfg = self.app.s.settings
         cfg.status_broadcast = bool(self.v_share.get())
-        try:
-            cfg.save()
-        except Exception:
-            pass
+        cfg.save_quietly(self.app.s.log)
         try:
             self.app.s.log("You: All characters → share this character on the LAN "
                            + ("on" if cfg.status_broadcast else "off"))

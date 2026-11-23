@@ -676,10 +676,7 @@ class Session:
         return [(SECRET_RE.sub(lambda m: (m.group(1) or m.group(3)) + "(hidden)", txt), col)]
 
     def _save_quietly(self):
-        try:
-            self.settings.save()
-        except Exception:
-            pass
+        self.settings.save_quietly(self.log)
         try:
             self.hangup_items.snapshot("save")         # the profile saves: so does the hang-up item list (0.8.201)
         except Exception:
@@ -2108,7 +2105,7 @@ class Session:
             return
         self.log(f"Default task: begin looping '{mp.title}'")
         if mp.resolved and mp.steps[0].room and not any(x.room == self.state.room for x in mp.steps):
-            self.bot.goto(mp.steps[0].room, then=mp)
+            self.bot.goto_bg(mp.steps[0].room, then=mp)
         else:
             self.bot.start_path(mp, loop=True)
 

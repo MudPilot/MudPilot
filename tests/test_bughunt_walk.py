@@ -181,6 +181,7 @@ check(f"3/817 'raise idol' isn't learned as a move to another map ({learned})",
 w.add_learned = real_add
 
 # --- (12) a target inside an avoided area
+_lv = g.level; g.level = 45                 # (0.8.225: NPP is only avoided under level 50)
 av = b.avoid_set()
 npp = [k for k in av if w.room(k).name == "Negative Power Plane"]
 bw = [k for k in av if w.room(k).name.startswith("Black Wasteland")]
@@ -188,6 +189,7 @@ af = b.avoid_for((8, 958))
 check("avoid_for 8/958: the target's own area isn't avoided", (8, 958) not in af and not (set(npp) & set(af)) if npp else False)
 check("…Black Wasteland still is", bw and set(bw) <= set(af))
 check("a target outside: unchanged", b.avoid_for((1, 1)) == av)
+g.level = _lv
 
 # --- (14) a follower doesn't farm bosses by itself
 due = []

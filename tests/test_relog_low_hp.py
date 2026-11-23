@@ -22,6 +22,7 @@ hung = []
 s.safety.hangup = lambda why: hung.append(why)
 g = s.state
 g.max_hp, g.hp = 208, 208                      # what we knew before the hang-up
+g.max_hp_read = True                           # (the real max was read before the drop — 0.8.225 waits for 'st' otherwise)
 s._connected_at = time.time(); s._entered = True
 s.safety._was_in = False
 s.safety.tick()

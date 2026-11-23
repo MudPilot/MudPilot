@@ -549,7 +549,7 @@ class ScrollErrand:
             here = self.s.state.room
             steps = [x.room for x in getattr(mp, "steps", []) if x.room]
             if here and steps and here not in steps:
-                self.s.bot.goto(steps[0], then=mp)
+                self.s.bot.goto_bg(steps[0], then=mp)
             else:
                 self.s.bot.start_path(mp, loop=loop)
 

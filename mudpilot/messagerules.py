@@ -228,7 +228,8 @@ class MessageRules:
                 # or the game refusing a move ("You are held!"), stop the walk
                 tentative = cond == "held" and r.get("bundled") and not self.REAL_HOLD_RE.search(
                     f"{name} {r.get('start', '')} {line}")
-                if cond not in self.conditions:
+                if cond not in self.conditions and (not tentative or s.bot.ready(f"msg_tent_{cond}", 600)):
+                    # (0.8.225, #29: a tentative hold you can't act on — once every 10 minutes, ~5,700 lines a day)
                     s.log(f"Messages: {cond.replace('_', ' ')} ({name})" + (
                         " — walking on (it only stops if a move fails, e.g. too heavy to move)" if tentative else ""))
                 self.conditions[cond] = {"since": now, "rule": name, "end_rx": end_rx, "tentative": tentative,
@@ -301,8 +302,8 @@ class MessageRules:
                     self.s.bot.x.care.report_mine(ail, False)
                 except Exception:
                     pass
-        if c:
-            self.s.log(f"Messages: {cond.replace('_', ' ')} gone ({why})")
+        if c and not (c.get("tentative") and not self.s.bot.ready(f"msg_tent_gone_{cond}", 600)):
+            self.s.log(f"Messages: {cond.replace('_', ' ')} gone ({why})")   # (0.8.225: throttled like its start line)
 
     def holding_walk(self) -> str | None:
         """Can't walk right now: held (can't move), or waiting for something to wear off (mode 2)."""

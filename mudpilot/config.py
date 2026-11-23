@@ -425,7 +425,7 @@ class Settings:
     party_rank: str = ""                # "front" | "mid" | "back" — set it whenever you're in a party
     rank_cmd: str = "{rank}rank"        # frontrank / midrank / backrank ({rank} = front/mid/back)
     attack_last: bool = False           # attack at once, and again after each party member joins in (be the last)
-    attack_last_wait: float = 8         # ...but attack anyway after this many seconds
+    attack_last_wait: float = 8         # (not used any more) ...but attack anyway after this many seconds
     # MegaMUD "Other" options
     pick_locks: bool = False            # pick locks instead of bashing
     bash_cmd: str = "bash {dir}"
@@ -501,7 +501,7 @@ class Settings:
     stash_cmd: str = "drop {qty} {item}"
     stash_hide: bool = True             # hide it after dropping
     stash_hide_cmd: str = "hide {qty} {item}"   # hides it from your pack (instead of dropping it)
-    stash_looted: bool = True           # also stash every item the Get button picks up (weapons that sell, etc.)
+    stash_looted: bool = True           # (not used any more) also stash every item the Get button picks up (weapons that sell, etc.)
     stash_each_lap: bool = True         # walk to the stash room at the end of each lap if you're carrying any
     stash_min_copper: int = 500         # ...but only when it's worth this much (copper value) or more
     get_cash_cmd: str = "get {qty} {item}"
@@ -842,6 +842,24 @@ class Settings:
         if not same:
             _write_safely(APP_STATE, state)
 
+    def save_quietly(self, log=None) -> bool:
+        """save(), but a failure doesn't raise: it's logged (at most once every 10 minutes) so a locked or full disk
+        isn't silent any more. 0.8.225, bug hunt #28."""
+        try:
+            self.save()
+            return True
+        except Exception as ex:
+            import time as _t
+            now = _t.time()
+            if log is not None and now - (self._save_warned_at or 0) >= 600:
+                self._save_warned_at = now
+                try:
+                    log(f"Couldn't save your settings ({ex}) — changes since then won't survive a restart")
+                except Exception:
+                    pass
+            return False
+
+    _save_warned_at = 0.0       # (not a field: never saved) when save_quietly last logged a failure
     _profile_note = ""
     _first_run = False          # (0.8.201) set by load() on a fresh install: the app asks which board
 

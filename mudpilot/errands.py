@@ -667,8 +667,11 @@ class Errands:
             min(rooms, key=lambda k: (k[0] != (st.room or k)[0], abs(k[1] - (st.room or k)[1])))
         cur["i"] = rooms.index(nxt)
         bot.status = f"Farming for the {w.item_name(cur['num'])} — {nxt[0]}/{nxt[1]} next"
-        if st.room != nxt and not bot.goto(nxt):
-            cur["i"] = cur["i"] + 1                   # can't get there: the next one
+        if st.room != nxt:
+            def done(ok, cur=cur):
+                if not ok:
+                    cur["i"] = cur["i"] + 1           # can't get there: the next one
+            bot.goto_bg(nxt, done=done)               # (off the window's thread — HUNT_1123 #24)
         return True
 
     def _recipe(self, cur, now) -> bool:
@@ -676,8 +679,13 @@ class Errands:
         bot, st, w = self.bot, self.bot.st, self.s.world
         a = self.active
         if st.room != cur["room"]:
-            if not bot.walking and bot.ready("errand_go", 5) and not bot.goto(cur["room"]):
-                self._give_up(f"Stopped: no way to {w.room(cur['room']).name} for the {w.item_name(cur['num'])}")
+            if not bot.walking and bot.ready("errand_go", 5):
+                def done(ok, a=a, cur=cur):
+                    # (0.8.225: a Go to refused for an item already said why — no second give-up)
+                    if not ok and self.active is a and time.time() - getattr(bot, "_goto_refused_at", 0) > 2:
+                        self._give_up(f"Stopped: no way to {w.room(cur['room']).name} for the "
+                                      f"{w.item_name(cur['num'])}")
+                bot.goto_bg(cur["room"], done=done)   # (off the window's thread — HUNT_1123 #24)
             return True
         if st.in_combat or (cur.get("nomonsters") and st.view and st.view.monsters):
             bot.status = f"Clearing the room before the {w.item_name(cur['num'])}"
@@ -752,9 +760,9 @@ class Errands:
             bot.log(f"Have everything — on to '{mp.title}'")
             here = st.room
             if a.get("target"):                       # it was a Go to: route again, now with the keys
-                bot.goto(a["target"], then=a.get("after"))
+                bot.goto_bg(a["target"], then=a.get("after"))
             elif mp.steps and mp.steps[0].room and here and not any(x.room == here for x in mp.steps):
-                bot.goto(mp.steps[0].room, then=mp)
+                bot.goto_bg(mp.steps[0].room, then=mp)
             else:
                 bot.start_path(mp, loop)
             return True
@@ -785,10 +793,12 @@ class Errands:
             return False
         if st.room != cur["room"]:
             if bot.ready("errand_go", 5):
-                if not bot.goto(cur["room"]):
-                    mp_ = a["then"][0]
-                    self._give_up(f"Not walking '{getattr(mp_, 'title', '?')}': no way from here to "
-                                  f"{cur['what']} for the {w.item_name(cur['num'])}")
+                def done(ok, a=a, cur=cur):
+                    if not ok and self.active is a and time.time() - getattr(bot, "_goto_refused_at", 0) > 2:
+                        mp_ = a["then"][0]
+                        self._give_up(f"Not walking '{getattr(mp_, 'title', '?')}': no way from here to "
+                                      f"{cur['what']} for the {w.item_name(cur['num'])}")
+                bot.goto_bg(cur["room"], done=done)   # (off the window's thread — HUNT_1123 #24)
                 return True
             return False
         # in the room

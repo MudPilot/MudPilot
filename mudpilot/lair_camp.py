@@ -127,10 +127,7 @@ class LairCamp:
         return f"took {room[0]}/{room[1]} out of Camp lairs"
 
     def _save(self):
-        try:
-            self.s.settings.save()
-        except Exception:
-            pass
+        self.s.settings.save_quietly(self.s.log)
 
     # ------------------------------------------------------------ respawn clocks
     def respawn(self, room):

@@ -603,10 +603,7 @@ class Extras:
                 self.b.log(f"'{b.get('name') or b.get('cast')}' ends with \"{end}\" (Messages file)"
                            + (f" — was \"{cur}\"" if cur else ""))
         if fixed:
-            try:
-                self.cfg.save()
-            except Exception:
-                pass
+            self.cfg.save_quietly(self.b.log)
         return fixed
 
     def stat_block_tick(self):

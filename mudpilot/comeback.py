@@ -221,9 +221,12 @@ class Comeback:
             return True
         if self.s.state.room == room:
             f["phase"] = "invite" if not f.get("no_invite") else "going"
-        elif not b.goto(room):
-            self.s.log(f"Comeback: no route to {f['name']} — carrying on")
-            self._finish()
+        else:
+            def done(ok, f=f):
+                if not ok and self.fetch is f:
+                    self.s.log(f"Comeback: no route to {f['name']} — carrying on")
+                    self._finish()
+            b.goto_bg(room, done=done)               # (off the window's thread — HUNT_1123 #24)
         return True
 
     MM_WHERE_RE = re.compile(r"^\{?\s*(.+?)\s*\(Exits?:\s*([A-Z, ]*)\)", re.I)
@@ -285,9 +288,12 @@ class Comeback:
         self.s.log(f"Comeback: the way to {name} pays a {toll:,}-copper toll — waiting outside it at "
                    f"{stop[0]}/{stop[1]} and asking them to come out (@summon)")
         b = self.s.bot
-        if tuple(self.s.state.room or ()) != stop and not b.goto(stop):
-            self.s.log(f"Comeback: no route to {stop[0]}/{stop[1]} — carrying on")
-            self._finish()
+        if tuple(self.s.state.room or ()) != stop:
+            def done(ok, f=f):
+                if not ok and self.fetch is f:
+                    self.s.log(f"Comeback: no route to {stop[0]}/{stop[1]} — carrying on")
+                    self._finish()
+            b.goto_bg(stop, done=done)               # (off the window's thread — HUNT_1123 #24)
         return True
 
     MEET_WAIT = 120
@@ -567,8 +573,8 @@ class Comeback:
                         b.resume, b.stop_note = None, ""   # the walk to them is done: nothing left to Rego
                     return self._finish()            # …and carry on with the trip (the loop / the Go to)
                 f["phase"], f["t"] = "invite", now
-            elif not b.walking and now - f["t"] > 30:
-                return self._finish()
+            elif not b.walking and not getattr(b, "_planning", False) and now - f["t"] > 30:
+                return self._finish()                # (not while its route is still being worked out: bgplan)
         if f["phase"] == "invite":
             s.send(f"invite {f['name']}", from_bot=True)
             f["phase"], f["t"] = "invited", now
@@ -631,7 +637,7 @@ class Comeback:
                 if not self.s.bot.walking or (self.s.bot.path and self.s.bot.path.title.startswith("Go to ")
                                               and getattr(self.s.bot, "_goto_target", None) != back[1]):
                     self.s.log(f"Comeback: carrying on to {back[1][0]}/{back[1][1]}")
-                    self.s.bot.goto(back[1], then=back[2] if len(back) > 2 else None)
+                    self.s.bot.goto_bg(back[1], then=back[2] if len(back) > 2 else None)
             elif back and not self.s.bot.walking and not self.s.state.dead:
                 self.s.log(f"Comeback: back to {back[0].title}")
                 self.s.bot.start_path(back[0], loop=True, checked=True)

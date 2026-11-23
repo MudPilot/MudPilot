@@ -381,7 +381,7 @@ class BossHunt:
             fr = a.get("from")
             if fr and s.state.room != fr:
                 s.log(f"Boss hunt: {why} — back to where I was ({fr[0]}/{fr[1]})")
-                b.goto(fr)
+                b.goto_bg(fr)
             else:
                 s.log(f"Boss hunt: {why}")
             return

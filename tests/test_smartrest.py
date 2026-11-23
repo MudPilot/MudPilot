@@ -9,6 +9,7 @@ ok = True
 def check(n, c):
     global ok; ok &= bool(c); print(("PASS " if c else "FAIL ") + n)
 st = config.Settings(); st.save = lambda: None; st.my_name = "Revolution"
+st.board = "Paradigm"   # grme / rgen spell data and 14/1791-1792 are Paradigm-only; runall forces MUDPILOT_DEFAULT_BOARD=Main
 st.heal_cmd, st.hp_regen_cmd, st.meditate_cmd = "grme", "rgen", "medi"
 st.rest_below_hp, st.rest_until_hp, st.rest_below_ma, st.rest_until_ma = 80, 90, 70, 90
 st.auto_heal, st.heal_pct, st.char_level = True, 90, 52

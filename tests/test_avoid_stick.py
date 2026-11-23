@@ -8,7 +8,7 @@ from mudpilot.session import Session
 from mudpilot.gamestate import RoomView
 from mudpilot import board_fixes
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-st = config.Settings(); st.save = lambda: None; st.my_name = "Miserable"; st.char_level = 55
+st = config.Settings(); st.save = lambda: None; st.my_name = "Miserable"; st.char_level = 45   # (0.8.225: NPP is only avoided under level 50)
 st.avoid_names = ["Negative Power Plane"]; st.avoid_mode = "ask"
 s = Session(st, world_path=os.path.join(here, "mudpilot", "bundled", "Paradigm.db")); s._no_log_file = True
 board_fixes.apply(s.world)
@@ -29,22 +29,18 @@ r = b.plan_route((1, 348), target, ask_no)
 av = b.avoid_set()
 check(f"fetching the orb: a way round, no prompt ({len(asked)})", r is not None and not asked
       and not any(ex.to in av for ex in r))
-# nothing fetchable: the only way is through the avoided area again
+# nothing fetchable: the only way is through the Negative Power Plane — 0.8.225 (Dan): under level 50 NPP is
+# avoided unless it's the only way, and then it goes: no question, no refusal
 b.errands.source_for = lambda n: None; b._opener_ok = {}
 r = b.plan_route((1, 348), target, ask_no)
-check(f"only way is NPP, said no → no route ({len(asked)} prompts)", r is None and len(asked) == 1)
-# a re-plan on the way (no one to ask: ask=None) must NOT pop the question again
+check(f"only way is NPP (level 45): goes, no prompt ({len(asked)} prompts)", r is not None and not asked)
 r = b.plan_route((1, 348), target, ask=None)
-check(f"re-plan (ask=None) doesn't pop the question again ({len(asked)} prompts total)", len(asked) == 1)
-# the bot carrying on (ask=None) stops cleanly with a message, doesn't start walking
-stopped = []
-b.stop = lambda why="": stopped.append(why)
-b.start_path = lambda *a, **k: stopped.append("WALKED")
-s.on_alert = lambda m: None
-res = b.goto(target, ask=None)
-check(f"goto stops cleanly, no walking ({b.no_route_msg!r})", res is False and "WALKED" not in stopped
-      and any(area in (b.no_route_msg or "") for area in ("Negative Power Plane", "Black Wasteland")))
-check("…and no extra prompt from the unattended carry-on", len(asked) == 1)
+check("…and the same unattended (ask=None)", r is not None and not asked)
+# from level 50 NPP isn't avoided at all
+g.level = st.char_level = 55
+check("level 55: NPP not in the avoid set", not any(w.room(k) and "negative power plane" in w.room(k).name.lower()
+                                                     for k in b.avoid_set()))
+g.level = st.char_level = 45
 # a place whose route crosses no prompt area still routes with no prompt (a short hop in town)
 asked.clear(); b._trip_deny = {}
 dest = next(((1, rm) for rm in (297, 309, 1, 310) if w.room((1, rm))

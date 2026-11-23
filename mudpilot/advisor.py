@@ -10,6 +10,7 @@ Advice goes in the log (only when it changes) and at the top of Loop stats.
 """
 from __future__ import annotations
 
+import re
 import time
 
 
@@ -69,9 +70,27 @@ class Advisor:
                 cands = s.loopbuilder.build(mp.steps[0].room, max(20, len(mp.steps)))
             except Exception:
                 cands = []
-            if cands and cands[0]["exp_hr"] >= sm["exp_hr"] * 1.3:
-                out.append(f"A loop built around here could do ~{cands[0]['exp_hr'] / 1000:,.0f}k/hr "
-                           f"({cands[0]['steps']} steps, {len(cands[0]['lairs'])} lairs) — Paths → More → Build a loop")
+            # 0.8.225 (HUNT_1123 #35): the estimate leaves out resting, waiting on the party, the exp split and other
+            # players — Revolution was told "~4,412k/hr" 33 times where his loop makes ~2,000k/hr. Scale it by how this
+            # loop's own estimate compares with what it really pays, and skip a candidate that is this loop again
+            w_ = s.world
+            mine = {st_.room for st_ in mp.steps if st_.room and (w_.room(st_.room) and w_.room(st_.room).lair)}
+            scale = 1.0
+            try:
+                est = s.loopbuilder.estimate(len(mp.steps), sorted(mine))[2] if mine else 0
+                if est > 0:
+                    scale = max(0.2, min(1.5, sm["exp_hr"] / est))
+            except Exception:
+                pass
+            for c_ in cands[:3]:
+                lairs = set(map(tuple, c_.get("lairs") or ()))
+                if mine and lairs and len(lairs & mine) >= 0.8 * min(len(lairs), len(mine)):
+                    continue                         # (basically the loop you're on)
+                hr = c_["exp_hr"] * scale
+                if hr >= sm["exp_hr"] * 1.3:
+                    out.append(f"A loop built around here could do ~{hr / 1000:,.0f}k/hr "
+                               f"({c_['steps']} steps, {len(c_['lairs'])} lairs) — Paths → More → Build a loop")
+                break
         self.latest = out
         return out
 
@@ -80,7 +99,8 @@ class Advisor:
         if self.s.bot.laps % 10:
             return
         for line in self.advise(mp):
-            k = line.split(" — ")[0][:60]
+            # (0.8.225, #35: the figures change every 10 laps — the same advice said 33 times; the key leaves them out)
+            k = re.sub(r"~?[\d][\d,.]*k?(?:/hr)?", "#", line.split(" — ")[0])[:60]
             if k not in self._said:
                 self._said.add(k)
                 self.s.log("Advice: " + line)

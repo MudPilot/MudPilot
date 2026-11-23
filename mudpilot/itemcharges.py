@@ -292,6 +292,10 @@ class ItemCharges:
             return
         self._sum_seq = self.s.state.inv_seq
         got = self.summary()
-        if got and got != self._summary:
+        said = self.__dict__.setdefault("_said_entries", set())
+        if got and got != self._summary and not set(got) <= said:
+            # (only when something's new — a count, an item: Miserable PVE's rainbow stone goes on to meditate and
+            #  back in the pack after, and each swap wrote the whole list again, ~1,000 times a session)
             self._summary = got
+            said |= set(got)
             self.s.log("Charged items you carry: " + ", ".join(got))

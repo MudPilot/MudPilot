@@ -312,7 +312,7 @@ class EventManager:
                 s.log("Event: room must be map/room, e.g. 3/606")
                 return
             then = s.bot.path if s.bot.walking and s.bot.path and not s.bot.path.title.startswith("Go to ") else None
-            s.bot.goto((int(m.group(1)), int(m.group(2))), then=then)
+            s.bot.goto_bg((int(m.group(1)), int(m.group(2))), then=then)
         elif d == "path":
             name = (ev.get("path") or "").lower()
             mp = next((p for p in s.paths if p.title.lower() == name), None) or \
@@ -322,6 +322,6 @@ class EventManager:
                 return
             if mp.resolved and mp.steps[0].room and s.state.room and \
                     not any(x.room == s.state.room for x in mp.steps):
-                s.bot.goto(mp.steps[0].room, then=mp)
+                s.bot.goto_bg(mp.steps[0].room, then=mp)
             else:
                 s.bot.start_path(mp)

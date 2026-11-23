@@ -26,7 +26,6 @@ def check(n, c):
 def plan(a, z, hp, lvl=30, carried=()):
     w.char = dict(w.char or {}, max_hp=hp, hangup_pct=30, carried=frozenset(carried), gate_any=False)
     w.forget_routes()
-    w.stretch_blocks = {}
     return w.route(a, z, level=lvl, have=set(carried))
 
 def dmg(r):
@@ -43,7 +42,6 @@ try:
     src = (7, 995) if (7, 995) in w.rooms else None
     if src:
         r = plan(src, (15, 1137), 533, lvl=41)
-        sb = list((w.stretch_blocks or {}).values())
         why = w.why_no_route(src, (15, 1137), level=41, have=set()) if r is None else []
         check(f"0.8.224.2 (Dan): Lava Tube with 533 HP: walked, no wall ({len(r or [])} steps)", r is not None)
         r = plan(src, (15, 1137), 2700, lvl=41)          # (0.8.224: the limit is the hang-up line — 1800 needs 2700 at 30%)

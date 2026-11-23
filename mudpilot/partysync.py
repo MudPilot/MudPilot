@@ -128,8 +128,12 @@ class PartySync:
             held = s.bot.held_items()
             if held is not None:
                 # 'kit=1281': of the items every walker needs their own of (the golden idol), the ones we carry —
-                # the leader only takes the idol teleport when every follower has one (0.8.190, Dan)
-                bits.append("kit=" + ".".join(str(n) for n in sorted(set(held) & set(s.world.carry_item_set()))))
+                # the leader only takes the idol teleport when every follower has one (0.8.190, Dan); and the items
+                # that stop a room spell (a phoenix feather in the lava), so the leader's rooms-that-hurt count
+                # knows the whole party is covered (HUNT_1123 #4)
+                ks = getattr(s.world, "kit_item_set", None)
+                kit = ks() if ks else s.world.carry_item_set()
+                bits.append("kit=" + ".".join(str(n) for n in sorted(set(held) & set(kit))))
         except Exception:
             pass
         return " ".join(b for b in bits if b)
@@ -311,10 +315,7 @@ class PartySync:
         return False
 
     def _save(self):
-        try:
-            self.s.settings.save()
-        except Exception:
-            pass
+        self.s.settings.save_quietly(self.s.log)
 
     # ------------------------------------------------------------ state
     def members(self):

@@ -508,7 +508,7 @@ class App:
         self.term = tk.Text(left, background=BG, foreground=FG[None][0], insertbackground=TEXT,
                             font=self._term_font(), wrap="word",
                             borderwidth=0, padx=6, pady=4, state="disabled", width=60, height=10)
-        sb = ttk.Scrollbar(left, command=self.term.yview)
+        sb = ttk.Scrollbar(left, command=lambda *a: (self._see_cancel(), self.term.yview(*a)))
         self._term_sb = sb
         self.term.configure(yscrollcommand=self._on_term_scroll)
         for k, (n, b) in FG.items():
@@ -540,7 +540,9 @@ class App:
             w.bind("<Prior>", lambda e: self.scroll_page(-1))
             w.bind("<Next>", lambda e: self.scroll_page(1))
             w.bind("<Control-End>", self.scroll_bottom)
-            w.bind("<Control-Home>", lambda e: (self.term.see("1.0"), "break")[1])
+            w.bind("<Control-Home>", lambda e: (self._see_cancel(), self.term.see("1.0"), "break")[2])
+        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):     # your own scrolling wins over a queued follow
+            self.term.bind(seq, lambda e: self._see_cancel(), add="+")
         self.root.bind("<Alt-b>", self.open_backscroll)
         self.root.bind("<Alt-r>", lambda e: self.resume_boss())
         self.root.bind("<Escape>", lambda e: self.stop_bot())
@@ -1730,8 +1732,7 @@ class App:
         self._row(f, r, "User-ID", "username", kind="entry", width=20); r += 1
         self._check(f, "auto_reconnect", "Reconnect automatically if the line drops").grid(row=r, column=0, columnspan=3, sticky="w"); r += 1
         self._row(f, r, "Reconnect after (sec)", "reconnect_delay", to=3600,
-                  hint="first try; then it backs off, up to the max below"); r += 1
-        self._row(f, r, "Longest wait between tries (sec)", "reconnect_max_delay", to=3600); r += 1
+                  hint="and again this often, for as long as MudPilot is open"); r += 1
         self._row(f, r, "Line is dead after (sec)", "dead_line_secs", to=900,
                   hint="sent a command and the board said nothing — drop and reconnect (0 = off)"); r += 1
         self._check(f, "resume_after_reconnect", "After reconnecting, carry on with the loop/path it was on "
@@ -2955,7 +2956,8 @@ class App:
 
         def save(*a):
             ok = N.set_topic(tv.get())
-            res.configure(text="topic saved in Windows Credential Manager" if ok else "couldn't save the topic")
+            where = "Windows Credential Manager" if sys.platform == "win32" else "the system keyring"
+            res.configure(text=f"topic saved in {where}" if ok else "couldn't save the topic")
         te.bind("<FocusOut>", save)
         te.bind("<Return>", save)
 
@@ -4320,21 +4322,44 @@ class App:
 
     # ---------------------------------------------------------------- back-scroll
     def _following(self) -> bool:
-        """True when the MUD screen is showing the newest line (not scrolled back)."""
+        """True when the MUD screen is showing the newest line (not scrolled back). A follow already queued
+        counts: the lines in between haven't been scrolled to yet, but the screen is following."""
+        if getattr(self, "_see_pending", False):
+            return True
         return self.term.yview()[1] >= 0.9995 or not getattr(self, "_scrolled_back", False)
 
     def _autoscroll(self, follow=True, new=0):
         if follow:
-            self.term.see("end")
+            # one scroll per batch of lines, not one per line (bug hunt #26): queue it for when Tk is idle
+            if not getattr(self, "_see_pending", False):
+                self._see_pending = True
+                try:
+                    self.root.after_idle(self._see_end)
+                except Exception:
+                    self._see_end()
             if getattr(self, "_scrolled_back", False):
                 self._scroll_done()
             return
         self._backlog = getattr(self, "_backlog", 0) + new
         self._scroll_show()
 
+    def _see_end(self):
+        if not getattr(self, "_see_pending", False):
+            return                       # you scrolled in the meantime: stay where you are
+        self._see_pending = False
+        try:
+            self.term.see("end")
+        except tk.TclError:
+            pass
+
+    def _see_cancel(self):
+        self._see_pending = False
+
     def _on_term_scroll(self, first, last):
         self._term_sb.set(first, last)
         back = float(last) < 0.9995
+        if back and getattr(self, "_see_pending", False):
+            return                       # new lines below a queued follow — not a back-scroll (no banner flicker)
         if back != getattr(self, "_scrolled_back", False):
             self._scrolled_back = back
             if back:
@@ -4360,11 +4385,13 @@ class App:
             self._scroll_lab.place_forget()
 
     def scroll_bottom(self, e=None):
+        self._see_pending = False
         self.term.see("end")
         self._scroll_done()
         return "break"
 
     def scroll_page(self, d):
+        self._see_cancel()
         self.term.yview_scroll(d, "pages")
         return "break"
 
@@ -5127,8 +5154,9 @@ class App:
         for p in self.live_panes:
             try:
                 if p.winfo_exists():
-                    p.refresh()
-                    alive.append(p)
+                    if p.winfo_viewable():
+                        p.refresh()      # (a Stats / exp chart tab you're not looking at, or a minimized window: not
+                    alive.append(p)      #  rebuilt every second — Miserable PVE's window stuck in it 14 times)
             except tk.TclError:
                 pass
         self.live_panes = alive
@@ -5428,7 +5456,8 @@ class App:
             self.s.password = pw
             if save and host not in ("127.0.0.1", "localhost"):
                 if not config.set_password(user, pw, host):
-                    self.add_log("Couldn't save password to Windows Credential Manager (keyring missing).")
+                    where = "Windows Credential Manager" if sys.platform == "win32" else "the system keyring"
+                    self.add_log(f"Couldn't save password to {where} (keyring missing).")
         st.save_password = save
         st.save()
         try:

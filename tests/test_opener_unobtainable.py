@@ -13,13 +13,13 @@ from mudpilot.session import Session
 ok = True
 def check(n, c):
     global ok; ok &= bool(c); print(("PASS " if c else "FAIL ") + n)
-st = config.Settings(); st.save = lambda: None; st.my_name = "Tester"; st.char_level = 55
+st = config.Settings(); st.save = lambda: None; st.my_name = "Tester"; st.char_level = 45   # (0.8.225: under 50, where the Negative Power Plane is still avoided — at 55 the way goes through it)
 st.char_class, st.char_race, st.char_alignment = "Mage", "Human", "Good"
 s = Session(st, world_path=os.path.join(here, "mudpilot", "bundled", "Paradigm.db")); s._no_log_file = True
 logs = []
 s.log = lambda m, *a, **k: logs.append(m)
 b, w, g = s.bot, s.world, s.state
-g.level, g.wealth = 55, 500000
+g.level, g.wealth = 45, 500000
 g.carrying, g.keys = "golden idol, rope and grapple", ""
 s.route_char()
 talisman = next(n for n, it in w.items.items() if it.get("name") == "amber talisman")

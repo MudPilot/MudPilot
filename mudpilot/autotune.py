@@ -147,10 +147,7 @@ class AutoTune:
                 if k in base:
                     setattr(cfg, k, base[k])
             cfg.tune_baseline = {}
-            try:
-                cfg.save()
-            except Exception:
-                pass
+            cfg.save_quietly(self.s.log)
 
     # ------------------------------------------------------------ measuring
     def hunting(self) -> bool:

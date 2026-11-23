@@ -8,6 +8,7 @@ from mudpilot.session import Session
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 st = config.Settings(); st.save = lambda: None; st.my_name = "Miserable"; st.char_level = 55
 st.auto_spells = True; st.auto_nuke = True; st.rest_below_hp = 60
+st.auto_combat = True   # 0.8.185: single-target spells (dtch) follow Combat — cast_on() reads auto_combat, not auto_cast
 s = Session(st, world_path=os.path.join(here, "mudpilot", "bundled", "Paradigm.db")); s._no_log_file = True
 sent = []
 s.send = lambda c, from_bot=False: sent.append(c)

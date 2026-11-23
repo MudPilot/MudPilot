@@ -13,7 +13,7 @@ if sys.argv[1:]:
 ok, bad = 0, []
 for f in files:
     try:
-        r = subprocess.run([sys.executable, f], env=env, capture_output=True, text=True, timeout=400,
+        r = subprocess.run([sys.executable, f], env=env, capture_output=True, text=True, timeout=(900 if os.path.basename(f).startswith('e2e_') else 400),
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))   # no console flashing per test
         out = r.stdout + r.stderr
         good = r.returncode == 0 and "SOME FAILED" not in out and "Traceback" not in out and \

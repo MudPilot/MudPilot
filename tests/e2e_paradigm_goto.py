@@ -7,7 +7,9 @@ from mudpilot.worlddb import WorldDB
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 world = WorldDB(os.path.join(here, "mudpilot", "bundled", "Paradigm.db"))
 PORT = 2421
-sim = simserver.Sim(world, seed=3, mob_rate=0, start=(17, 1637))
+# gates on: since 0.8.201 a small toll before the cash is read is walkable, so the route now takes the 5-copper toll
+# W of 1/1382 — the plain sim answers "Your path is blocked." to every toll; the gated one charges it
+sim = simserver.Sim(world, seed=3, mob_rate=0, start=(17, 1637), gates={"level": 30, "cash": 5000})
 def run_server():
     async def go():
         srv = await asyncio.start_server(lambda r, w: simserver.handle(sim, r, w), "127.0.0.1", PORT)

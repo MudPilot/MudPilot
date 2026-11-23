@@ -41,10 +41,10 @@ check("…no hang-up set: the whole max HP", w.stretch_limit() == 500)
 w.char = dict(w.char, hangup_pct=30)
 
 # 1 + 5: refused, quick to refuse again, and walked once you said yes
-w.forget_routes(); w.stretch_blocks = {}; w.stretch_ok = {}
+w.forget_routes(); w.stretch_ok = {}
 r = w.route((1, 2), (6, 472), level=60, have=set())
 check(f"0.8.224.2 (Dan): Misty Bog at 500 HP: walked, no wall, no prompt ({len(r or [])} steps)",
-      r is not None and not w.stretch_blocks)
+      r is not None)
 # the safe-way-round pick: only when a run hurts for over half your max HP and a way round is no huge detour
 asked2 = []
 b.held_items = lambda: set()
@@ -71,11 +71,14 @@ asked3 = []
 pk = b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: asked3.append(a) or False)
 check(f"…800 damage vs 30 dry steps more: asked, no answer -> the safe way ({asked3[:1]})",
       asked3 and asked3[0][:2] == (40, 70) and asked3[0][3] == "hurtpick" and pk is dry_r)
+b._hurt_pick_ans = {}
 pk = b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: True)
 check("…yes: the short way", pk is short_r)
+b._hurt_pick_ans = {}
 pk = b._hurt_choice((1, 1), (1, 2), short_r, None)
 check("…nobody to ask: the safe way", pk is dry_r)
 w.safe_round = lambda *a, **k: ["d"] * 400
+b._hurt_pick_ans = {}
 check("…a huge detour: not asked, the short way", b._hurt_choice((1, 1), (1, 2), short_r, lambda *a: 1 / 0) is short_r)
 w.hurt_stretches, w.safe_round = hs0, sr0
 b._boss_free_route, b._party_carry_way, b._carry_short = bfr0, pcw0, cs0
@@ -106,10 +109,8 @@ check("…yes: it counts as carried for that Go to", okc and w.stretch_counter.g
 w.stretch_counter = {}; b._counter_buy = None
 w.char = saved_char; w.forget_routes()
 
-# 4: no avoided-area / quest-flag detours when rooms that hurt are the block
-check("avoid message skipped on a hurt block", "if route is None and ab and not hurt_block" in src)
-check("no 'abil' re-read on a hurt block", "and not hurt_block and self._ask_gate_abilities" in src)
-check("look-alike behind rooms that hurt is named", "the look-alike room" in src)
+# 4: (0.8.226: the rooms-that-hurt wall is gone, and with it the hurt_block shortcuts and the look-alike note)
+check("no hurt_block / stretch_blocks left", "hurt_block" not in src and "stretch_blocks" not in src)
 
 # 6: a timed door is gone round at most every 10 s
 check("timed door: TIMED_ROUND_SECS guard", Automation.TIMED_ROUND_SECS >= 5 and "_timed_round_at" in src)

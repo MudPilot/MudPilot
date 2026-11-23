@@ -85,6 +85,16 @@ class GearWatch:
                          agility=st.agility or 50, strength=st.strength or 50,
                          encum_pct=int(st.enc[3]) if st.enc else 33)
 
+    def _ruled_away(self, name) -> bool:
+        """An item rule (Game Data → Items) that stashes, sells, drops or junks this item."""
+        nm = (name or "").strip().lower()
+        for ln in getattr(self.s.settings, "item_rules", None) or []:
+            k, _, spec = str(ln).partition(":")
+            if k.strip().lower() == nm and \
+                    {p.strip() for p in re.split(r"[,;]", spec.lower())} & {"stash", "sell", "drop", "junk", "never"}:
+                return True
+        return False
+
     def weapon_upgrade(self, g):
         """(gear, "Weapon", gain per round, what you wield) when `g` hits harder than your weapon (0.8.201)."""
         from .gamestate import wielded
@@ -113,8 +123,11 @@ class GearWatch:
 
     def _tell(self, name, up, where):
         now = time.time()
-        if now - self.told.get(name.lower(), 0) < 3600:
-            return False
+        if name.lower() in self.told:
+            return False                     # (0.8.225, #36: once per item per session, as the module says — not hourly)
+        if self._ruled_away(name):
+            return False                     # (0.8.225, #36: your own rule stashes / sells / drops it — not an upgrade
+                                             #  to you: Revolution's runed stone cudgel, 18 alerts, then stashed)
         self.told[name.lower()] = now
         g, slot, gain, cur = up
         unit = "damage/round" if slot == "Weapon" else (self.s.settings.gear_goal or "AC").split(" (")[0]

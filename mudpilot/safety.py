@@ -314,6 +314,11 @@ class Safety:
             return          # no HP prompt since we connected: what we have is from before the hang-up (full HP) —
                             # judging on it armed the check and the first real prompt hung up straight away (Evolution,
                             # 2026-11-01: hung up at 38/208 in an empty room the second it came back in)
+        if not self._was_in and not getattr(st, "max_hp_read", True) and \
+                time.time() - max(getattr(s, "_connected_at", 0) or 0, getattr(s, "_entered_at", 0) or 0) < 15:
+            # (review: from entering the realm — a 15 s+ login used up the window before the first prompt)
+            return          # (0.8.225, logs — Buddy: a fresh start at 131/738 read the prompt's 131 as full HP, then
+                            #  'st' showed the real max and it hung up in an empty room. Wait for 'st' first)
         pct = st.hp_pct()
         if not self._was_in:
             self._was_in = True
@@ -467,7 +472,10 @@ class Safety:
         if not pr or pr.get("looked") or not state.view:
             return False
         pr["looked"] = True
-        mobs = [sh for sh, _r in (state.view.monsters or [])]
+        # (0.8.225, #9: not monsters on your ignore list — any other one can still hurt you)
+        ign = {x.strip().lower() for x in (getattr(self.cfg, "ignore_mobs", None) or []) if x.strip()}
+        mobs = [sh for sh, rec in (state.view.monsters or [])
+                if sh.lower() not in ign and ((rec or {}).get("name") or "").lower() not in ign]
         if mobs:
             return bool(self.hangup(f"HP: {', '.join(mobs[:3])} still here after the relog") or True)
         pr["clear"] = True                       # (0.8.224.2, review: kept — a clear room isn't a new bout; only

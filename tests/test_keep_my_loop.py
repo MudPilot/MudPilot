@@ -54,14 +54,14 @@ walk(s)
 s.bot.note_line("Zed has invited you to follow him.")
 sent.clear(); time.sleep(0.6)
 s.bot.note_line("Zed has invited you to follow him.")          # Zed kept its loop and invited back
-check(f"both on loops, I sort first: I invite again, don't join ({sent})",
-      "invite Zed" in sent and not any(c.startswith("join") for c in sent))
+check(f"0.8.225 (Dan): both on their own loops: each keeps its loop — no join, no more invites ({sent})",
+      not any(c.startswith(("join", "invite")) for c in sent))
 s, sent = make("Evolution")
 walk(s)
 s.bot.note_line("Aaron has invited you to follow him.")
 sent.clear(); time.sleep(0.6)
 s.bot.note_line("Aaron has invited you to follow him.")
-check(f"both on loops, they sort first: I join them ({sent})", "join Aaron" in sent)
+check(f"…whichever name sorts first ({sent})", not any(c.startswith(("join", "invite")) for c in sent))
 
 s, sent = make("Evolution")
 walk(s)

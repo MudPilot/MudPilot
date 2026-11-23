@@ -76,14 +76,26 @@ class Recorder:
             return
         c = cmd or ""
         secret = self._pass_prompt
-        try:
-            pw = self.s.password or config.get_password(self.s.settings.username, self.s.settings.host)
-        except Exception:
-            pw = None
+        pw = self.s.password or self._saved_pw()
         if pw and c.strip() == pw:
             secret = True
         self._pass_prompt = False
         self._put("tx", "(hidden)" if secret and c.strip() else c, bot=bool(from_bot))
+
+    def _saved_pw(self):
+        """The saved password, looked up once a minute per user/board — not twice in Credential Manager for every
+        command sent (it showed in the window's freeze stacks)."""
+        st = self.s.settings
+        key = (st.username, st.host)
+        c = getattr(self, "_pw_cache", None)
+        now = time.time()
+        if c is None or c[0] != key or now - c[2] > 60:
+            try:
+                pw = config.get_password(st.username, st.host)
+            except Exception:
+                pw = None
+            c = self._pw_cache = (key, pw, now)
+        return c[1]
 
     def log(self, msg: str):
         if self.on:

@@ -129,6 +129,63 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.225.1
+
+- **Treasure digging kept stopping:** a dig that drops you into the Dark Pit counted as being knocked off the path. At 2–3 laps a minute that reached 7 in 5 minutes, and the loop stopped. The climb back out after a dig no longer counts.
+
+## 0.8.225
+
+From the 2026-11-22 hunt: about 12,000 Go tos on 0.8.224.2, loop and party walks, and a day of the six characters' logs.
+
+
+
+Dan's picks from the hunt (HUNT_1123)
+- **The Negative Power Plane by level:** under level 50 (the party's lowest) it's avoided unless it's the only way, and then it goes instead of refusing. From level 50 it isn't avoided at all, since it's much less dangerous there. So a level-50+ Go to to Tidepool goes through NPP to Port Blackwater and takes the ship to Terra Fuego, which needs level 50 and 2,000,000 copper. (From Silvermere the only way to Blackwater that keeps out of NPP needs quest flag 204.)
+- **Two characters each running their own loop stay on their own loops.** No join and no more invites back and forth. Before, a "name that sorts first leads" join was decided, then refused by another check, and they kept inviting each other.
+- **Drawing a loop on the map works wherever the keyboard focus is.** Clicking on the map first let its number-pad look-ahead take the keys: the view moved, but nothing was drawn.
+- **Route searches are quicker and repeatable:** equal-length ways are broken by room number, so the same Go to gives the same route every time.
+- **Leading a party, the items followers carry against room spells count** (a phoenix feather or magma amulet against magma heat). Followers' party sync only listed idols and passes, so the leader counted every lava room at full damage: "up to 3,060" for Evolution, who takes none. Followers on older versions still under-report until they update.
+- **An errand finds the shop behind a door you said "try anyway" to.** The item search treated that door as a wall, so an L8 was told "the crowbar drops off Giovanni, too strong" with 8 shops selling one. If you said no, it names the door.
+- **MudPilot's own Go tos are worked out in the background too**, as yours already were: back to the loop, comeback trips, errand and stash walks, event walks, boss-hunt returns, shop and bank trips, scroll and training trips. These froze the window for 2-13 s (about 45% of freezes). Rego, going round a failed exit and loop rotation still plan in place.
+- **Leftover code from the old rooms-that-hurt wall is gone** (no change in behaviour).
+- **Loop advice is realistic.** "A loop built around here could do …" is scaled by how this loop's own estimate compares with what it really pays (rests, waits, exp split, other players), skips a candidate that is the loop you're on, and is said once, not every 10 laps (Revolution got "~4,412k/hr" 33 times).
+- **"Upgrade here" is said once per item per session** (as documented), and never for an item your own rule stashes, sells or drops (Revolution's runed stone cudgel: 18 alerts, then stashed).
+- **The route question's answer is remembered for 3 hours** instead of being asked again on every re-plan.
+- **Back in after a party low-HP hang-up:** monsters on your ignore list don't count as "still there".
+- "What you really do a round" counts rounds you missed in, so a dropper doesn't look weaker than it is.
+- **Stuck somewhere the map has no way out of** (aboard the Swiftwind, 14/744), a Go to says so instead of blaming the target.
+- The time breakdown counts a party-wait rest that started topped up as waiting on the party, not resting.
+- An errand leg whose Go to was refused for an item doesn't give up a second time with a wrong "no way from here" reason.
+- Fewer log lines: "up on the tick" (the rest summary says it) and the knockdown "held … walking on" note (once every 10 minutes). Pre/post-rest commands show "; " instead of "^M".
+
+Resting
+- **Your own heal mid-rest no longer ends the rest early.** With heal at 85%, rest below 80 and rest until 89, the heal stood Buddy up at 81% and he walked on (178 of 188 rests). Once that took him into three manticores and a hang-up. It sits back down to 'rest until' now.
+- **"Up on the tick" waits until mana is over the rest line too.** It stood up at 59% mana with the line at 60 and sat straight back down, with a full gear swap each way (186 times on PVE in a day).
+
+Safety
+- **A fresh start under the hang-up line no longer hangs up at once.** A board whose prompt shows no max HP read the first prompt (131) as full, then 'st' showed 131/738 and it hung up in an empty room. It waits for 'st' (15 s at most) first.
+
+Fighting
+- **No-attack rooms: the lap's last step counts too.** The 0.8.224 fix missed it (47 of 48 remaining casts at the Camp Site).
+- **The stall watchdog knows touch spells** ("You reach out and touch…").
+
+Walking
+- **A Go to that its item check refuses says so.** It used to report "walking to…" (and @goto replied that) with nothing walking.
+- **The "safe way round" never needs a door the party can't open** (it set off on a 1% key farm), and the question says whose max HP it means.
+- **"No way into that area" Go tos are quicker** (15-50 s to about 6 s): look-alike rooms nothing leads to from here aren't searched.
+- **A MegaMUD loop still being matched isn't stopped as "not matched to MME's map".**
+
+Smaller fixes
+- The saved password isn't looked up on every command sent (about 5 ms each; it showed in UI freezes).
+- "Charged items you carry" is logged only when something on it is new (it was about 1,000 lines a session).
+- The Stats and Exp chart panes aren't redrawn while hidden (22 freezes on one character).
+- Settings → Connection: the reconnect hint no longer promises a back-off, and the unused "Longest wait between tries" row is gone.
+- If MudPilot can't save your settings (a locked or full disk), it now says so in the log, at most once every 10 minutes, instead of failing silently.
+- On Linux and Mac, the password and phone-alert messages say "the system keyring" instead of "Windows Credential Manager".
+- Two old settings that do nothing any more (attack_last_wait, stash_looted) are marked unused in the code.
+- The MUD screen scrolls once per burst of text instead of once per line. Scrolling back works as before, and the back-scroll bar no longer flickers.
+- Faster start: the room commands read from the MME data are cached next to world.db, so the map loads in about a third of the time after the first start. The cache is rebuilt whenever world.db or MudPilot changes.
+
 ## 0.8.224.4
 
 - **Item spells that need a two-handed weapon work after the first one again** (PVEREV's divine intervention failed 217 of 221 times). After any wear/remove line the hands lost their slot names until the next 'i', so the off-hand chalice wasn't taken off first. The slots are kept now.

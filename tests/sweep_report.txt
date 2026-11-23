@@ -2088,3 +2088,117 @@ walks:
   ok 1/1118 Slum Street                       → 8/798 Building Rooftop                     41.4 s   30/30 rooms  door, normal, text
 
 skipped (the practice server blocks these exit kinds): 13 — key 11, item 1, restricted 1, cast 1
+
+====================================================================================================
+MudPilot route sweep (walk, practice server) — 2026-11-23 01:13
+24 walks (each from 30 rooms out), 1 with issues: timeout 1
+
+- 1/1 Town Gates → 1/9462 Musty Grottos, Portal  [Musty Grottos, Portal]  exits: door, normal, text
+    timeout: still walking after 82 s at 1/830 Graveyard (status: Idle)
+    fix: pilot.py / automation.Bot.walk
+    walked: 1/192 1/14 1/177 1/178 1/179 1/180 1/816 1/832 1/831 1/830
+    last sent: ['', '', '', 'i', '', '', '', 'i', '', '', '', '']
+
+walks:
+  ok 2/91 Western Road                        → 8/880 Lavish Bedroom                       20.6 s  124/125 rooms  door, hidden, normal, text
+  ok 3/741 Black Wasteland                    → 7/1227 Elaborate Chamber                    4.0 s   30/30 rooms  door, hidden, normal, text
+  ok 7/944 Lava Fields                        → 15/10234 Crimson Tunnel                     1.5 s   29/30 rooms  hidden, normal, text
+  ok 1/1724 Darkwood Forest                   → 9/853 Hallway                              11.0 s   51/52 rooms  door, hidden, normal
+  ok 1/1756 Huge Cave, Tunnel                 → 15/69 Huge Cavern, Training Area            5.7 s   30/30 rooms  door, hidden, normal
+  ok 1/2738 Darkwood Forest                   → 7/1174 Black Fortress, Inner Bailey        56.0 s  270/276 rooms  door, normal, text
+  ok 8/412 Dark Tunnel                        → 8/459 Commander's Office                    4.2 s   30/30 rooms  door, hidden, normal
+  ok 1/1401 Darkwood Forest, Main Road        → 9/1291 Ancient Darkwood Tree, Portal        5.9 s   30/30 rooms  door, hidden, normal
+  !! 1/1 Town Gates                           → 1/9462 Musty Grottos, Portal               83.4 s   20/19 rooms  door, normal, text
+  ok 2/698 Dragon's Teeth Hills               → 8/900 Black Cave, Entrance                 20.4 s  115/115 rooms  door, hidden, normal
+  ok 1/1641 Darkwood Forest                   → 7/1136 Small Store                         54.6 s  265/274 rooms  door, normal, text
+  ok 3/785 Abandoned House                    → 7/1245 Large Dank Chamber                   4.2 s   29/30 rooms  door, hidden, normal
+  ok 7/506 Fungus Forest                      → 15/319 White Corridor                      11.3 s   29/30 rooms  hidden, normal, text
+  ok 10/297 Frozen Cavern, Cave Opening       → 17/246 Mausoleum, Entrance                  1.5 s   29/30 rooms  hidden, normal, text
+  ok 1/1757 Huge Cave, Tunnel                 → 15/93 Orc Kitchen                           5.2 s   29/30 rooms  door, hidden, normal
+  ok 1/14 Intersection of River St. & Bridge St. → 6/861 Tomb Vaults, Stairwell                1.5 s   30/30 rooms  door, hidden, normal
+  ok 1/2045 Labyrinth Passage                 → 1/2126 Watery Tunnel                       15.7 s   29/30 rooms  hidden, normal, text
+  ok 1/217 Guild Street                       → 1/1875 Wooden Passage                       6.8 s   30/30 rooms  door, normal, text
+  ok 12/684 Scorching Desert                  → 12/2444 Temple Colonnade                   12.1 s   38/38 rooms  hidden, normal, text
+  ok 1/614 Sewer Tunnel                       → 9/181 Wooden Passage, Ramp Up               6.3 s   43/43 rooms  door, hidden, normal
+  ok 1/1118 Slum Street                       → 8/798 Building Rooftop                     41.1 s   30/30 rooms  door, normal, text
+  ok 1/2315 Narrow Stone Passage              → 10/271 Ancient Keep, Throne Room            6.5 s   30/30 rooms  hidden, normal
+  ok 1/1392 Main Road                         → 10/3 Narrow Passage, Base Of Cliff         17.4 s   30/30 rooms  normal, text
+  ok 17/52 Forest Trail                       → 17/7094 Forest Trail                        6.0 s   28/30 rooms  normal, text
+
+skipped (the practice server blocks these exit kinds): 17 — key 11, toll 4, item 1, restricted 1, cast 1
+
+====================================================================================================
+MudPilot route sweep (walk, practice server) — 2026-11-23 09:50
+24 walks (each from 30 rooms out), 1 with issues: timeout 1
+
+- 1/1 Town Gates → 1/9462 Musty Grottos, Portal  [Musty Grottos, Portal]  exits: door, normal, text
+    timeout: still walking after 82 s at 1/830 Graveyard (status: Idle)
+    fix: pilot.py / automation.Bot.walk
+    walked: 1/192 1/14 1/177 1/178 1/179 1/180 1/816 1/832 1/831 1/830
+    last sent: ['', '', '', 'i', '', '', '', 'i', '', '', '', '']
+
+walks:
+  ok 2/91 Western Road                        → 8/880 Lavish Bedroom                       20.4 s  124/125 rooms  door, hidden, normal, text
+  ok 3/741 Black Wasteland                    → 7/1227 Elaborate Chamber                    4.2 s   30/30 rooms  door, hidden, normal, text
+  ok 7/944 Lava Fields                        → 15/10234 Crimson Tunnel                     1.5 s   29/30 rooms  hidden, normal, text
+  ok 1/1724 Darkwood Forest                   → 9/853 Hallway                              11.0 s   49/52 rooms  door, hidden, normal
+  ok 1/1756 Huge Cave, Tunnel                 → 15/69 Huge Cavern, Training Area            5.7 s   29/30 rooms  door, hidden, normal
+  ok 1/2738 Darkwood Forest                   → 7/1174 Black Fortress, Inner Bailey        56.1 s  274/276 rooms  door, normal, text
+  ok 8/412 Dark Tunnel                        → 8/459 Commander's Office                    4.1 s   28/30 rooms  door, hidden, normal
+  ok 1/1401 Darkwood Forest, Main Road        → 9/1291 Ancient Darkwood Tree, Portal        5.8 s   30/30 rooms  door, hidden, normal
+  !! 1/1 Town Gates                           → 1/9462 Musty Grottos, Portal               83.5 s   21/19 rooms  door, normal, text
+  ok 2/698 Dragon's Teeth Hills               → 8/900 Black Cave, Entrance                 20.2 s  112/115 rooms  door, hidden, normal
+  ok 1/1641 Darkwood Forest                   → 7/1136 Small Store                         54.7 s  263/274 rooms  door, normal, text
+  ok 3/785 Abandoned House                    → 7/1245 Large Dank Chamber                   4.3 s   28/30 rooms  door, hidden, normal
+  ok 7/506 Fungus Forest                      → 15/319 White Corridor                      11.4 s   30/30 rooms  hidden, normal, text
+  ok 10/297 Frozen Cavern, Cave Opening       → 17/246 Mausoleum, Entrance                  1.5 s   30/30 rooms  hidden, normal, text
+  ok 1/1757 Huge Cave, Tunnel                 → 15/93 Orc Kitchen                           5.3 s   30/30 rooms  door, hidden, normal
+  ok 1/14 Intersection of River St. & Bridge St. → 6/861 Tomb Vaults, Stairwell                1.5 s   30/30 rooms  door, hidden, normal
+  ok 1/2045 Labyrinth Passage                 → 1/2126 Watery Tunnel                       15.7 s   30/30 rooms  hidden, normal, text
+  ok 1/217 Guild Street                       → 1/1875 Wooden Passage                       6.7 s   30/30 rooms  door, normal, text
+  ok 12/684 Scorching Desert                  → 12/2444 Temple Colonnade                   12.0 s   37/38 rooms  hidden, normal, text
+  ok 1/614 Sewer Tunnel                       → 9/181 Wooden Passage, Ramp Up               6.3 s   42/43 rooms  door, hidden, normal
+  ok 1/1118 Slum Street                       → 8/798 Building Rooftop                     41.2 s   30/30 rooms  door, normal, text
+  ok 1/2315 Narrow Stone Passage              → 10/271 Ancient Keep, Throne Room            6.5 s   29/30 rooms  hidden, normal
+  ok 1/1392 Main Road                         → 10/3 Narrow Passage, Base Of Cliff         17.4 s   30/30 rooms  normal, text
+  ok 17/52 Forest Trail                       → 17/7094 Forest Trail                        6.0 s   27/30 rooms  normal, text
+
+skipped (the practice server blocks these exit kinds): 17 — key 11, toll 4, item 1, restricted 1, cast 1
+
+====================================================================================================
+MudPilot route sweep (walk, practice server) — 2026-11-23 11:40
+24 walks (each from 30 rooms out), 1 with issues: timeout 1
+
+- 1/1 Town Gates → 1/9462 Musty Grottos, Portal  [Musty Grottos, Portal]  exits: door, normal, text
+    timeout: still walking after 82 s at 1/830 Graveyard (status: Idle)
+    fix: pilot.py / automation.Bot.walk
+    walked: 1/13 1/14 1/177 1/178 1/179 1/180 1/816 1/832 1/831 1/830
+    last sent: ['', '', '', 'i', '', '', '', 'i', '', '', '', '']
+
+walks:
+  ok 2/91 Western Road                        → 8/880 Lavish Bedroom                       20.5 s  123/125 rooms  door, hidden, normal, text
+  ok 3/741 Black Wasteland                    → 7/1227 Elaborate Chamber                    4.1 s   29/30 rooms  door, hidden, normal, text
+  ok 7/944 Lava Fields                        → 15/10234 Crimson Tunnel                     1.5 s   30/30 rooms  hidden, normal, text
+  ok 1/1724 Darkwood Forest                   → 9/853 Hallway                              11.0 s   50/52 rooms  door, hidden, normal
+  ok 1/1756 Huge Cave, Tunnel                 → 15/69 Huge Cavern, Training Area            5.7 s   29/30 rooms  door, hidden, normal
+  ok 1/2738 Darkwood Forest                   → 7/1174 Black Fortress, Inner Bailey        56.1 s  273/276 rooms  door, normal, text
+  ok 8/412 Dark Tunnel                        → 8/459 Commander's Office                    4.1 s   29/30 rooms  door, hidden, normal
+  ok 1/1401 Darkwood Forest, Main Road        → 9/1291 Ancient Darkwood Tree, Portal        5.9 s   30/30 rooms  door, hidden, normal
+  !! 1/1 Town Gates                           → 1/9462 Musty Grottos, Portal               83.1 s   21/19 rooms  door, normal, text
+  ok 2/698 Dragon's Teeth Hills               → 8/900 Black Cave, Entrance                 20.4 s  113/115 rooms  door, hidden, normal
+  ok 1/1641 Darkwood Forest                   → 7/1136 Small Store                         54.7 s  265/274 rooms  door, normal, text
+  ok 3/785 Abandoned House                    → 7/1245 Large Dank Chamber                   4.1 s   30/30 rooms  door, hidden, normal
+  ok 7/506 Fungus Forest                      → 15/319 White Corridor                      11.4 s   30/30 rooms  hidden, normal, text
+  ok 10/297 Frozen Cavern, Cave Opening       → 17/246 Mausoleum, Entrance                  1.5 s   30/30 rooms  hidden, normal, text
+  ok 1/1757 Huge Cave, Tunnel                 → 15/93 Orc Kitchen                           5.3 s   30/30 rooms  door, hidden, normal
+  ok 1/14 Intersection of River St. & Bridge St. → 6/861 Tomb Vaults, Stairwell                1.5 s   30/30 rooms  door, hidden, normal
+  ok 1/2045 Labyrinth Passage                 → 1/2126 Watery Tunnel                       15.7 s   30/30 rooms  hidden, normal, text
+  ok 1/18 River Street                        → 1/1875 Wooden Passage                       6.8 s   30/30 rooms  door, normal, text
+  ok 12/684 Scorching Desert                  → 12/2444 Temple Colonnade                   12.1 s   38/38 rooms  hidden, normal, text
+  ok 1/614 Sewer Tunnel                       → 9/181 Wooden Passage, Ramp Up               6.3 s   43/43 rooms  door, hidden, normal
+  ok 1/1118 Slum Street                       → 8/798 Building Rooftop                     41.1 s   30/30 rooms  door, normal, text
+  ok 1/2315 Narrow Stone Passage              → 10/271 Ancient Keep, Throne Room            6.5 s   29/30 rooms  hidden, normal
+  ok 1/1392 Main Road                         → 10/3 Narrow Passage, Base Of Cliff         17.4 s   30/30 rooms  normal, text
+  ok 17/52 Forest Trail                       → 17/7094 Forest Trail                        6.0 s   29/30 rooms  normal, text
+
+skipped (the practice server blocks these exit kinds): 17 — key 11, toll 4, item 1, restricted 1, cast 1

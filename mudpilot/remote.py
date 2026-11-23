@@ -1221,12 +1221,12 @@ class RemoteControl:
             # 'invite Miserable' AND 'join Miserable' for one line)
             return True
         if ago < 60 and not regrouping:
-            # (regrouping after a restart with our loop: they're the ones coming back to us — never give way)
-            # they invited me again after I invited them back: they're running a loop too. One of us has to give
-            # way or we hunt apart — the name that sorts first leads (both sides work it out the same way)
-            if (self.cfg.my_name or "").lower() > who.lower():
-                self.s.log(f"{who} is running a loop too — joining them (they lead)")
-                return False
+            # they invited me again after I invited them back: they're running a loop of their own too. 0.8.225 (Dan:
+            # "if they're both running their own loops there's a reason for it"): each keeps its loop — no join, and
+            # no more invites back and forth (the old "name that sorts first leads" join was undone by c_join anyway)
+            if self.s.bot.ready(f"own_loops_{who.lower()}", 600):
+                self.s.log(f"{who} is running a loop of their own too — each of us keeps hunting our own")
+            return True
         last[who.lower()] = time.time()
         self.s.send(f"invite {who}", from_bot=True)
         self.s.log(f"{who} invited me, but I'm running my loop — inviting them to follow me instead")

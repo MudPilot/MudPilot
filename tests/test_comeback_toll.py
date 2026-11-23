@@ -7,6 +7,7 @@ from mudpilot import config
 from mudpilot.session import Session
 from types import SimpleNamespace
 st = config.Settings(); st.save = lambda: None; st.my_name = "Revolution"
+st.board = "Paradigm"   # grme / rgen spell data and 14/1791-1792 are Paradigm-only; runall forces MUDPILOT_DEFAULT_BOARD=Main
 s = Session(st); s._no_log_file = True
 sent, logs = [], []
 s.send = lambda x, from_bot=False, **k: sent.append(x)

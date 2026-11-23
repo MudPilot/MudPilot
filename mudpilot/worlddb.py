@@ -736,6 +736,8 @@ class WorldDB:
 
     def remove_learned(self, src, move, dst=None) -> bool:
         """A learned way that turned out wrong (the action failed): take it off the map and the list."""
+        self.__dict__.pop("_rev_lead", None)         # (0.8.225: the map-only reachability caches go stale)
+        self.__dict__.pop("_leads_to_c", None)
         self.forget_routes()
         src = tuple(src)
         r = self.rooms.get(src)
@@ -1177,6 +1179,22 @@ class WorldDB:
             c = self._carry_items = frozenset(out)
         return c
 
+    def kit_item_set(self) -> frozenset:
+        """What party sync's 'kit=' tells the leader we carry: the carry-for-everyone items, plus the ones that stop a
+        room spell (MME NegateSpell — a phoenix feather or magma amulet in the lava; a spell's own fail-item). HUNT_1123
+        #4: leading, only what every follower is known to carry counts against a room's damage (partyB P2), and the
+        feather never made it into 'kit=' — Evolution and Revolution both carried one through 51 rooms of magma heat
+        unhurt while the estimate said up to 3,060."""
+        c = getattr(self, "_kit_items", None)
+        if c is None:
+            out = set(self.carry_item_set())
+            for lst in (getattr(self, "negates", None) or {}).values():
+                out |= {int(i) for i in lst}
+            for sp in set((getattr(self, "room_spells", None) or {}).values()):
+                out |= set(self.spell_items(int(sp)) or ())
+            c = self._kit_items = frozenset(out)
+        return c
+
     def is_fixture_exit(self, ex) -> bool:
         m = self.NEED_RE.match(ex.etype or "") if ex.kind == "item" else None
         return bool(m and self.exit_need(ex) is None)
@@ -1249,8 +1267,6 @@ class WorldDB:
                 if nd < dist.get(ex.to, 1e18):
                     dist[ex.to], prev[ex.to] = nd, (c, dr, ex)
                     heapq.heappush(pq, (nd, ex.to))
-        sb = (getattr(self, "stretch_blocks", None) or {}).get((tuple(start), goal)) if not isinstance(goal, set) \
-            else None
         if goal not in prev:
             return []
         out, node = [], goal
@@ -1307,19 +1323,9 @@ class WorldDB:
                 out.append((c, dr, why))
             node = c
         out = list(reversed(out))
-        if sb:
-            rooms, dmg = sb
-            hp = int((self.char or {}).get("max_hp") or 0)
-            a, b = rooms[0], rooms[-1]
-            lim = self.stretch_limit()
-            line = f"more than the {lim} HP {self._hp_whose()} hang-up line leaves" if lim < hp else \
-                f"{self._hp_whose()} whole max HP ({hp}) or more"
-            out.insert(0, (a, "", f"{len(rooms)} rooms that hurt in a row ({a[0]}/{a[1]} to {b[0]}/{b[1]}) can do up to "
-                                  f"{dmg} damage — {line}, with nowhere to rest between"))
         # (a max-HP wall first: it's this character's hard stop, and it was cut off behind three key doors the key run
         #  would sort out — m58 bug 1, 8/1835's 200-damage trap)
-        out = sorted(out, key=lambda t: 0 if ("whole max HP" in (t[2] or "") or "hang-up line" in (t[2] or ""))
-                     else 1)[:limit]
+        out = sorted(out, key=lambda t: 0 if "whole max HP" in (t[2] or "") else 1)[:limit]
         for k in ([goal] if not isinstance(goal, (set, frozenset)) else []):
             for wv in (getattr(self, "npc_ways", {}).get(k) or [])[:1]:
                 rm = wv["rooms"][0] if wv["rooms"] else None
@@ -1407,6 +1413,19 @@ class WorldDB:
     # who is walking (the session fills it in): {"class", "race", "align", "abil": fn(id)->value|None,
     # "wealth", "party_classes", "party_races"} — gates with unknown answers stay closed
     char: dict = {}
+    # the per-search flags route() / board_fixes / spots set, read as plain attributes in can_use and _route
+    # (0.8.225 speed — they were ~43M getattr(self, ..., None) calls for 15 Go tos); same values as the old defaults
+    segment_exits = None
+    shut_doors = None
+    refused_doors = None
+    danger_fn = None
+    item_casts = None
+    scatter = None
+    _no_chance = False
+    _no_danger = False
+    _party_carry = False
+    _trap_ok = False
+    _use_scatter = False
 
     def gate_ok(self, ex) -> bool | None:
         """A class / race / alignment / ability gate: True = you (and your party) may pass, False = not,
@@ -1530,12 +1549,12 @@ class WorldDB:
                     if at not in [x[0] for x in lst]:
                         lst.append((at, sm.group(1)))
                     self.summon_triggers.add(sm.group(1).strip().lower())
-        for mp, rm, tb in room_tb:
+        all_acts = self._room_actions_cached(room_tb, mmetext)
+        for (mp, rm, tb), acts in zip(room_tb, all_acts):
             here = (mp, rm)
             r = self.rooms.get(here)
             if not r:
                 continue
-            acts = mmetext.room_actions(self.textblocks, self.spells, tb, here)
             if acts:
                 self.room_actions[here] = acts
             for a in acts:
@@ -1564,6 +1583,59 @@ class WorldDB:
                     self.quest_steps.setdefault(ab, []).append(
                         {"value": val, "add": add, "how": f"kill the {m['name']}",
                          "where": list(m.get("spawn_rooms") or [])[:1], "req": req})
+
+    def _room_actions_key(self, room_tb, mmetext):
+        from . import __version__
+        st = os.stat(self.path)
+        key = [__version__, st.st_mtime_ns, st.st_size, len(room_tb)]
+        try:
+            ms = os.stat(mmetext.__file__)           # (a source run: a changed mmetext.py reads it again)
+            key += [ms.st_mtime_ns, ms.st_size]
+        except (OSError, AttributeError, TypeError):
+            pass
+        return key
+
+    def _room_actions_cached(self, room_tb, mmetext):
+        """mmetext.room_actions for every room_tb row (None for a room the map doesn't have) — most of the
+        world load's time. Kept in a file next to world.db, keyed by its time and size (and MudPilot's version), so
+        the next start reads it back; parsed again on any doubt. 0.8.225, bug hunt #27."""
+        import pickle
+        cache = self.path + ".actions.cache"
+        try:
+            key = self._room_actions_key(room_tb, mmetext)
+        except Exception:
+            key = None
+        if os.environ.get("MUDPILOT_NO_TB_CACHE") == "1":
+            key = None                               # (switched off: parse, and leave no file)
+        try:
+            pkg = os.path.dirname(os.path.abspath(__file__))
+            if os.path.commonpath([pkg, os.path.abspath(self.path)]) == pkg:
+                key = None                           # (the bundled maps inside the program: no file written there —
+                                                     #  it'd go out in the release zip / an install's app folder)
+        except (ValueError, TypeError):
+            pass
+        if key is not None:
+            try:
+                with open(cache, "rb") as f:
+                    data = pickle.load(f)
+                if isinstance(data, dict) and data.get("key") == key and len(data.get("acts") or ()) == len(room_tb):
+                    return data["acts"]
+            except Exception:
+                pass
+        out = []
+        for mp, rm, tb in room_tb:
+            here = (mp, rm)
+            out.append(mmetext.room_actions(self.textblocks, self.spells, tb, here) if here in self.rooms else None)
+        if key is not None:
+            try:
+                blob = pickle.dumps({"key": key, "acts": out}, protocol=pickle.HIGHEST_PROTOCOL)  # before anything
+                tmp = f"{cache}.{os.getpid()}.tmp"   # (two characters starting at once: no shared temp file)                                                         # below changes them
+                with open(tmp, "wb") as f:
+                    f.write(blob)
+                os.replace(tmp, cache)
+            except Exception:
+                pass
+        return out
 
     def _attach_open(self, here, tgt, cmds, label, req=None):
         """A command in `here` that opens room tgt's exit (remoteaction room … exit): the exit's action when
@@ -2016,6 +2088,8 @@ class WorldDB:
         r = self.rooms.get(tuple(src))
         if not r or tuple(dst) not in self.rooms or not move:
             return False
+        self.__dict__.pop("_rev_lead", None)        # (0.8.225 review: the map-only reachability caches go stale)
+        self.__dict__.pop("_leads_to_c", None)
         mv = clean_move(move)
         if not mv:
             return False                             # a party / telepath command, not a way to walk
@@ -2136,7 +2210,15 @@ class WorldDB:
         import time as _t
         if (getattr(self, "refused_doors", None) or {}).get(id(ex), 0) > _t.time():
             return True
+        if _t.time() - (getattr(self, "door_yes", None) or {}).get(id(ex), 0) < 3 * 3600:
+            return False                             # (HUNT_1123 #19: you said "try it anyway" — the Go to walks it, so
+                                                     #  an errand's source search counts the rooms past it too)
         return ex.kind in ("door", "key") and self.door_hopeless(ex, have)
+
+    def _door_yes_key(self):
+        import time as _t
+        now = _t.time()
+        return frozenset(k for k, t in (getattr(self, "door_yes", None) or {}).items() if now - t < 3 * 3600) or None
 
     ONE_WAY_DOOR = 2000                  # a '1000 picklocks/strength' door nothing we know opens: the last resort
 
@@ -2379,24 +2461,6 @@ class WorldDB:
         import time as _t
         return g is not None and _t.time() - ok.get(g, 0) < 3 * 3600
 
-    def stretch_wall(self, start, route, have=None):
-        """0.8.223 (Dan, m1315 R6): the first unbroken stretch of the route that hurts for your whole max HP or more
-        (the Lava Tube: 9 rooms of 60 = 540 against a paladin's 533 — hung up at 6/1217), as (rooms, damage), or None.
-        Not when you start inside one already (walking out is the point), nor with your max HP unknown."""
-        c = self.char or {}
-        hp = self.stretch_limit()
-        if hp <= 0 or c.get("gate_any") or getattr(self, "_hp_wall_off", False) or not route:
-            return None
-        first = True
-        start_hurts = bool(start and self.room_damage(tuple(start), c.get("carried") if c.get("carried") is not None
-                                                      else (have or ())))
-        for rooms, dmg in self.hurt_stretches(route, have):
-            began_here = first and start_hurts and rooms and rooms[0] == tuple(route[0].to)
-            first = False
-            if dmg >= hp and not began_here:
-                return rooms, dmg
-        return None
-
     def _exit_cost(self, ex, cur=None, have=None) -> float:
         if ex.kind == "trap":
             m = self.TRAP_RE.search(ex.etype)
@@ -2410,6 +2474,8 @@ class WorldDB:
             return 1 + req["voyage"] * 5 / 1.6           # rounds at sea, in walking steps
         if getattr(ex, "chance", False):
             return 6
+        if ex.kind not in ("hidden", "door", "key", "cast"):
+            return 1                                 # (0.8.225 speed: none of the checks below is about these kinds)
         at = self.action_at(ex)
         if at:
             # walk over to where it's opened from, and back: at its real length (0.8.190, Dan — the 6/861 four-lever
@@ -2502,72 +2568,82 @@ class WorldDB:
     def can_use(self, ex, passable=None, level=None, have=None, avoid=None, goal=None) -> bool:
         """Can we walk through this exit? (your level, keys/items, hidden exits we can open, class / race /
         alignment / ability gates, tolls you can pay, avoid list)"""
-        passable = passable or self.PASSABLE_DEFAULT
-        if not ex or ex.to not in self.rooms:
+        # (0.8.225 speed, HUNT_1123 #25: ~4M calls for 15 Go tos — the per-search flags are class defaults read as
+        #  plain attributes, each exit's fields read once, and the checks in the same order with the same answers)
+        if not ex:
             return False
-        on_segment = id(ex) in (getattr(self, "segment_exits", None) or ())
-        if ex.kind not in passable and not self.is_fixture_exit(ex) and not on_segment:
+        to = ex.to
+        if to not in self.rooms:
+            return False
+        kind, etype = ex.kind, ex.etype
+        if kind not in (passable or self.PASSABLE_DEFAULT) and not self.is_fixture_exit(ex) \
+                and id(ex) not in (self.segment_exits or ()):
             # (a walked-for-real segment's exits always plan: its key is picked up on the way — pyramid level 3)
-            lm = self.LEVEL_RE.search(ex.etype) if (level and ex.kind == "restricted") else None
+            c = self.char or {}
+            restricted = kind == "restricted"
+            lm = self.LEVEL_RE.search(etype) if (level and restricted) else None
             need = self.exit_need(ex) if have is not None else None
-            gate = self.gate_ok(ex) if ex.kind == "restricted" else None
-            toll = self.TOLL_RE.search(ex.etype) if ex.kind == "toll" else None
-            wl = (self.char or {}).get("wealth")
+            gate = self.gate_ok(ex) if restricted else None
+            toll = self.TOLL_RE.search(etype) if kind == "toll" else None
+            wl = c.get("wealth")
             # 0.8.201, bug hunt: cash not read yet (a Go to before the first stat line) — a small toll is assumed
             # payable (start_path checks the cash before walking), not a wall: 1/1381's 5-copper gate made 28 rooms 121
             paid = bool(toll and (int(toll.group(1)) <= self.SMALL_TOLL if wl is None else wl >= int(toll.group(1)))
-                        and (self.char or {}).get("tolls", True))
-            spell_trap = ex.kind == "restricted" and "spell trap" in ex.etype.lower() and \
-                (bool((self.char or {}).get("spell_traps")) or getattr(self, "_trap_ok", False))
-            if ex.kind == "restricted" and (self.char or {}).get("gate_any") and self.LEVEL_RE.search(ex.etype):
+                        and c.get("tolls", True))
+            spell_trap = restricted and "spell trap" in etype.lower() and \
+                (bool(c.get("spell_traps")) or self._trap_ok)
+            if restricted and c.get("gate_any") and self.LEVEL_RE.search(etype):
                 gate = True                          # (the map-only "any way in?" check: a level gate isn't a wall)
-            top_ = max(level or 0, int((self.char or {}).get("top_level") or 0)) if lm else 0
+            top_ = max(level or 0, int(c.get("top_level") or 0)) if lm else 0
             if not (lm and int(lm.group(1)) <= level and top_ <= (int(lm.group(2)) or 9999)) \
                     and not (need and need[0] in have) \
                     and not gate and not paid and not spell_trap:
                 return False
-        if avoid and ex.to in avoid and ex.to != goal and not (isinstance(goal, (set, frozenset)) and ex.to in goal):
+        in_goal = to == goal or (isinstance(goal, (set, frozenset)) and to in goal)
+        if avoid and to in avoid and not in_goal:
             return False
-        if ex.kind != "restricted" and ex.etype and (self.ABIL_GATE_RE.search(ex.etype) or self.ALIGN_RE.search(
-                ex.etype) or self.GATE_RE.search(ex.etype)) and self.gate_ok(ex) is False:
+        if kind != "restricted" and etype and (self.ABIL_GATE_RE.search(etype) or self.ALIGN_RE.search(
+                etype) or self.GATE_RE.search(etype)) and self.gate_ok(ex) is False:
             # a gate on a typed command, not just on a 'restricted' exit: 'ask Jorah teleport' (Ability 127 —
             # a quest Dan's good mage doesn't have) — PVE walked to the Blue Tower and asked him 8 times
             return False
-        if getattr(self, "_no_chance", False) and "(Chance)" in (ex.etype or "") and ex.to != goal:
+        if self._no_chance and "(Chance)" in (etype or "") and to != goal:
             return False                             # (a party's first try keeps off chance jumps — route())
-        if getattr(self, "_no_danger", False) and ex.to != goal and not (isinstance(goal, (set, frozenset))
-                                                                         and ex.to in goal):
-            fn = getattr(self, "danger_fn", None)
-            if fn is not None and fn(ex.to):
+        if self._no_danger and not in_goal:
+            fn = self.danger_fn
+            if fn is not None and fn(to):
                 return False                         # (a lair that would maul you — route() tries without first)
-        if id(ex) in (getattr(self, "shut_doors", None) or ()):
+        if id(ex) in (self.shut_doors or ()):
             return False                             # pMUD: a pyramid 1000-door that never opens (board_fixes)
-        rd = getattr(self, "refused_doors", None)
+        rd = self.refused_doors
         if rd and rd.get(id(ex), 0) > _time.time() and not (self.char or {}).get("gate_any"):
             return False                             # nobody can open it and the player said No (0.8.201)
         if getattr(ex, "req", None) and not self.req_ok(ex, level, have):
             return False
-        if ex.kind == "item" and getattr(self, "_party_carry", False):
+        if kind == "item" and self._party_carry:
             need = self.exit_need(ex)
             if need and not need[1] and need[0] not in ((self.char or {}).get("party_have") or ()):
                 return False                         # every member shows one: not unless they all carry it
-        if (ex.kind == "text" or ex.actions) and self.spends_item(ex):
+        if (kind == "text" or ex.actions) and self.spends_item(ex):
             return False                             # spends a limited-use item (the token of Silvermere): never planned
-        if ex.kind == "item" and "(Item: 185)" in (ex.etype or "") and ex.to[0] == 17 and 2901 <= ex.to[1] <= 2937:
+        if kind == "item" and "(Item: 185)" in (etype or "") and to[0] == 17 and 2901 <= to[1] <= 2937:
             return False                             # pMUD: in the Golden Phoenix maze the 'manhole' links are walls
-        if self._sea(ex.to) and not (ex.to == goal or (isinstance(goal, (set, frozenset)) and ex.to in goal)):
+        rs = self.__dict__.get("room_spells")
+        if rs and rs.get(to) and not in_goal and self._sea(to):
             return False                             # pMUD: sea rooms throw you somewhere random — boats only
-        if ex.kind == "cast" and self._cast_moves_you(ex):
+        if kind == "cast" and self._cast_moves_you(ex):
             return False                             # pMUD: the spell sends you somewhere else (Ebon Blade maze)
-        if ex.kind == "hidden" and "pass" not in ex.etype.lower() and "search" not in ex.etype.lower():
-            if not ex.action_cmds():
-                return False                     # needs an action we don't know
-            if ex.action_items() and not (have and all(i in have for i in ex.action_items())):
-                return False                     # …or an item for it we don't carry
-        if ex.kind == "door" and ex.actions and have is not None and ex.action_items() and \
+        if kind == "hidden":
+            el = etype.lower()
+            if "pass" not in el and "search" not in el:
+                if not ex.action_cmds():
+                    return False                 # needs an action we don't know
+                if ex.action_items() and not (have and all(i in have for i in ex.action_items())):
+                    return False                 # …or an item for it we don't carry
+        if kind == "door" and ex.actions and have is not None and ex.action_items() and \
                 not all(i in have for i in ex.action_items()):
             return False                         # a door its room command opens only with an item (signet ring)
-        if (ex.kind == "trap" or ex.to in (self.__dict__.get("room_spells") or ())) and self.hp_wall(ex, have):
+        if (kind == "trap" or to in (rs or ())) and self.hp_wall(ex, have):
             return False                         # 0.8.222: could do your whole max HP in one go (why_no_route says so)
         return True
 
@@ -2576,7 +2652,6 @@ class WorldDB:
     def forget_routes(self):
         """Something changed under the routes (a wall, a door that wouldn't open, the party, a quest step)."""
         self._memo = {}
-        self._stretch_refused = {}
 
     def _memo_key(self, *parts):
         c = self.char or {}
@@ -2657,80 +2732,6 @@ class WorldDB:
                 hot.add(rm)
         hot -= {tuple(goal), tuple(start)}
         return self.route(start, goal, level=level, have=have, avoid=frozenset(set(avoid or ()) | hot))
-
-    def _round_stretches(self, start, goal, r, passable, max_nodes, avoid, level, have):
-        """0.8.223 (Dan, m1315 R6): a route with an unbroken stretch that hurts for your whole max HP is planned again
-        round every such stretch (twice at most); no way round: no route — why_no_route names the stretch."""
-        if r and self.stretch_allowed(goal):
-            return r                             # (0.8.224: you said go anyway)
-        sw = self.stretch_wall(start, r, have) if r else None
-        if not sw:
-            return r
-        goals = goal if isinstance(goal, (set, frozenset)) else {tuple(goal)}
-        # 0.8.224 (Dan, speed): the same refusal again in this Go to (keyed_route, _bank_way, plan_route… each ask with
-        # their own avoid set) — at once, not two more full-map searches round it
-        try:
-            bk = (tuple(start), goal if not isinstance(goal, set) else frozenset(goal),
-                  frozenset(have) if have else None, self._memo_key("s"))
-        except TypeError:
-            bk = None
-        import time as _t
-        rc = self.__dict__.setdefault("_stretch_refused", {})
-        if bk is not None and _t.time() - rc.get(bk, (0, None))[0] < self.MEMO_SECS:
-            try:
-                self.__dict__.setdefault("stretch_blocks", {})[(bk[0], bk[1])] = rc[bk][1]
-            except TypeError:
-                pass
-            return None
-        hp = self.stretch_limit()
-        av = set(avoid or ())
-        for _ in range(2):
-            bad = set()
-            for rooms, dmg in self.hurt_stretches(r, have):
-                if dmg >= hp:
-                    bad |= set(rooms)
-            bad -= set(goals) | {tuple(start)} | av
-            if not bad:
-                break
-            av |= bad
-            r = self._route_uncached(start, goal, passable, max_nodes, frozenset(av), level, have)
-            if r is None:
-                break                            # (and the search below avoids even more: no use — 0.8.224 speed)
-            sw2 = self.stretch_wall(start, r, have)
-            if not sw2:
-                return r
-            sw = sw2
-        # (0.8.224 — regression walks, w1214 #3: a thief refused 14/1923 -> 14/9045 with a 254-room dry way there.
-        #  Before giving up: one search round every room that hurts at all)
-        try:
-            if r is None:
-                raise LookupError                # (no way round even the walled rooms: none round them all)
-            c = self.char or {}
-            plan = set(have or ())
-            hv = set(c.get("carried")) if c.get("carried") is not None else plan
-            boats = self._boat_items() if plan else frozenset()
-            rs = getattr(self, "room_spells", None) or {}
-            hot = set()
-            for rm, sp in rs.items():
-                si = boats & set(self.spell_items(sp) or ()) & plan if boats else ()
-                if self.room_damage(rm, (hv | set(si)) if si else hv):
-                    hot.add(rm)
-            hot -= set(goals) | {tuple(start)}
-            r = self._route_uncached(start, goal, passable, max_nodes, frozenset(av | hot), level, have)
-            if r is not None and not self.stretch_wall(start, r, have):
-                return r
-        except Exception:
-            pass
-        try:
-            self.__dict__.setdefault("stretch_blocks", {})[
-                (tuple(start), goal if not isinstance(goal, set) else frozenset(goal))] = sw
-        except TypeError:
-            pass
-        if bk is not None:
-            if len(rc) > 200:
-                rc.clear()
-            rc[bk] = (_t.time(), sw)
-        return None
 
     def _route_uncached(self, start: Room, goal, passable: set | None = None, max_nodes: int = 200000,
                         avoid: set | frozenset | None = None, level: int | None = None, have: set | None = None):
@@ -2852,12 +2853,24 @@ class WorldDB:
         if ua:
             avoid = (frozenset(avoid or ()) | frozenset(ua)) - {tuple(start) if start else None}
         key = self._memo_key("d", start, level, frozenset(have) if have else None,
-                             frozenset(avoid) if avoid else None, reverse)
+                             frozenset(avoid) if avoid else None, reverse, self._door_yes_key())
         with self._plan_lock:
             hit = self._memo.get(key)
             if hit and _t.time() - hit[0] < self.MEMO_SECS:
                 return hit[1]
-            d = self._dist_map(start, level, have, avoid, reverse, max_nodes)
+            off = False
+            hp = int((self.char or {}).get("max_hp") or 0)
+            if not reverse and hp > 0 and start and tuple(start) in (getattr(self, "room_spells", None) or {}):
+                # (HUNT_1123 #19: the same start-room pass as route() — standing in a room that can do your whole max
+                #  HP, walking out is the point; errand sources were all "unreachable" where the Go to went)
+                cr = (self.char or {}).get("carried")
+                off = self.room_damage(tuple(start), cr if cr is not None else (have or ())) >= hp
+            prev_off = getattr(self, "_hp_wall_off", False)
+            self._hp_wall_off = prev_off or off
+            try:
+                d = self._dist_map(start, level, have, avoid, reverse, max_nodes)
+            finally:
+                self._hp_wall_off = prev_off
             self._memo[key] = (_t.time(), d)
             return d
 
@@ -2983,13 +2996,19 @@ class WorldDB:
         # cheapest path (traps, tolls and spell traps cost extra), ties broken by fewer steps
         prev: dict[Room, tuple] = {start: None}
         best = {start: 0.0}
-        q = [(0.0, 0, start)]
+        q = [(0.0, tuple(start), start)]   # (0.8.225: the tie is a room, like the rest)
         n = 0
         bg = threading.current_thread() is not threading.main_thread()
         rs_ = self.__dict__.get("room_spells") or ()
+        # (0.8.225 speed: the per-search lookups read once, not once per room or exit)
+        can_use, exit_cost, push, pop, best_get = self.can_use, self._exit_cost, heapq.heappush, heapq.heappop, best.get
+        rooms_get = self.rooms.get
+        casts = (self.item_casts or {}) if have else None
+        party_carry = self._party_carry
+        scatter = (self.scatter or {}) if self._use_scatter else None
         while q and n < max_nodes:
-            cost, _tie, cur = heapq.heappop(q)
-            if cost > best.get(cur, 1e18):
+            cost, _tie, cur = pop(q)
+            if cost > best_get(cur, 1e18):
                 continue
             n += 1
             if bg and not n % YIELD_EVERY:
@@ -3001,43 +3020,45 @@ class WorldDB:
                     steps.append(e)
                     node = p
                 return self._pin(list(reversed(steps)), start)
-            r = self.rooms.get(cur)
+            r = rooms_get(cur)
             if not r:
                 continue
             for ex in r.exits.values():
-                if not self.can_use(ex, passable, level, have, avoid, goals):
+                if not can_use(ex, passable, level, have, avoid, goals):
                     continue
                 if failed and (cur, ex.dir) in failed:
                     continue                         # this exit just failed us (locked, search missed…)
-                c2 = cost + self._exit_cost(ex, cur, have)   # (exit_cost, inlined for speed — 0.8.223)
-                if ex.to in rs_:
-                    c2 += self.hurt_cost(ex.to, have)
-                if c2 < best.get(ex.to, 1e18):
-                    best[ex.to] = c2
-                    prev[ex.to] = (cur, ex)
-                    heapq.heappush(q, (c2, id(ex.to) & 0xffff, ex.to))
-            for ex, items in ((getattr(self, "item_casts", None) or {}).get(cur, ()) if have else ()):
+                to = ex.to
+                c2 = cost + exit_cost(ex, cur, have)   # (exit_cost, inlined for speed — 0.8.223)
+                if to in rs_:
+                    c2 += self.hurt_cost(to, have)
+                if c2 < best_get(to, 1e18):
+                    best[to] = c2
+                    prev[to] = (cur, ex)
+                    push(q, (c2, to, to))            # (0.8.225: ties by room number — the same route every run)
+            for ex, items in (casts.get(cur, ()) if casts is not None else ()):
                 # a teleport that only goes there if you carry the item (the golden idol): you do — and leading a
                 # party, every follower too (0.8.190, Dan: or the idol-less ones land in 16/2228)
-                if getattr(self, "_party_carry", False) and \
+                if party_carry and \
                         not (items & set((self.char or {}).get("party_have") or ())):
                     continue
-                if not (items & set(have)) or (avoid and ex.to in avoid and ex.to not in goals) or                         (failed and (cur, ex.dir) in failed):
+                if not (items & set(have)) or (avoid and ex.to in avoid and ex.to not in goals) or \
+                        (failed and (cur, ex.dir) in failed):
                     continue
                 c2 = cost + self.exit_cost(ex)
-                if c2 < best.get(ex.to, 1e18):
+                if c2 < best_get(ex.to, 1e18):
                     best[ex.to] = c2
                     prev[ex.to] = (cur, ex)
-                    heapq.heappush(q, (c2, id(ex.to) & 0xffff, ex.to))
-            for ex, gate in ((getattr(self, "scatter", None) or {}).get(cur, ()) if getattr(self, "_use_scatter", False)
-                             else ()):
+                    push(q, (c2, ex.to, ex.to))
+            for ex, gate in (scatter.get(cur, ()) if scatter is not None else ()):
                 # a random drop (the asylum, the uninvited portal): planned as if it lands where it suits;
                 # the walk finds out where it really did and plans again
-                if (avoid and ex.to in avoid and ex.to not in goals) or (failed and (cur, ex.dir) in failed)                         or not self.scatter_ok(gate):
+                if (avoid and ex.to in avoid and ex.to not in goals) or (failed and (cur, ex.dir) in failed) \
+                        or not self.scatter_ok(gate):
                     continue
                 c2 = cost + self.SCATTER_COST
-                if c2 < best.get(ex.to, 1e18):
+                if c2 < best_get(ex.to, 1e18):
                     best[ex.to] = c2
                     prev[ex.to] = (cur, ex)
-                    heapq.heappush(q, (c2, id(ex.to) & 0xffff, ex.to))
+                    push(q, (c2, ex.to, ex.to))
         return None

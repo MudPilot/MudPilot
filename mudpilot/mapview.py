@@ -299,6 +299,10 @@ class MapView(tk.Canvas):
 
     def _pan_key(self, e):
         """Number pad (8 n, 3 se, 0 d, . u …) or arrow keys: look one room that way on this map."""
+        rr = getattr(self.s, "routerec", None)
+        if rr is not None and getattr(rr, "active", False) and getattr(rr, "draw", False):
+            return None     # (0.8.225, Dan: drawing a loop — the pen takes the number pad, not the look-ahead; this
+                            #  binding ran first and swallowed every key, so the map moved and nothing was drawn)
         import sys
         from .macros import key_name
         arrows = {"Up": "N", "Down": "S", "Left": "W", "Right": "E"}
