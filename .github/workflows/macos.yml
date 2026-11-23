@@ -87,6 +87,22 @@ jobs:
           cat selftest.txt
           grep -qx "ALL OK" selftest.txt
 
+      - name: Opens like a player opens it
+        run: |
+          # the top MudPilot starter -> launcher -> MudPilot window, as a double-click does; still running 45 s later
+          cd t
+          ./MudPilot/MudPilot > launch.log 2>&1 &
+          sleep 45
+          ps -axo pid,command | grep '[M]udPilot.bin' || true
+          ok=0
+          ps -axo command | grep -q '[M]udPilot.bin -m mudpilot.launcher' || { echo "::error::the launcher isn't running"; ok=1; }
+          ps -axo command | grep -Eq '[M]udPilot.bin -m mudpilot( |$)' || { echo "::error::the MudPilot window didn't open"; ok=1; }
+          test -d MudPilot/data || { echo "::error::no data folder was made"; ok=1; }
+          echo "--- launch.log"; cat launch.log || true
+          echo "--- data/"; ls -R MudPilot/data 2>/dev/null | head -40 || true
+          pkill -f '[M]udPilot.bin' || true
+          exit $ok
+
       - uses: actions/upload-artifact@v5
         with:
           name: mac-${{ matrix.arch }}
