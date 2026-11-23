@@ -11,7 +11,7 @@ Run on Linux (WSL is fine) it makes dist/MudPilot-<version>-linux.zip instead: t
 build_exe/starter.sh as the 'MudPilot' starter on top. Linux needs gcc and patchelf, and a Python with Tk
 (python3-tk); build on an older distro (Ubuntu 22.04) so the result runs on the newer ones too.
 
-Run on macOS it makes dist/MudPilot-<version>-mac-arm64.zip (Apple Silicon) or -mac-intel.zip, the Linux layout
+Run on macOS it makes dist/MudPilot-<version>-mac-arm64.zip (Apple Silicon) or -mac-x64.zip (Intel), the Linux layout
 with the same starter.sh; it needs Xcode's command-line tools (clang) and a python.org-style Python with Tk.
 GitHub builds those on its macOS runners (.github/workflows/macos.yml)."""
 from __future__ import annotations
@@ -40,7 +40,7 @@ def version() -> str:
 
 
 def mac_arch() -> str:
-    return "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "intel"
+    return "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
 
 
 def run(cmd, **kw):

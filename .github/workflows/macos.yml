@@ -1,0 +1,104 @@
+# The macOS builds of MudPilot: the same compiled, no-source build as Windows and Linux (build_exe/build.py, Nuitka),
+# made on GitHub's macOS machines — Apple Silicon and Intel — each zip checked with --selftest before it's kept.
+#
+# Run it from the Actions tab (Run workflow): "ref" is the source to build (a tag, branch or commit; its
+# mudpilot/__init__.py version names the zip) and "release" is the GitHub release to attach the zips to (e.g.
+# v0.8.224.2; leave it blank to only build — the zips are kept on the run's page for a week).
+name: macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Source to build (tag, branch or commit)"
+        default: main
+        required: true
+      release:
+        description: "Release tag to attach the Mac zips to (blank = build only)"
+        default: ""
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14          # Apple Silicon (M1+)
+            arch: arm64
+          - runner: macos-15-intel    # Intel Macs
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"   # runs on macOS 11 (Big Sur) and newer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python has Tk
+        run: python -c "import tkinter, sys, platform; print(sys.version, platform.machine(), 'tk', tkinter.TkVersion)"
+
+      - name: Build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install nuitka ordered-set zstandard -r requirements.txt
+
+      - name: Build
+        run: python build_exe/build.py
+
+      - name: Unzip and selftest
+        run: |
+          set -e
+          zip=$(ls dist/MudPilot-*-mac-${{ matrix.arch }}.zip)
+          echo "ZIP=$zip" >> "$GITHUB_ENV"
+          rm -rf t && mkdir t && cd t && unzip -q "../$zip"
+          ver=$(ls MudPilot/app)
+          test -x MudPilot/MudPilot
+          file "MudPilot/app/$ver/MudPilot"
+          codesign -dv "MudPilot/app/$ver/MudPilot" 2>&1 | head -5 || true
+          echo "minimum macOS:"; otool -l "MudPilot/app/$ver/MudPilot" | grep -A3 LC_BUILD_VERSION | grep minos || true
+          if find MudPilot -path '*mudpilot*' \( -name '*.py' -o -name '*.pyc' \) | grep -q .; then
+            echo "source in the build"; exit 1
+          fi
+          "MudPilot/app/$ver/MudPilot" --selftest selftest.txt || { cat selftest.txt; exit 1; }
+          cat selftest.txt
+          grep -qx "ALL OK" selftest.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: ${{ env.ZIP }}
+          retention-days: 7
+          if-no-files-found: error
+
+  attach:
+    needs: build
+    if: ${{ inputs.release != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: zips
+          merge-multiple: true
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release }}
+        run: |
+          ls -la zips
+          want="${TAG#v}"
+          for z in zips/*.zip; do
+            case "$(basename "$z")" in MudPilot-"$want"-mac-*.zip) ;; *) echo "$z isn't version $want"; exit 1 ;; esac
+          done
+          gh release upload "$TAG" zips/*.zip --clobber --repo "$GITHUB_REPOSITORY"
