@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14          # Apple Silicon (M1+)
+          - runner: macos-15          # Apple Silicon (M1+)
             arch: arm64
           - runner: macos-15-intel    # Intel Macs
             arch: x64
@@ -35,17 +35,31 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"   # runs on macOS 11 (Big Sur) and newer
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Python has Tk
         run: python -c "import tkinter, sys, platform; print(sys.version, platform.machine(), 'tk', tkinter.TkVersion)"
+
+      - name: Source knows the Mac program name
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          # the compiled program is MudPilot.bin on a Mac (a Mac disk sees "MudPilot" and mudpilot/ as one name);
+          # launcher.py and config.py must look for that name too, or the install won't open
+          # (a build-only run of older source is a warning, so the build itself can still be tried)
+          if ! grep -q 'MudPilot.bin' mudpilot/launcher.py || ! grep -q 'MudPilot.bin' mudpilot/config.py; then
+            if [ -n "$RELEASE" ]; then
+              echo "::error::this source predates the Mac build (no MudPilot.bin in launcher.py/config.py)"; exit 1
+            fi
+            echo "::warning::this source predates the Mac build: the zip would build but not open"
+          fi
 
       - name: Build tools
         run: |
@@ -62,18 +76,18 @@ jobs:
           echo "ZIP=$zip" >> "$GITHUB_ENV"
           rm -rf t && mkdir t && cd t && unzip -q "../$zip"
           ver=$(ls MudPilot/app)
-          test -x MudPilot/MudPilot
-          file "MudPilot/app/$ver/MudPilot"
-          codesign -dv "MudPilot/app/$ver/MudPilot" 2>&1 | head -5 || true
-          echo "minimum macOS:"; otool -l "MudPilot/app/$ver/MudPilot" | grep -A3 LC_BUILD_VERSION | grep minos || true
+          test -x MudPilot/MudPilot && test -x "MudPilot/app/$ver/MudPilot.bin"
+          file "MudPilot/app/$ver/MudPilot.bin"
+          codesign -dv "MudPilot/app/$ver/MudPilot.bin" 2>&1 | head -5 || true
+          echo "minimum macOS:"; otool -l "MudPilot/app/$ver/MudPilot.bin" | grep -A3 LC_BUILD_VERSION | grep minos || true
           if find MudPilot -path '*mudpilot*' \( -name '*.py' -o -name '*.pyc' \) | grep -q .; then
             echo "source in the build"; exit 1
           fi
-          "MudPilot/app/$ver/MudPilot" --selftest selftest.txt || { cat selftest.txt; exit 1; }
+          "MudPilot/app/$ver/MudPilot.bin" --selftest selftest.txt || { cat selftest.txt; exit 1; }
           cat selftest.txt
           grep -qx "ALL OK" selftest.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: mac-${{ matrix.arch }}
           path: ${{ env.ZIP }}
@@ -87,7 +101,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           path: zips
           merge-multiple: true

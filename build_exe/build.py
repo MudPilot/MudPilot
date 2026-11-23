@@ -12,7 +12,7 @@ build_exe/starter.sh as the 'MudPilot' starter on top. Linux needs gcc and patch
 (python3-tk); build on an older distro (Ubuntu 22.04) so the result runs on the newer ones too.
 
 Run on macOS it makes dist/MudPilot-<version>-mac-arm64.zip (Apple Silicon) or -mac-x64.zip (Intel), the Linux layout
-with the same starter.sh; it needs Xcode's command-line tools (clang) and a python.org-style Python with Tk.
+with the same starter.sh (the program in app/<version>/ is MudPilot.bin there); it needs Xcode's command-line tools (clang) and a python.org-style Python with Tk.
 GitHub builds those on its macOS runners (.github/workflows/macos.yml)."""
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ DIST = os.path.join(SRC, "dist")
 GUIDES = ("MudPilot Setup Guide.pdf", "MudPilot Setup Guide.docx")
 WIN = os.name == "nt"
 MAC = sys.platform == "darwin"
-EXE = "MudPilot.exe" if WIN else "MudPilot"
+# (macOS: not plain "MudPilot", which a Mac disk sees as the same name as the mudpilot/ folder beside it)
+EXE = "MudPilot.exe" if WIN else "MudPilot.bin" if MAC else "MudPilot"
 
 
 def version() -> str:

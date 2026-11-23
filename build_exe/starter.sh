@@ -3,12 +3,15 @@
 # there does the rest), passing on any arguments ('--data PVE'). A version named in data/control/skip-versions.txt
 # is passed over (one that crashed on install). The Linux twin of starter.c.
 root=$(cd "$(dirname "$0")" && pwd)
+exe=MudPilot
+# (macOS: a Mac disk sees "MudPilot" and the mudpilot/ folder beside it as one name)
+[ "$(uname)" = Darwin ] && exe=MudPilot.bin
 skip="$root/data/control/skip-versions.txt"
 best=""
 for d in "$root"/app/*/; do
     v=$(basename "$d")
     case "$v" in *[!0-9.]*|"") continue ;; esac
-    [ -x "$d/MudPilot" ] || continue
+    [ -x "$d/$exe" ] || continue
     if [ -f "$skip" ] && grep -qx "$v" "$skip" 2>/dev/null; then continue; fi
     if [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -n1)" = "$v" ]; then
         best=$v
@@ -23,4 +26,4 @@ if [ -z "$best" ]; then
     fi
     exit 1
 fi
-cd "$root" && exec "$root/app/$best/MudPilot" -m mudpilot.launcher "$@"
+cd "$root" && exec "$root/app/$best/$exe" -m mudpilot.launcher "$@"
