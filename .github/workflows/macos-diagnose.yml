@@ -17,12 +17,17 @@ on:
         description: "From-source run: try the start-up hang fix (.github/mac_update_fix.py) first"
         type: boolean
         default: false
+      newchar:
+        description: "Only the new-character test (from source: Character -> New character..., and the launcher's)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   diagnose:
+    if: ${{ !inputs.newchar }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - name: Download
@@ -63,6 +68,7 @@ jobs:
 
   # From source: counts every Python callback Tk runs (and what's happening in the event loop) while it's stuck
   from-source:
+    if: ${{ !inputs.newchar }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - uses: actions/checkout@v5
