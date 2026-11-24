@@ -29,13 +29,17 @@ on:
         description: "Only: tkinter's name box vs a plain one, real clicks and typing"
         type: boolean
         default: false
+      appbox:
+        description: "Only: MudPilot's New character box with real clicks/typing, pieces switched off one at a time"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   diagnose:
-    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog }}
+    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog && !inputs.appbox }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - name: Download
@@ -76,7 +80,7 @@ jobs:
 
   # From source: counts every Python callback Tk runs (and what's happening in the event loop) while it's stuck
   from-source:
-    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog }}
+    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog && !inputs.appbox }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - uses: actions/checkout@v5
@@ -282,5 +286,43 @@ jobs:
         if: always()
         with:
           name: dialog-${{ matrix.mode }}-${{ inputs.arch }}
+          path: out
+          retention-days: 7
+
+  # MudPilot's own New character box (from source), real mouse/keyboard; which piece of MudPilot stops it taking input?
+  appbox:
+    if: ${{ inputs.appbox }}
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        off: ["", "uilog", "keys", "loop", "uilog,keys,loop,hangwatch"]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: New character box (off ${{ matrix.off }})
+        env:
+          MP_OFF: ${{ matrix.off }}
+        run: |
+          brew install -q cliclick >/dev/null 2>&1 || true
+          python -m pip install -q -r requirements.txt
+          mkdir -p out
+          (python -I .github/mac_app_probe.py > out/run.log 2>&1 &)
+          for i in $(seq 1 60); do [ -s out/coords.txt ] && break; sleep 1; done
+          read ex ey ox oy < out/coords.txt || true; echo "entry $ex,$ey OK $ox,$oy"
+          screencapture -x out/a-box.png || true
+          cliclick c:$ex,$ey w:500 t:Hello || true; sleep 2; screencapture -x out/b-typed.png || true
+          cliclick c:$ox,$oy || true; sleep 4; screencapture -x out/c-ok.png || true
+          pkill -f mac_app_probe || true
+          cat out/probe.log; tail -15 out/run.log
+          grep -q "profile now Hello" out/probe.log || { echo "::error::the box didn't take the name (off: $MP_OFF)"; exit 1; }
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: appbox-${{ strategy.job-index }}-${{ inputs.arch }}
           path: out
           retention-days: 7
