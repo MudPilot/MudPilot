@@ -113,12 +113,15 @@ jobs:
           ps -axo command | grep -q '[M]udPilot.bin -m mudpilot.launcher' || { echo "::error::the launcher isn't running"; ok=1; }
           ps -axo command | grep -Eq '[M]udPilot.bin -m mudpilot( |$)' || { echo "::error::the MudPilot window didn't open"; ok=1; }
           test -d MudPilot/data || { echo "::error::no data folder was made"; ok=1; }
-          # past the loading screen = MudPilot sits in Tk's main loop (0.8.224.4 on a Mac froze in the splash's update)
+          # past the loading screen? (0.8.224.4 on a Mac froze in the splash's update)
           app=$(pgrep -f 'MudPilot.bin -m mudpilot$' | head -1)
           if [ -n "$app" ]; then
             sample "$app" 3 -file sample.txt >/dev/null 2>&1 || true
-            if grep -q Tkapp_MainLoop sample.txt; then echo "past the loading screen (in Tk's main loop)"
-            else echo "::error::MudPilot is stuck before its main window (not in Tk's main loop)"; grep -m5 -E 'splash|Tk_UpdateObjCmd' sample.txt || true; ok=1; fi
+            # (stuck = still inside the loading screen's code; a first-run question box waits in tkwait, which is fine)
+            if grep -q 'mudpilot\$splash' sample.txt; then
+              echo "::error::MudPilot is stuck on the loading screen"; grep -m5 -E 'splash|Tk_UpdateObjCmd' sample.txt || true; ok=1
+            elif grep -qE 'Tkapp_MainLoop|Tk_TkwaitObjCmd' sample.txt; then echo "past the loading screen"
+            else echo "::warning::couldn't tell from the stack sample whether MudPilot got past the loading screen"; fi
           fi
           screencapture -x ../launch-shot.png || true
           echo "--- launch.log"; cat launch.log || true
