@@ -101,6 +101,12 @@ def _wrap_menu():
                     you(f"menu '{_l}'")
                 except Exception:
                     pass
+                if sys.platform == "darwin":
+                    # macOS 27 runs a menu pick inside the menu-bar agent's callback and beachballs the app until it
+                    # returns; a box opened straight from the pick (New character...) waits there forever. So run the
+                    # pick just after the menu has closed instead.
+                    _m.after(1, lambda: _c(*a))
+                    return None
                 return _c(*a)
             kw["command"] = run
         return orig(self, itemType, kw)

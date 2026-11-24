@@ -129,6 +129,10 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.226.2
+
+- **Macs no longer beachball on Character → New character…** (or any other menu item that opens a box). On macOS 27 a menu pick runs inside the system menu bar's own callback, and a box opened straight from it kept that callback waiting, so macOS showed the app as frozen. On a Mac, menu picks now run just after the menu closes. Windows and Linux work as before. Thanks to the Mac player whose stack sample pinned it down.
+
 ## 0.8.226.1
 
 - **Macs no longer freeze on the loading screen** at "Opening the gates…". On macOS the loading screen's redraw never returned once MudPilot's timers were running, and the window layout re-applied itself hundreds of thousands of times in its first 10 seconds. Windows and Linux work as before.
