@@ -1,0 +1,58 @@
+# Opens a published Mac download on GitHub's Mac like a player does, and keeps what happened: screenshots over the
+# first two minutes, MudPilot's logs, and a stack sample of each MudPilot process (where it's stuck, if it is).
+name: macOS diagnose
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release tag whose Mac zip to open"
+        default: v0.8.224.4
+        required: true
+      arch:
+        description: "arm64 or x64"
+        default: arm64
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    steps:
+      - name: Download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release }}
+          ARCH: ${{ inputs.arch }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "*-mac-$ARCH.zip"
+          mkdir t && cd t && unzip -q ../*.zip && ls MudPilot MudPilot/app
+
+      - name: Open and watch
+        run: |
+          mkdir -p out
+          cd t
+          ./MudPilot/MudPilot > ../out/launch.log 2>&1 &
+          for s in 5 15 30 60 120; do
+            sleep $(( s - ${prev:-0} )); prev=$s
+            screencapture -x "../out/shot-${s}s.png" || true
+            echo "== ${s}s"; ps -axo pid,%cpu,stat,command | grep '[M]udPilot.bin' || true
+          done
+          for p in $(pgrep -f 'MudPilot.bin -m mudpilot'); do
+            sample "$p" 5 -file "../out/sample-$p.txt" >/dev/null 2>&1 || true
+            ps -o pid,command -p "$p" >> ../out/samples-index.txt
+          done
+          cp -R MudPilot/data ../out/data 2>/dev/null || true
+          find ../out/data -name '*.db' -delete 2>/dev/null || true
+          pkill -f '[M]udPilot.bin' || true
+          tail -60 ../out/data/logs/*.log 2>/dev/null || true
+          tail -40 ../out/data/control/launcher.log 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: diagnose-${{ inputs.arch }}
+          path: out
+          retention-days: 7
