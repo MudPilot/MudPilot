@@ -193,7 +193,7 @@ jobs:
           osa() { osascript -e "$1" 2>&1 | tee -a ../out/osa.log || true; }
           osa "tell application \"System Events\" to get name of every menu bar item of menu bar 1 of (first process whose unix id is $app)"
           osa "tell application \"System Events\" to tell (first process whose unix id is $app) to set frontmost to true"
-          osa "tell application \"System Events\" to tell (first process whose unix id is $app) to click menu item \"New character…\" of menu \"Character\" of menu bar item \"Character\" of menu bar 1"
+          osa "tell application \"System Events\" to tell (first process whose unix id is $app) to click menu item \"New characterâ€¦\" of menu \"Character\" of menu bar item \"Character\" of menu bar 1"
           sleep 5; shot b-box
           osa "tell application \"System Events\" to keystroke \"Testchar\""
           sleep 2; shot c-typed
