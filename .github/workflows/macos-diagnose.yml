@@ -56,3 +56,62 @@ jobs:
           name: diagnose-${{ inputs.arch }}
           path: out
           retention-days: 7
+
+  # From source: counts every Python callback Tk runs (and what's happening in the event loop) while it's stuck
+  from-source:
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run with Tk callback counting
+        run: |
+          python -m pip install -q -r requirements.txt
+          mkdir -p out diag
+          cat > diag/tkcount.py <<'PY'
+          import collections, os, sys, threading, time, tkinter, traceback
+          counts = collections.Counter(); recent = collections.deque(maxlen=40); t0 = time.time()
+          orig = tkinter.CallWrapper.__call__
+          def call(self, *args):
+              f = self.func
+              name = getattr(f, "__qualname__", repr(f))
+              code = getattr(f, "__code__", None)
+              if code is not None:
+                  name += f" ({os.path.basename(code.co_filename)}:{code.co_firstlineno})"
+              counts[name] += 1
+              recent.append(f"{time.time() - t0:7.2f} {name}")
+              return orig(self, *args)
+          tkinter.CallWrapper.__call__ = call
+          def dump():
+              while True:
+                  time.sleep(10)
+                  with open("out/tkcount.txt", "a") as fh:
+                      fh.write(f"=== {time.time() - t0:.0f}s
+")
+                      for k, v in counts.most_common(25):
+                          fh.write(f"{v:8d} {k}
+")
+                      fh.write("--- last calls
+" + "
+".join(recent) + "
+")
+                      fh.write("--- main thread now
+" + "".join(traceback.format_stack(sys._current_frames()[threading.main_thread().ident])) + "
+")
+          threading.Thread(target=dump, daemon=True).start()
+          PY
+          (PYTHONPATH=diag python -c "import tkcount, runpy, sys; sys.argv=['mudpilot']; runpy.run_module('mudpilot', run_name='__main__')" > out/run.log 2>&1 &)
+          sleep 75
+          screencapture -x out/shot.png || true
+          pkill -f "runpy.run_module" || true
+          tail -80 out/tkcount.txt || true
+          tail -20 out/run.log || true
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: from-source-${{ inputs.arch }}
+          path: out
+          retention-days: 7
