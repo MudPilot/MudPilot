@@ -246,7 +246,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [bare, custom]
+        mode: [bare, custom, menu, menudefer]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -259,6 +259,17 @@ jobs:
           brew install -q cliclick >/dev/null 2>&1 || true
           mkdir -p out
           (python -I .github/mac_dialog_probe.py ${{ matrix.mode }} > out/run.log 2>&1 &)
+          if case "${{ matrix.mode }}" in menu*) true;; *) false;; esac; then
+            for i in $(seq 1 20); do grep -q "menu ready" out/probe.log 2>/dev/null && break; sleep 1; done; sleep 2
+            pid=$(pgrep -f mac_dialog_probe | head -1)
+            # a real click on the menu bar, then on the item (as a hand does)
+            osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to set frontmost to true" || true
+            pos=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to get position of menu bar item \"Character\" of menu bar 1" | tr -d ' ')
+            echo "Character menu at $pos"; mx=${pos%,*}; my=${pos#*,}
+            cliclick c:$((mx+20)),$((my+10)) w:700 || true
+            ipos=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to get position of menu item 1 of menu 1 of menu bar item \"Character\" of menu bar 1" | tr -d ' ')
+            echo "item at $ipos"; cliclick c:$((${ipos%,*}+30)),$((${ipos#*,}+8)) || true
+          fi
           for i in $(seq 1 30); do [ -s out/coords.txt ] && break; sleep 1; done
           read ex ey ox oy < out/coords.txt || true; echo "entry $ex,$ey OK $ox,$oy"
           screencapture -x out/a-box.png || true

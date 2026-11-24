@@ -1,6 +1,7 @@
 # Mac diagnosis (macos-diagnose.yml, "dialog" job): does a name box take real typing and an OK click on a Mac?
 #   python -I .github/mac_dialog_probe.py bare    -> tkinter's simpledialog.askstring (what MudPilot uses)
 #   python -I .github/mac_dialog_probe.py custom  -> a plain Toplevel box (no Mac "moveableModal" style)
+#   ... menu / menudefer -> the bare box from a menu-bar item, run straight away / once the menu has closed
 # Writes out/coords.txt (entry x y, OK x y in screen points) once the box is up; the workflow clicks and types there.
 import os, sys, time
 import tkinter as tk
@@ -91,7 +92,7 @@ tk.Entry(root, width=40).pack(pady=20)
 
 def go():
     log(f"opening the {mode} box (tk {root.tk.call('info', 'patchlevel')})")
-    if mode == "bare":
+    if mode != "custom":
         root.after(1500, find_bare)
         v = simpledialog.askstring("New profile", "Character name:", parent=root)
     else:
@@ -100,5 +101,15 @@ def go():
     root.after(1000, root.destroy)
 
 
-root.after(2000, go)
+if mode.startswith("menu"):
+    # opened from the Mac menu bar, as Character -> New character... is ("menudefer": run once the menu has closed)
+    bar = tk.Menu(root)
+    cm = tk.Menu(bar, tearoff=0)
+    cm.add_command(label="New character…",
+                   command=(lambda: root.after(1, go)) if mode == "menudefer" else go)
+    bar.add_cascade(label="Character", menu=cm)
+    root.config(menu=bar)
+    log("menu ready")
+else:
+    root.after(2000, go)
 root.mainloop()
