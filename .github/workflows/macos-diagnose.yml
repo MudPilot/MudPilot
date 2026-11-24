@@ -168,47 +168,68 @@ jobs:
           path: out
           retention-days: 7
 
-  # The compiled download: Character -> New character..., typed and OK'd through the real Mac menu bar and keyboard
+  # The compiled download (and the same source), driven with the real Mac menu bar, mouse and keyboard:
+  # does typing reach the main window? the New character box? after clicking into it? does OK work?
   compiled-newchar:
     if: ${{ inputs.compiled_newchar }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [compiled, source]
     steps:
-      - name: Download
+      - uses: actions/checkout@v5
+        if: matrix.build == 'source'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        if: matrix.build == 'source'
+        with:
+          python-version: "3.12"
+      - name: Get it
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release }}
           ARCH: ${{ inputs.arch }}
         run: |
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "*-mac-$ARCH.zip"
-          mkdir t && cd t && unzip -q ../*.zip
-      - name: Open, then New character...
+          if [ "${{ matrix.build }}" = compiled ]; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "*-mac-$ARCH.zip"
+            mkdir t && cd t && unzip -q ../*.zip
+          else
+            python -m pip install -q -r requirements.txt
+            if [ "${{ inputs.patch }}" = "true" ]; then python .github/mac_update_fix.py .; fi
+          fi
+      - name: Open, type, New character...
         run: |
           mkdir -p out
-          cd t
-          ./MudPilot/MudPilot > ../out/launch.log 2>&1 &
+          if [ "${{ matrix.build }}" = compiled ]; then
+            (cd t && ./MudPilot/MudPilot > ../out/launch.log 2>&1 &); pat='MudPilot.bin -m mudpilot$'; DATA=t/MudPilot/data
+          else
+            (python -m mudpilot > out/launch.log 2>&1 &); pat='python -m mudpilot$'; DATA=data
+          fi
           sleep 40
-          screencapture -x ../out/a-open.png || true
-          app=$(pgrep -f 'MudPilot.bin -m mudpilot$' | head -1); echo "app pid $app"
-          shot() { screencapture -x "../out/$1.png" || true; sample "$app" 2 -file "../out/sample-$1.txt" >/dev/null 2>&1 || true; }
-          osa() { osascript -e "$1" 2>&1 | tee -a ../out/osa.log || true; }
-          osa "tell application \"System Events\" to get name of every menu bar item of menu bar 1 of (first process whose unix id is $app)"
-          osa "tell application \"System Events\" to tell (first process whose unix id is $app) to set frontmost to true"
-          osa "tell application \"System Events\" to tell (first process whose unix id is $app) to click menu item \"New character…\" of menu \"Character\" of menu bar item \"Character\" of menu bar 1"
-          sleep 5; shot b-box
-          osa "tell application \"System Events\" to keystroke \"Testchar\""
-          sleep 2; shot c-typed
-          osa "tell application \"System Events\" to key code 36"
-          sleep 10; shot d-after-ok
-          sleep 20; shot e-30s-later
+          app=$(pgrep -f "$pat" | head -1); echo "app pid $app"
+          shot() { screencapture -x "out/$1.png" || true; sample "$app" 2 -file "out/sample-$1.txt" >/dev/null 2>&1 || true; }
+          se() { osascript -e "tell application \"System Events\" to $1" 2>&1 | tee -a out/osa.log || true; }
+          se "tell (first process whose unix id is $app) to set frontmost to true"
+          shot a-open
+          se "click at {152, 210}"; sleep 3; shot b-board-answered        # Paradigm, on the board question
+          se "click at {336, 645}"; sleep 1; se "keystroke \"hello\""; sleep 2; shot c-typed-main   # the command line
+          se "tell (first process whose unix id is $app) to click menu item \"New character…\" of menu \"Character\" of menu bar item \"Character\" of menu bar 1"
+          sleep 4; shot d-box
+          se "keystroke \"Typed\""; sleep 2; shot e-typed-box
+          se "click at {502, 391}"; sleep 1; se "keystroke \"Clicked\""; sleep 2; shot f-clicked-typed
+          se "click at {433, 430}"; sleep 6; shot g-ok
           ps -o pid,%cpu,stat,command -p "$app" || echo "app process gone"
-          for f in ../out/sample-*.txt; do echo "== $f"; grep -E 'mudpilot\$|Tk_UpdateObjCmd|Tk_TkwaitObjCmd|Tkapp_MainLoop' "$f" | sed 's/^ *//' | sort | uniq -c | sort -rn | head -12; done
-          cp -R MudPilot/data ../out/data 2>/dev/null || true
-          find ../out/data -name '*.db' -delete 2>/dev/null || true
-          pkill -f '[M]udPilot.bin' || true
-          tail -40 ../out/data/logs/*.log 2>/dev/null || true
+          for f in out/sample-*.txt; do echo "== $f"; grep -oE '(new_profile|Tk_TkwaitObjCmd|Tkapp_MainLoop|Tk_UpdateObjCmd|switch_profile)' "$f" | sort | uniq -c; done
+          cp -R "$DATA" out/data 2>/dev/null || true
+          find out/data -name '*.db' -delete 2>/dev/null || true
+          pkill -f "$pat" || true; pkill -f '[M]udPilot.bin' || true
+          echo "--- log"; tail -25 out/data/logs/*.log 2>/dev/null || true
+          ls out/data/profiles 2>/dev/null || true
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: compiled-newchar-${{ inputs.arch }}
+          name: compiled-newchar-${{ matrix.build }}-${{ inputs.arch }}
           path: out
           retention-days: 7
