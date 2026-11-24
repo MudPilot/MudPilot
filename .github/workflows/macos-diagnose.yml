@@ -205,7 +205,7 @@ jobs:
           if [ "${{ matrix.build }}" = compiled ]; then
             (cd t && ./MudPilot/MudPilot > ../out/launch.log 2>&1 &); pat='MudPilot.bin -m mudpilot$'; DATA=t/MudPilot/data
           else
-            (python -m mudpilot > out/launch.log 2>&1 &); pat='python -m mudpilot$'; DATA=data
+            (python -m mudpilot > out/launch.log 2>&1 &); pat='[Pp]ython.* -m mudpilot$'; DATA=data
           fi
           sleep 40
           app=$(pgrep -f "$pat" | head -1); echo "app pid $app"
