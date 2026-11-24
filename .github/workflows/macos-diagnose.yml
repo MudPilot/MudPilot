@@ -13,6 +13,10 @@ on:
         description: "arm64 or x64"
         default: arm64
         required: true
+      patch:
+        description: "From-source run: try the start-up hang fix (.github/mac_update_fix.py) first"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -70,6 +74,7 @@ jobs:
       - name: Run with Tk callback counting
         run: |
           python -m pip install -q -r requirements.txt
+          if [ "${{ inputs.patch }}" = "true" ]; then python .github/mac_update_fix.py .; fi
           mkdir -p out diag
           cat > diag/tkcount.py <<'PY'
           import collections, os, sys, threading, time, tkinter, traceback
