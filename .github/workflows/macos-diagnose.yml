@@ -33,6 +33,10 @@ on:
         description: "Only: MudPilot's New character box with real clicks/typing, pieces switched off one at a time"
         type: boolean
         default: false
+      window:
+        description: "Compiled new-character test: window state first (normal, fullscreen = green button, zoom = option-green)"
+        default: normal
+        required: false
       runner:
         description: "Runner image to use instead (e.g. macos-26); empty = macos-15 / macos-15-intel by arch"
         default: ""
@@ -229,6 +233,15 @@ jobs:
           cliclick c:152,210 || true; sleep 3; shot b-board-answered        # Paradigm, on the board question
           cliclick c:336,645 w:500 t:hello || true; sleep 2; shot c-typed-main   # the command line
           sw_vers || true
+          case "${{ inputs.window }}" in
+            fullscreen) se "tell (first process whose unix id is $app) to set value of attribute \"AXFullScreen\" of window 1 to true"; sleep 5;;
+            zoom) se "tell (first process whose unix id is $app) to click (first button of window 1 whose subrole is \"AXFullScreenButton\")" ; sleep 1
+                  se "tell (first process whose unix id is $app) to set value of attribute \"AXFullScreen\" of window 1 to false"; sleep 4
+                  se "tell (first process whose unix id is $app) to set {position, size} of window 1 to {{0, 25}, {1900, 1150}}"; sleep 2;;
+          esac
+          se "tell (first process whose unix id is $app) to get {value of attribute \"AXFullScreen\", position, size} of window 1"
+          shot c2-window
+          cliclick m:200,1 w:1500 || true   # bring a hidden (full-screen) menu bar down
           # a real click on the menu bar, then on New character... (an AX "click menu item" leaves the box deaf)
           pos=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $app) to get position of menu bar item \"Character\" of menu bar 1" | tr -d ' ')
           cliclick c:$((${pos%,*}+20)),$((${pos#*,}+10)) w:700 || true
