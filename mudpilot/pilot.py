@@ -429,6 +429,25 @@ class Pilot:
         return "(teleport)" not in (ex.etype or "").lower() and not req.get("voyage") and not getattr(ex, "scatter", None)
         # (a random drop — the Padded Cells — lands in any of its look-alikes: not trusted without 'pro', m149 N2)
 
+    def _same_way_out(self, cands):
+        """The room to go by when look-alike candidates all have the same exits to the same rooms (and there are
+        some), so it doesn't matter which one we're in; else None."""
+        if len(cands) < 2 or len(cands) > 40:
+            return None
+        sig = None
+        for c in cands:
+            r = self.w.room(c)
+            if r is None or not r.exits:
+                return None
+            s = frozenset((str(e.dir).lower(), tuple(e.to) if e.to else None) for e in r.exits.values())
+            if any(to in cands for _d, to in s):
+                return None                          # (exits between the look-alikes: a maze — which one matters)
+            if sig is None:
+                sig = (r.name, s)
+            elif sig != (r.name, s):
+                return None
+        return min(tuple(c) for c in cands)
+
     def _where(self, now):
         """The room we're in for sure, or None (asked the board / lost — this tick is taken)."""
         a, st, w = self.a, self.st, self.w
@@ -453,6 +472,15 @@ class Pilot:
         last = self.last
         if here is None:
             cands = list(st.candidates or [])
+            same = self._same_way_out(cands)
+            if same:
+                # 0.8.226 (Dan): look-alikes that all lead the same way (the Dark Pit: every pit's 'climb out' lands in
+                # 13/211) — which one it is doesn't matter, so no 'pro' (26 of them in 10 min of digging)
+                st.candidates = [same]
+                self.trusted = same
+                if a.ready("same_way_out", 300):
+                    a.log(f"One of {len(cands)} look-alike rooms that all lead the same way — no need to ask which")
+                return same
             if cands and ask_ok:
                 self._ask(f"not sure which of {len(cands)} rooms this is")
                 return None

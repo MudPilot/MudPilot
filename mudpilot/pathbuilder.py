@@ -285,7 +285,7 @@ class PathBuilder(ttk.Frame):
             return None                      # typing a name / room: keys are just text
         from .macros import key_name
         win = sys.platform.startswith("win")
-        name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x20000) if win else True)
+        name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x40000) if win else True)
         if name and name.startswith("Keypad "):
             k = name.split(" ", 1)[1]
             if k in KEY_DIRS:

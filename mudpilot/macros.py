@@ -51,7 +51,9 @@ FREE_KEYS = [k for k in ALL_KEYS if k not in RESERVED_KEYS]
 
 
 def key_name(keysym: str, keycode: int, state: int, windows: bool, extended: bool = True) -> str | None:
-    """Turn a Tk key event into a macro key name, or None if it isn't a macro key."""
+    """Turn a Tk key event into a macro key name, or None if it isn't a macro key. On Windows `extended` is
+    state & 0x40000, Tk's flag for the arrow / Home / End block (0x20000 is Alt: checking that made the Up arrow
+    Keypad 8 — Dan, 0.8.226: "the up arrow just makes me run north" instead of bringing back the last command)."""
     shift, ctrl = bool(state & 0x1), bool(state & 0x4)
     if keysym in FKEYS:
         return ("Ctrl+Shift+" if ctrl and shift else "Ctrl+" if ctrl else "Shift+" if shift else "") + keysym

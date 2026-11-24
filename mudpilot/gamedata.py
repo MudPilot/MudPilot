@@ -902,7 +902,7 @@ class GameData(ttk.Frame):
             cap.configure(text="…press it now")
             def got(e):
                 win = sys.platform.startswith("win")
-                nm = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x20000) if win else True)
+                nm = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x40000) if win else True)
                 if e.keysym in ("Control_L", "Control_R", "Shift_L", "Shift_R", "Alt_L", "Alt_R"):
                     return "break"
                 d.unbind("<KeyPress>")

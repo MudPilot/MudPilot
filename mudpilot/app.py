@@ -4326,7 +4326,12 @@ class App:
         counts: the lines in between haven't been scrolled to yet, but the screen is following."""
         if getattr(self, "_see_pending", False):
             return True
-        return self.term.yview()[1] >= 0.9995 or not getattr(self, "_scrolled_back", False)
+        at_end = self.term.yview()[1] >= 0.9995
+        if time.time() - getattr(self, "_user_scroll_at", 0) < 2:
+            # 0.8.226 (Dan: "his backscroll was fighting me"): you just scrolled, and Tk tells us only when it's idle —
+            # a line before that found _scrolled_back still False, queued a follow and snapped you back down
+            return at_end
+        return at_end or not getattr(self, "_scrolled_back", False)
 
     def _autoscroll(self, follow=True, new=0):
         if follow:
@@ -4354,6 +4359,7 @@ class App:
 
     def _see_cancel(self):
         self._see_pending = False
+        self._user_scroll_at = time.time()
 
     def _on_term_scroll(self, first, last):
         self._term_sb.set(first, last)
@@ -4373,7 +4379,7 @@ class App:
         if lab is None:
             lab = self._scroll_lab = tk.Label(self.term, cursor="hand2", font=("Segoe UI", 9, "bold"),
                                               background="#b8860b", foreground="#0b0d10", padx=10, pady=3)
-            lab.bind("<Button-1>", lambda e: self.scroll_bottom())
+            lab.bind("<Button-1>", lambda e: self._bar_click())
         n = getattr(self, "_backlog", 0)
         lab.configure(text=f"▼ Back-scroll — {n} new line{'s' if n != 1 else ''} below · click, Ctrl+End or Enter to jump down"
                       if n else "▼ Back-scroll — the bot keeps running · click or Ctrl+End to jump down")
@@ -4386,9 +4392,18 @@ class App:
 
     def scroll_bottom(self, e=None):
         self._see_pending = False
+        self._user_scroll_at = 0
         self.term.see("end")
         self._scroll_done()
         return "break"
+
+    def _bar_click(self):
+        """The back-scroll bar: down to the newest line, and the command line gets the keys (0.8.226, Dan)."""
+        self.scroll_bottom()
+        try:
+            self.entry.focus_set()
+        except Exception:
+            pass
 
     def scroll_page(self, d):
         self._see_cancel()
@@ -4693,7 +4708,7 @@ class App:
             return None
         if isinstance(w, tk.Text) and str(w.cget("state")) == "normal":
             return None
-        if e.state & 0x4 or e.state & 0x20000 and e.keysym in ("Up", "Down", "Left", "Right"):
+        if e.state & 0x4 or e.state & 0x40000 and e.keysym in ("Up", "Down", "Left", "Right"):   # (0x40000: Tk's "extended key" on Windows — the arrow keys, not the number pad)
             return None             # Ctrl+C to copy from the MUD screen etc.
         if e.keysym in ("Return", "KP_Enter"):
             self.entry.focus_set()
@@ -4720,7 +4735,7 @@ class App:
         import sys
         from .macros import key_name, split
         win = sys.platform.startswith("win")
-        name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x20000) if win else True)
+        name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x40000) if win else True)
         if not name:
             return None
         try:

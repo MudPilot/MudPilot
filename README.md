@@ -129,6 +129,14 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.226
+
+- **A boss you stop for is a wall for routing.** A Go to takes any way round it, however long, unless the boss's room is where you're going. Miserable PVE's Go to the Great Pyramid went through the Crazed Inquisitor's Command Room (and a pool dive, a portal and an imp teleport) because the Khazarad → Dusty Village way was 160 rooms longer than the old "about as short" rule allowed. The every-key fallback (doors to pick) now goes round bosses too. A boss you'd simply fight keeps the old rule.
+- **Look-alike rooms that all lead the same way don't need 'pro'.** Every Dark Pit's 'climb out' lands in 13/211, so after a dig drops you in, MudPilot doesn't ask which pit it is (26 'pro's in 10 minutes of digging). Look-alikes with different ways out (mazes, the Great Pyramid) are still checked.
+- **The MUD screen's back-scroll stops fighting you.** Scrolling up while fight text poured in could snap you straight back down. Tk reports a scroll only when it's idle, and a line arriving before that queued a jump to the bottom.
+- **Clicking the yellow back-scroll bar** jumps to the bottom and puts you in the command line.
+- **Up arrow brings back your last command** (Down goes forward again), as in MegaMUD. Handy for retrying a spell in a boss fight: Up, Enter. On Windows, the arrow keys were being read as the number pad, so Up walked you north. The number pad still walks, with NumLock on or off.
+
 ## 0.8.225.1
 
 - **Treasure digging kept stopping:** a dig that drops you into the Dark Pit counted as being knocked off the path. At 2–3 laps a minute that reached 7 in 5 minutes, and the loop stopped. The climb back out after a dig no longer counts.

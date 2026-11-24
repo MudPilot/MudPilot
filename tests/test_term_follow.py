@@ -73,6 +73,25 @@ a.scroll_page(-1)
 root.update()
 check("page-up cancels a queued follow", a.term.yview()[1] < 0.9995 and getattr(a, "_scrolled_back", False))
 
+# 0.8.226 (Dan: "his backscroll was fighting me"): wheel up while the fight text pours in. Tk tells us about the scroll
+# only when it's idle; a line arriving before that found _scrolled_back still False, queued a follow, and the follow
+# snapped you back down — every wheel undone on a busy screen
+a.scroll_bottom(); root.update()
+for k in range(3):
+    a._see_cancel()                                   # (what the wheel binding does)
+    a.term.yview_scroll(-3, "units")                  # (the Text's own wheel scroll)
+    a.add_line([(f"fight {k}", St)])                  # a line before Tk reports the scroll
+    root.update()
+check("wheel up with lines arriving: it stays up", a.term.yview()[1] < 0.9995 and getattr(a, "_scrolled_back", False))
+
+# clicking the back-scroll bar: down to the bottom, and the command line gets the keys
+a.entry = tk.Entry(root); a.entry.pack()
+a.term.focus_set(); root.update()
+a._scroll_lab.event_generate("<Button-1>")
+root.update()
+check("the bar jumps down", a.term.yview()[1] >= 0.9995 and not a._scrolled_back)
+check("…and puts you in the command line", root.focus_get() is a.entry)
+
 root.destroy()
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

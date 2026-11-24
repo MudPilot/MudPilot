@@ -309,7 +309,7 @@ class MapView(tk.Canvas):
         d = arrows.get(e.keysym)
         if not d:
             win = sys.platform.startswith("win")
-            name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x20000) if win else True)
+            name = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x40000) if win else True)
             if name and name.startswith("Keypad "):
                 d = {"8": "N", "2": "S", "4": "W", "6": "E", "7": "NW", "9": "NE", "1": "SW", "3": "SE",
                      "0": "U", ".": "D"}.get(name.split(" ", 1)[1])

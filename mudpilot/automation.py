@@ -1206,7 +1206,11 @@ class Automation:
     def keyed_route(self, here, target, ask=None):
         """'As if you had every key' — and a door nobody can open is asked about first (0.8.201, _ask_doors)."""
         r = self._keyed_route(here, target, ask)
-        return self._ask_doors(here, target, r, ask, lambda: self._keyed_route(here, target, None))
+        r = self._ask_doors(here, target, r, ask, lambda: self._keyed_route(here, target, None))
+        if r and not isinstance(target, (set, frozenset)):
+            # 0.8.226: round the bosses too — this fallback walked Miserable PVE into the Crazed Inquisitor's room
+            r = self._boss_free_route(here, target, r, have=set(self.plan_items(target)))
+        return r
 
     def _needed_area(self, here, target, lvl, have, avoid, thru):
         """No way that keeps out of every avoided area: the one area the way really needs (m1315 R2: Webbed Hollow
@@ -1661,10 +1665,15 @@ class Automation:
             prev = ex.to
         return out
 
-    def _boss_free_route(self, here, target, route):
+    def _boss_free_route(self, here, target, route, have=None):
         """0.8.183 (Dan, 2026-11-12): a Go to to Tidepool went through Captain Flintlock's room and stopped there
         ('stop before a boss room'). When there's another way about as short (up to a quarter longer), take it;
-        the stop only happens when there isn't."""
+        the stop only happens when there isn't.
+        0.8.226 (Dan: "wall it off"): a boss you'd stop before is a wall — any way round, however long (Miserable PVE's
+        Go to the Great Pyramid went through the Crazed Inquisitor's Command Room, the Khazarad way being 160 rooms
+        longer). Only when there's no way round at all does the walk go up to it and stop, as before. A boss you'd
+        just fight (easy, unticked) keeps the 'about as short' rule. have: the items to plan with (the every-key
+        fallback's)."""
         if not route or not (self.cfg.stop_before_boss or getattr(self.cfg, "boss_route_round", True)):
             return route
         goals = target if isinstance(target, (set, frozenset)) else {tuple(target)}
@@ -1673,7 +1682,7 @@ class Automation:
             return route
         w = self.s.world
         lvl = self.route_level()
-        have = self.held_items() or set()
+        have = set(have) if have is not None else (self.held_items() or set())
         avoid = set(self.avoid_set()) | self._boss_area(bossy, goals) | self._dry_keep(target)
         # never round a boss by water you'd need a raft for when this way is dry (Dan, 2026-11-16: Stonecaps →
         # Rodolfo is dry over the Dale Road; round Shadow Lord took the River Lorian and sent Miserable 202 rooms
@@ -1683,7 +1692,8 @@ class Automation:
         wet0 = self._needy_rooms(here, route, carry) if self.cfg.check_needed_items else set()
         for _ in range(10):
             alt = w.route(here, target, level=lvl, have=have, avoid=frozenset(avoid))
-            if alt is None or len(alt) > len(route) + max(20, len(route) // 4):
+            wall = any(self._boss_stops(k) for k in bossy)       # (a stop-for boss: any length goes)
+            if alt is None or (not wall and len(alt) > len(route) + max(20, len(route) // 4)):
                 # no way round that's about as short: stop before it, as before (the boss may be what you're
                 # there for: the king crab's claw opens Seher'Sahham's shortcut — 226 rooms, not 324)
                 return route

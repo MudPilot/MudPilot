@@ -56,5 +56,16 @@ check(f"8 dig drops in a row: walked back out each time ({len(back)})", len(back
 check(f"…and not one counted as drift / stopped ({bad[:2]})", not bad and b.walking)
 bad, back = climbs(10 * 60)
 check(f"knocked off with no dig just before still counts ({bad[:1]})", bad)
+# 0.8.226 (Dan: skip the pro): every pit leads the same way ('climb out' → 13/211) — no asking which pit
+pits = [(13, n) for n in range(315, 324)]
+check(f"the nine Dark Pits all lead the same way ({b.pilot._same_way_out(pits)})", b.pilot._same_way_out(pits) in pits)
+g.candidates = list(pits)
+b.pilot.asked = None
+sent.clear()
+got = b.pilot._where(time.time())
+check(f"…so a drop is placed without 'pro' ({got}, sent {sent})", got in pits and "pro" not in sent)
+pyr = [k for k, r in w.rooms.items() if k[0] == 12 and r.name == w.room((12, 1800)).name][:20] if w.room((12, 1800)) else []
+check(f"look-alikes with different ways out still aren't guessed ({len(pyr)} rooms)",
+      len(pyr) < 2 or b.pilot._same_way_out(pyr) is None)
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

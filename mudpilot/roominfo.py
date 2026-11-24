@@ -288,7 +288,7 @@ class RecordBar:
         import sys
         from .macros import key_name
         win = sys.platform.startswith("win")
-        nm = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x20000) if win else True) or ""
+        nm = key_name(e.keysym, e.keycode, e.state, win, extended=bool(e.state & 0x40000) if win else True) or ""
         k = nm[len("Keypad "):] if nm.startswith("Keypad ") else (e.keysym if e.keysym in self.PEN_KEYS else None)
         d = self.PEN_KEYS.get(k or "")
         if not d:
