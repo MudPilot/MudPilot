@@ -289,14 +289,16 @@ jobs:
           path: out
           retention-days: 7
 
-  # MudPilot's own New character box (from source), real mouse/keyboard; which piece of MudPilot stops it taking input?
+  # MudPilot's own New character box (from source), real mouse/keyboard; what in the player's steps stops it?
+  # (MP_STEPS: board = answer the first-run board question first, main = type in the command line first,
+  #  menu = open it from the menu bar rather than a timer)
   appbox:
     if: ${{ inputs.appbox }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     strategy:
       fail-fast: false
       matrix:
-        off: ["", "uilog", "keys", "loop", "uilog,keys,loop,hangwatch"]
+        steps: ["board", "menu", "board,menu", "board,main,menu"]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -304,22 +306,37 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: New character box (off ${{ matrix.off }})
+      - name: New character box (${{ matrix.steps }})
         env:
-          MP_OFF: ${{ matrix.off }}
+          MP_STEPS: ${{ matrix.steps }}
         run: |
           brew install -q cliclick >/dev/null 2>&1 || true
           python -m pip install -q -r requirements.txt
           mkdir -p out
           (python -I .github/mac_app_probe.py > out/run.log 2>&1 &)
-          for i in $(seq 1 60); do [ -s out/coords.txt ] && break; sleep 1; done
+          for i in $(seq 1 60); do [ -s out/ready.txt ] && break; sleep 1; done
+          read cx cy < out/ready.txt || true
+          pid=$(pgrep -f mac_app_probe | head -1)
+          osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to set frontmost to true" || true
+          case ",$MP_STEPS," in *,board,*)
+            for i in $(seq 1 20); do [ -s out/board.txt ] && break; sleep 1; done
+            read bx by < out/board.txt || true; cliclick c:$bx,$by || true; sleep 4; screencapture -x out/a-board.png || true;;
+          esac
+          case ",$MP_STEPS," in *,main,*) cliclick c:$cx,$cy w:500 t:hello || true; sleep 2;; esac
+          case ",$MP_STEPS," in *,menu,*)
+            pos=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to get position of menu bar item \"Character\" of menu bar 1" | tr -d ' ')
+            cliclick c:$((${pos%,*}+20)),$((${pos#*,}+10)) w:700 || true
+            ipos=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $pid) to get position of menu item 1 of menu 1 of menu bar item \"Character\" of menu bar 1" | tr -d ' ')
+            echo "menu $pos item $ipos"; cliclick c:$((${ipos%,*}+30)),$((${ipos#*,}+8)) || true;;
+          esac
+          for i in $(seq 1 40); do [ -s out/coords.txt ] && break; sleep 1; done
           read ex ey ox oy < out/coords.txt || true; echo "entry $ex,$ey OK $ox,$oy"
-          screencapture -x out/a-box.png || true
-          cliclick c:$ex,$ey w:500 t:Hello || true; sleep 2; screencapture -x out/b-typed.png || true
-          cliclick c:$ox,$oy || true; sleep 4; screencapture -x out/c-ok.png || true
+          screencapture -x out/b-box.png || true
+          cliclick c:$ex,$ey w:500 t:Hello || true; sleep 2; screencapture -x out/c-typed.png || true
+          cliclick c:$ox,$oy || true; sleep 4; screencapture -x out/d-ok.png || true
           pkill -f mac_app_probe || true
           cat out/probe.log; tail -15 out/run.log
-          grep -q "profile now Hello" out/probe.log || { echo "::error::the box didn't take the name (off: $MP_OFF)"; exit 1; }
+          grep -q "profile now Hello" out/probe.log || { echo "::error::the box didn't take the name (steps: $MP_STEPS)"; exit 1; }
       - uses: actions/upload-artifact@v5
         if: always()
         with:
