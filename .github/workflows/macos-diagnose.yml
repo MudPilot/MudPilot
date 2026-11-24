@@ -77,6 +77,10 @@ jobs:
           orig = tkinter.CallWrapper.__call__
           def call(self, *args):
               f = self.func
+              if getattr(f, "__name__", "") == "callit" and f.__closure__:
+                  inner = [c.cell_contents for c in f.__closure__ if callable(c.cell_contents)]
+                  if inner:
+                      f = inner[0]
               name = getattr(f, "__qualname__", repr(f))
               code = getattr(f, "__code__", None)
               if code is not None:
@@ -88,19 +92,14 @@ jobs:
           def dump():
               while True:
                   time.sleep(10)
+                  NL = chr(10)
                   with open("out/tkcount.txt", "a") as fh:
-                      fh.write(f"=== {time.time() - t0:.0f}s
-")
+                      fh.write(f"=== {time.time() - t0:.0f}s" + NL)
                       for k, v in counts.most_common(25):
-                          fh.write(f"{v:8d} {k}
-")
-                      fh.write("--- last calls
-" + "
-".join(recent) + "
-")
-                      fh.write("--- main thread now
-" + "".join(traceback.format_stack(sys._current_frames()[threading.main_thread().ident])) + "
-")
+                          fh.write(f"{v:8d} {k}" + NL)
+                      fh.write("--- last calls" + NL + NL.join(recent) + NL)
+                      fr = sys._current_frames()[threading.main_thread().ident]
+                      fh.write("--- main thread now" + NL + "".join(traceback.format_stack(fr)) + NL)
           threading.Thread(target=dump, daemon=True).start()
           PY
           (PYTHONPATH=diag python -c "import tkcount, runpy, sys; sys.argv=['mudpilot']; runpy.run_module('mudpilot', run_name='__main__')" > out/run.log 2>&1 &)
