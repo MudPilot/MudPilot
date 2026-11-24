@@ -260,7 +260,7 @@ jobs:
           mkdir -p out
           (python -I .github/mac_dialog_probe.py ${{ matrix.mode }} > out/run.log 2>&1 &)
           for i in $(seq 1 30); do [ -s out/coords.txt ] && break; sleep 1; done
-          read ex ey ox oy < out/coords.txt; echo "entry $ex,$ey OK $ox,$oy"
+          read ex ey ox oy < out/coords.txt || true; echo "entry $ex,$ey OK $ox,$oy"
           screencapture -x out/a-box.png || true
           cliclick c:$ex,$ey w:500 t:Hello || true; sleep 2; screencapture -x out/b-typed.png || true
           cliclick c:$ox,$oy || true; sleep 4; screencapture -x out/c-ok.png || true
