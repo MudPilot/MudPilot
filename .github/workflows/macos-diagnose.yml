@@ -25,13 +25,17 @@ on:
         description: "Only: open the release's Mac zip and click Character -> New character... (as a player)"
         type: boolean
         default: false
+      dialog:
+        description: "Only: tkinter's name box vs a plain one, real clicks and typing"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   diagnose:
-    if: ${{ !inputs.newchar && !inputs.compiled_newchar }}
+    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - name: Download
@@ -72,7 +76,7 @@ jobs:
 
   # From source: counts every Python callback Tk runs (and what's happening in the event loop) while it's stuck
   from-source:
-    if: ${{ !inputs.newchar && !inputs.compiled_newchar }}
+    if: ${{ !inputs.newchar && !inputs.compiled_newchar && !inputs.dialog }}
     runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
     steps:
       - uses: actions/checkout@v5
@@ -232,5 +236,40 @@ jobs:
         if: always()
         with:
           name: compiled-newchar-${{ matrix.build }}-${{ inputs.arch }}
+          path: out
+          retention-days: 7
+
+  # tkinter's simpledialog name box vs a plain Toplevel one: real mouse/keyboard (cliclick), does the name get through?
+  dialog:
+    if: ${{ inputs.dialog }}
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [bare, custom]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Box (${{ matrix.mode }})
+        run: |
+          brew install -q cliclick >/dev/null 2>&1 || true
+          mkdir -p out
+          (python -I .github/mac_dialog_probe.py ${{ matrix.mode }} > out/run.log 2>&1 &)
+          for i in $(seq 1 30); do [ -s out/coords.txt ] && break; sleep 1; done
+          read ex ey ox oy < out/coords.txt; echo "entry $ex,$ey OK $ox,$oy"
+          screencapture -x out/a-box.png || true
+          cliclick c:$ex,$ey w:500 t:Hello || true; sleep 2; screencapture -x out/b-typed.png || true
+          cliclick c:$ox,$oy || true; sleep 4; screencapture -x out/c-ok.png || true
+          pkill -f mac_dialog_probe || true
+          cat out/probe.log; cat out/run.log
+          grep -q "RESULT 'Hello'" out/probe.log || { echo "::error::the ${{ matrix.mode }} box didn't take the name"; exit 1; }
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: dialog-${{ matrix.mode }}-${{ inputs.arch }}
           path: out
           retention-days: 7
