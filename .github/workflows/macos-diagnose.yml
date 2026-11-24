@@ -119,3 +119,41 @@ jobs:
           name: from-source-${{ inputs.arch }}
           path: out
           retention-days: 7
+
+  # Making a new character, as a player does it (0.8.226.1 on a Mac: beachball when making a new character)
+  newchar:
+    if: ${{ inputs.newchar }}
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-15' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [app, picker]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: New character (${{ matrix.mode }})
+        run: |
+          python -m pip install -q -r requirements.txt
+          mkdir -p out
+          (python -I .github/mac_newchar_probe.py ${{ matrix.mode }} > out/run.log 2>&1 &)
+          for s in 10 25 32 40 60; do
+            sleep $(( s - ${prev:-0} )); prev=$s
+            screencapture -x "out/shot-${s}s.png" || true
+          done
+          pid=$(pgrep -f mac_newchar_probe | head -1)
+          [ -n "$pid" ] && sample "$pid" 3 -file out/sample.txt >/dev/null 2>&1 || true
+          pkill -f mac_newchar_probe || true
+          echo "--- probe.log"; cat out/probe.log || true
+          echo "--- last stack"; tail -30 out/stacks.txt || true
+          echo "--- run.log"; tail -30 out/run.log || true
+          grep -q DONE out/probe.log || { echo "::error::making a new character didn't finish"; exit 1; }
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: newchar-${{ matrix.mode }}-${{ inputs.arch }}
+          path: out
+          retention-days: 7
