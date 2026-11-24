@@ -3,6 +3,7 @@ behind it — then the window opens fully drawn (maximised the first time)."""
 from __future__ import annotations
 
 import os
+import sys
 import tkinter as tk
 
 from . import config
@@ -66,7 +67,12 @@ class Splash:
                 self.c.coords(self.fill, x0 + 1, y + 1, x0 + 1 + (x1 - x0 - 2) * pct / 100, y + 11)
             if msg:
                 self.c.itemconfigure(self.text, text=msg)
-            self.win.update()
+            if sys.platform == "darwin":
+                # (macOS: a full update() never returns once MudPilot's timers are running — the splash froze
+                # on 'Opening the gates…'; redrawing is enough there)
+                self.win.update_idletasks()
+            else:
+                self.win.update()
         except tk.TclError:
             pass
 

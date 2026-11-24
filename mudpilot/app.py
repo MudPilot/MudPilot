@@ -587,8 +587,16 @@ class App:
             pw.bind("<ButtonRelease-1>", dragged, add="+")
         # the window keeps sizing itself for a few seconds after start (maximise, the splash closing): apply the
         # split again as it does, until you move it — at 0.3 s alone the conversations box opened squeezed
-        rside.bind("<Configure>", lambda e: (time.time() - self._layout_t0 < 10 and not self._layout_dragged
-                                             and self.root.after_idle(self._apply_layout)), add="+")
+        # (only when its size really changed: on a Mac applying the split fires <Configure> again, ~230,000
+        # times in the first 10 s)
+        self._layout_size = None
+
+        def resized(e):
+            if time.time() - self._layout_t0 >= 10 or self._layout_dragged or (e.width, e.height) == self._layout_size:
+                return
+            self._layout_size = (e.width, e.height)
+            self.root.after_idle(self._apply_layout)
+        rside.bind("<Configure>", resized, add="+")
         self.root.after(300, self._apply_layout)
         self.root.after(1200, self._reopen_windows)
         from .windows import remember_window
@@ -5880,7 +5888,8 @@ class App:
             text = f"(diagnostics failed: {ex})\n{traceback.format_exc()}"
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
-        self.root.update()
+        if sys.platform != "darwin":
+            self.root.update()                # (macOS: a full update() can hang; the clipboard keeps it anyway)
         self.add_log("Diagnostics copied to the clipboard — paste them into the chat")
         messagebox.showinfo("Copy diagnostics", "Copied to the clipboard.\n\nPaste it (Ctrl+V) into the chat with "
                             "Claude.\nPasswords are never included.", parent=self.root)
