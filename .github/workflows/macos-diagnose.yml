@@ -77,7 +77,7 @@ jobs:
           orig = tkinter.CallWrapper.__call__
           def call(self, *args):
               f = self.func
-              if getattr(f, "__name__", "") == "callit" and f.__closure__:
+              if getattr(f, "__qualname__", "").endswith("callit") and f.__closure__:
                   inner = [c.cell_contents for c in f.__closure__ if callable(c.cell_contents)]
                   if inner:
                       f = inner[0]
