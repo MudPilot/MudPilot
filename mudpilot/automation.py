@@ -1683,7 +1683,12 @@ class Automation:
         w = self.s.world
         lvl = self.route_level()
         have = set(have) if have is not None else (self.held_items() or set())
-        avoid = set(self.avoid_set()) | self._boss_area(bossy, goals) | self._dry_keep(target)
+        area = self._boss_area(bossy, goals)
+        if tuple(here) in area:
+            # 0.8.227.3 (Dan: PvP Miserable, restarted outside Shadow Lord at 14/8389 Farnholme): the whole of
+            # Farnholme walled off, there was no way out of it but through him. Already inside: only his room's a wall
+            area = set(bossy)
+        avoid = set(self.avoid_set()) | area | self._dry_keep(target)
         # never round a boss by water you'd need a raft for when this way is dry (Dan, 2026-11-16: Stonecaps →
         # Rodolfo is dry over the Dale Road; round Shadow Lord took the River Lorian and sent Miserable 202 rooms
         # for a wooden skiff). Same carry rule as the dry way: a party is planned as carrying none.
@@ -1719,7 +1724,8 @@ class Automation:
                              if extra > 0 else "no longer") + f", {len(alt)} steps)")
                 return alt
             bossy |= more
-            avoid |= self._boss_area(more, goals)
+            a2 = self._boss_area(more, goals)
+            avoid |= set(more) if tuple(here) in a2 else a2
         return route
 
     def _boss_area(self, rooms, goals) -> set:

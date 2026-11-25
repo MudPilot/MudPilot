@@ -129,6 +129,10 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.4
+
+- **Stopped right outside a boss's room, a Go to can back out the other way.** Going round a boss walls off his whole area (all of Farnholme for Shadow Lord), so standing inside it, at his door, there was no way out but through him. Inside the area now, only his own room is the wall.
+
 ## 0.8.227.3
 
 - **Going round a boss counts the party's rafts.** A Go to that passes a boss you stop for goes round him, but the way round can take more water. MudPilot planned a party as carrying no rafts, so with Tagesh Plateau's exits out of use, it threw the way round Shadow Lord out and walked up to his room and stopped. Now rafts you hold, and that every follower is known to carry (party sync or '@have'), count.

@@ -70,5 +70,13 @@ s.partysync.info = lambda: {"Revolution": {"kit": []}}
 w.forget_routes()
 r = b.plan_route((14, 6804), (14, 1782))
 print("  (follower without a raft:", len(r or []), "rooms, through his room:", bool(r and any(ex.to == (14, 8390) for ex in r)), ")")
+# restarted standing outside his room (14/8389, Farnholme): the round-the-boss rule walled off all of Farnholme,
+# start included — no way out but through him. Inside the area, only his room is the wall
+w.failed_edges.clear()
+s.partysync.info = lambda: {"Revolution": {"kit": [raft]}}
+w.forget_routes()
+r = b.plan_route((14, 8389), (14, 1782))
+check(f"from outside Shadow Lord's door, everyone with a raft: back out the other way ({len(r or [])} rooms)",
+      r and not any(ex.to == (14, 8390) for ex in r))
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)
