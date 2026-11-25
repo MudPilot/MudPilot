@@ -7280,9 +7280,10 @@ class FontDialog(tk.Toplevel):
         f = ttk.Frame(self, padding=16)
         f.pack()
         fams = sorted(set(tkfont.families(self)), key=str.lower)
-        mono = [x for x in ("Consolas", "Cascadia Mono", "Cascadia Code", "Lucida Console", "Courier New",
-                            "Terminal", "Fixedsys", "DejaVu Sans Mono", "Liberation Mono", "Ubuntu Mono",
-                            "Noto Sans Mono") if x in fams]
+        mono = [x for x in (("Menlo", "SF Mono", "Monaco", "Andale Mono", "PT Mono") if sys.platform == "darwin"
+                            else ()) + ("Consolas", "Cascadia Mono", "Cascadia Code", "Lucida Console", "Courier New",
+                                        "Terminal", "Fixedsys", "DejaVu Sans Mono", "Liberation Mono", "Ubuntu Mono",
+                                        "Noto Sans Mono") if x in fams]
         values = mono + ["──────────"] + [x for x in fams if x not in mono and not x.startswith("@")]
         self.vars = {}
         for r, (lbl, fk, sk) in enumerate((("MUD window", "term_font", "term_font_size"),
@@ -7456,6 +7457,12 @@ def main():
         if os.path.exists(conf) and os.path.exists("/etc/fonts/fonts.conf"):
             os.environ["FONTCONFIG_FILE"] = conf
     root = tk.Tk()
+    if sys.platform == "darwin":
+        try:   # Consolas & co. aren't on a Mac: draw them in Menlo so the game's columns line up (macfonts.py)
+            from . import macfonts
+            macfonts.install(root)
+        except Exception:
+            pass
     if os.name == "nt":
         try:
             root.iconbitmap(default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "mudpilot.ico"))

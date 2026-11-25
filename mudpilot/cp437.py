@@ -20,7 +20,8 @@ SAMPLE = "─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬░�
 
 # IBM PC fonts first when installed (the real DOS look), then common monospace fonts that carry the glyphs
 FALLBACKS = ("Mx437 IBM VGA 8x16", "Px437 IBM VGA 8x16", "Perfect DOS VGA 437", "Perfect DOS VGA 437 Win",
-             "Consolas", "Lucida Console", "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", "Courier New")
+             "Consolas", "Lucida Console", "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", "Menlo", "Monaco",
+             "Courier New")
 
 
 def decode(data: bytes) -> str:

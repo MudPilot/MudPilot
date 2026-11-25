@@ -3,6 +3,7 @@ calculator. Each panel works inside a tab or in its own window."""
 from __future__ import annotations
 
 import re
+import sys
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -245,7 +246,8 @@ class ChatPane(ttk.Frame):
         m.add_command(label="Bigger", command=lambda: self._font_size(+1))
         m.add_command(label="Smaller", command=lambda: self._font_size(-1))
         m.add_separator()
-        for fam in ("Consolas", "Arial", "Segoe UI", "Courier New", "Lucida Console"):
+        for fam in (("Menlo", "Monaco", "Helvetica", "Courier New") if sys.platform == "darwin"
+                    else ("Consolas", "Arial", "Segoe UI", "Courier New", "Lucida Console")):
             m.add_command(label=fam, command=lambda f=fam: self._font_family(f))
 
     def _color_menu(self, m):
