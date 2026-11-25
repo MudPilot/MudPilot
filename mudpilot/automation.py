@@ -5671,6 +5671,11 @@ class Automation:
             if st.ma:
                 st.max_ma = st.ma                    # mana's full: our max was stale (gear changed it)
             self._sick_med_until = time.time() + 10
+        if "too heavy to move" in low:
+            self._heavy_move_at = time.time()
+            if not getattr(self, "_heavy_since", 0) or time.time() - self._heavy_move_at_prev > 30:
+                self._heavy_since = time.time()
+            self._heavy_move_at_prev = time.time()
         if "too heavy to move" in low and self.ready("heavy_move_i", 20):
             self.log("Too heavy to move — reading the pack")
             self.send("i")                           # (makeroom / drop rules work from a fresh pack)
@@ -7880,6 +7885,7 @@ class Automation:
     SPADE_RE = re.compile(r"\b(?:spades?|shovels?)\b", re.I)
 
     DIG_DROP_SECS = 180        # off the path this soon after a dig: the dig dropped you (the Dark Pit) — not drift
+    HEAVY_STOP_SECS = 180      # "too heavy to move" this long (no weakness wearing off): stop and say so
 
     def _dig_out_of_spades(self) -> bool:
         """Dan, 2026-10-28: 'dig treasure' → "Nothing happens." means you're out of spades. Read the inventory;
@@ -8933,6 +8939,26 @@ class Automation:
             self.stop(f"Stopped: '{move}' got no answer — not sending it again (it costs money or moves the party)")
             self.s.on_alert(f"Stopped at '{move}' — check the screen")
             return True
+        if last == key and here and time.time() - getattr(self, "_heavy_move_at", 0) < 6:
+            # 0.8.227.2 (Dan: PvP Miserable stopped): "You are too heavy to move!" is your pack, not the exit — never
+            # counted against it (it went round NE, SW, E, then stopped on NW, the only way). A weakness wears off;
+            # still too heavy after HEAVY_STOP_SECS: stop and say why. Try again every few seconds, not 6 a second
+            now = time.time()
+            if now - getattr(self, "_heavy_since", now) > self.HEAVY_STOP_SECS:
+                self._resends = (None, 0)
+                enc = getattr(self.st, "enc", None)
+                at = f" ({enc[0]}/{enc[1]} encumbrance)" if enc and len(enc) > 1 else ""
+                why = f"Stopped: too heavy to move{at} for {self.HEAVY_STOP_SECS // 60} minutes — drop something"
+                self.stop(why)
+                self.s.on_alert(why)
+                return True
+            if self.ready("heavy_wait_say", 20):
+                self.log("Too heavy to move — waiting (a weakness wears off), then trying again")
+            self.status = "Too heavy to move — waiting"
+            self._resends = (key, n)
+            if now - getattr(self, "_step_sent_at", 0) < 4:
+                return True
+            return False
         if last == key and here and time.time() - getattr(self.st, "confused_fail_at", 0) < 6:
             # confused / afraid: the game ate the move — that's not the exit failing, so don't count it
             if time.time() - getattr(self, "_confused_said", 0) > 20:

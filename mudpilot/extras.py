@@ -618,16 +618,25 @@ class Extras:
             # pMUD: the effects list is the truth — a blind / held / stunned / confused we picked up from a
             # message but that isn't listed any more is over (we missed the 'wears off' line)
             text = " ".join(sb.get("lines") or [])
+            mr = getattr(self.b.s, "msgrules", None)
+            # 0.8.227.2 (Dan: PvP Miserable stopped walking): 'st' lists a weakness as "You feel weak and
+            # powerless! (33s)", never the word 'held' — that cleared the hold, and the walk counted each "too
+            # heavy to move" against the exit, went round it and stopped. A rule whose own start line is listed stays.
+            listed = {cond for cond, c in (getattr(mr, "conditions", {}) or {}).items()
+                      if c.get("start") and c["start"] in text.lower()}
             for name in ("blind", "held", "stunned", "confused"):
+                if name in listed:
+                    continue
                 since = self.ailments.get(name)
                 if since and sb["t"] - since > 3 and not STATUS_RES[name][0].search(text) and name not in text:
                     self.ailments.pop(name, None)
                     self.care.report_mine(name, False)
                     self.b.log(f"Not {name} any more (your stat effects don't list it)")
-            mr = getattr(self.b.s, "msgrules", None)
             for cond in list(getattr(mr, "conditions", {}) or {}):
                 c = mr.conditions[cond]
                 word = cond.replace("_", " ")
+                if cond in listed:
+                    continue
                 if sb["t"] - c.get("since", sb["t"]) > 3 and cond in ("blind", "held", "confused") and word not in text:
                     mr._clear(cond, "not in your stat effects")
         if not sb["seen"] and not self._bless_active:

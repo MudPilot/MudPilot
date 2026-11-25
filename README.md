@@ -129,6 +129,10 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.2
+
+- **A weakness no longer stops your walk.** Near full encumbrance, "You feel weak and powerless!" leaves you too heavy to move until it wears off. MudPilot should wait that out, but its stat check missed the weakness (the 'st' line says "weak and powerless", not "held"), so it counted every "too heavy to move" against the exit, went round it, and stopped. Now it waits, trying again every few seconds. Still too heavy after 3 minutes, it stops and says to drop something.
+
 ## 0.8.227.1
 
 - **Macs: the MUD window lines up.** MudPilot asked for Consolas, a Windows font. A Mac doesn't have it, so the text came out in the system font, whose letters are different widths, and boxes and columns (character creation, `who`) went crooked. On a Mac, Consolas and the other Windows monospace fonts are now drawn in Menlo, which every Mac has. A font you've picked yourself and do have is used as it is, and your settings aren't changed. Font… and the Conversations font menu list the Mac's own monospace fonts first. Windows and Linux work as before.

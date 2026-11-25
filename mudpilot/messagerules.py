@@ -233,6 +233,7 @@ class MessageRules:
                     s.log(f"Messages: {cond.replace('_', ' ')} ({name})" + (
                         " — walking on (it only stops if a move fails, e.g. too heavy to move)" if tentative else ""))
                 self.conditions[cond] = {"since": now, "rule": name, "end_rx": end_rx, "tentative": tentative,
+                                         "start": (r.get("start") or "").strip().lower().rstrip("!. "),
                                          "rule_own": None if r.get("bundled") else True}
                 ail = AILMENT.get(cond)
                 if ail and not tentative:
