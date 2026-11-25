@@ -132,6 +132,7 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 ## 0.8.227.2
 
 - **A weakness no longer stops your walk.** Near full encumbrance, "You feel weak and powerless!" leaves you too heavy to move until it wears off. MudPilot should wait that out, but its stat check missed the weakness (the 'st' line says "weak and powerless", not "held"), so it counted every "too heavy to move" against the exit, went round it, and stopped. Now it waits, trying again every few seconds. Still too heavy after 3 minutes, it stops and says to drop something.
+- **No room for a raft: the dry way, however long.** Before a Go to sets off over water (or anything else each walker has to carry, like a climbing harness), MudPilot checks there's room for it: your pack, plus the copper, silver and gold it can drop. If a party member couldn't take one in the last half hour, that counts too. Without room, it takes any dry way there is, not just one up to about double the length. Only when there's no dry way at all does it still go for the raft.
 
 ## 0.8.227.1
 

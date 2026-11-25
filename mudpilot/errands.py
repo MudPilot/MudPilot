@@ -858,6 +858,7 @@ class Errands:
                 # "Evolution cannot accept your offer.": too heavy — they drop coins (@makeroom), then again
                 n = cur.get("regives", 0)
                 if n >= GIVE_TRIES:
+                    bot.note_no_room(cur["num"])         # (0.8.227.2: plan dry ways for a while)
                     return self._give_up(f"Not walking '{title}': {cur['for']} can't carry the {name} — too heavy "
                                          f"even after dropping coins. Lighten their pack, then Rego")
                 if not cur.get("room_asked"):

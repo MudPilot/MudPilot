@@ -1790,6 +1790,11 @@ class Automation:
         # "even if it's longer it's usually shorter on this side than going to get a raft" (Dan, 2026-11-17): the
         # dry way is fine up to about double, or up to the trip by way of the raft shop, whichever is longer
         cap = max(len(route) + max(60, len(route)), self._raft_trip(here, target, route, carry))
+        # 0.8.227.2 (Dan: PvP Miserable's Go to Kingsport wanted a raft while the party hauled cudgels — nobody could
+        # carry one, so it stopped): no room for the raft — any dry way, however long; none: the raft after all
+        short = self._no_room_on(here, route, carry)
+        if short:
+            cap = 10 ** 6
         for _ in range(8):
             alt = w.route(here, target, level=lvl, have=have, avoid=frozenset(avoid))
             if alt is None or len(alt) > cap:
@@ -1797,13 +1802,58 @@ class Automation:
             more = self._needy_rooms(here, alt, carry)
             if not more:
                 if self.ready("dry_route_note", 30):
-                    self.log(f"Going round the water ({len(alt)} rooms instead of {len(route)}) — no raft needed")
+                    self.log(f"Going round the water ({len(alt)} rooms instead of {len(route)}) — no raft needed"
+                             + (f" ({short})" if short else ""))
                 # the later passes (round a boss, the cheapest way, fewer jumps) re-plan: they keep off this water
                 # too — the boss pass swapped the 204-room dry way back for the 129-room river (2026-11-16)
                 self._dry_avoid = (self._tkey(target), frozenset(avoid - set(self.avoid_set())))
                 return alt
             avoid |= more
         return route
+
+    NO_ROOM_SECS = 1800
+
+    def note_no_room(self, item):
+        """A raft (or the like) nobody could make room for — the party member it was given to, or us: plan dry ways
+        for NO_ROOM_SECS (0.8.227.2)."""
+        w = self.s.world
+        num = item if isinstance(item, int) else (w.item_names.get(str(item or "").strip().lower()) or {}).get("num")
+        if num:
+            self._no_room = {**(getattr(self, "_no_room", None) or {}), num: time.time()}
+
+    def _no_room_on(self, here, route, carry) -> str:
+        """Why one of the items this route needs carried can't be: a member or we couldn't make room for it lately,
+        or our own pack can't take it even after dropping copper/silver/gold ('' = it can)."""
+        w, st, now = self.s.world, self.st, time.time()
+        nr = {n: t for n, t in (getattr(self, "_no_room", None) or {}).items() if now - t < self.NO_ROOM_SECS}
+        self._no_room = nr
+        sets, prev = [], here
+        try:
+            for ex in route:
+                sets += [s for s in w.carry_needs([(prev, ex)]) if not (s & carry)]
+                prev = ex.to
+        except Exception:
+            return ""
+        held = self.held_items() or set()
+        for s in {frozenset(x) for x in sets}:
+            if s & held:
+                continue
+            try:
+                pick = self.carry_pick(s)               # the one MudPilot would get (a log raft over a canoe)
+            except Exception:
+                pick = min(s)
+            name = w.item_name(pick)
+            if pick in nr:
+                return f"no room for a {name} in the party lately"
+            enc = st.enc
+            wt = int((w.items.get(pick) or {}).get("encum") or 0)
+            if enc and wt:
+                from .remote import RemoteControl as _RC
+                coins = sum(int(st.coins.get(k, 0) or 0) for k in _RC.ROOM_COINS)
+                room = max(0, enc[1] - enc[0]) + coins // _RC.COINS_PER_ENC
+                if wt > room:
+                    return f"a {name} weighs {wt}, you've room for {room}"
+        return ""
 
     @staticmethod
     def _tkey(target):

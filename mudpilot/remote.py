@@ -1116,6 +1116,10 @@ class RemoteControl:
                 break
         if not kind:
             self._room = None
+            try:
+                self.s.bot.note_no_room(r["item"])     # (0.8.227.2: plan dry ways for a while)
+            except Exception:
+                pass
             self.s.log(f"Can't make room for the {r['item']} ({free} free, needs {r['need']}): no copper, silver or "
                        "gold left to drop" + (" (not the coins its price needs)" if spare is not None else ""))
             return
