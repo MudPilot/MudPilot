@@ -52,5 +52,23 @@ check(f"a party member had no room for one lately: the dry way ({len(r or [])} r
 b._no_room = {k: time.time() - b.NO_ROOM_SECS - 1 for k in b._no_room}
 r = b._dry_route(src, dst, wet_r)
 check("…half an hour later: the short way again", r and wet(src, r))
+# the boss wall, with the party's rafts: from Stonemill Village, Docks (14/6804) with Tagesh Plateau's exits failed,
+# the way to Kingsport runs through Shadow Lord's room (14/8390); round him takes more river. Everyone carrying a
+# raft (Revolution's kit), that's the way — it went up to his room and stopped, planning the party as raftless.
+del b._raft_trip
+w.failed_edges.clear()
+for d in ("NE", "SW", "E"):
+    w.fail_edge((14, 5290), d)
+g.enc = (4000, 4939, "Heavy", 81)
+raft = w.item_names["log raft"]["num"]
+b.held_items = lambda: {raft}
+s.partysync.info = lambda: {"Revolution": {"kit": [raft]}}
+w.forget_routes()
+r = b.plan_route((14, 6804), (14, 1782))
+check(f"everyone has a raft: round Shadow Lord ({len(r or [])} rooms)", r and not any(ex.to == (14, 8390) for ex in r))
+s.partysync.info = lambda: {"Revolution": {"kit": []}}
+w.forget_routes()
+r = b.plan_route((14, 6804), (14, 1782))
+print("  (follower without a raft:", len(r or []), "rooms, through his room:", bool(r and any(ex.to == (14, 8390) for ex in r)), ")")
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

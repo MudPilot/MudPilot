@@ -1689,6 +1689,14 @@ class Automation:
         # for a wooden skiff). Same carry rule as the dry way: a party is planned as carrying none.
         me = (self.cfg.my_name or "").lower()
         carry = set() if any(n.lower() != me for n in (self.st.party or {})) else have
+        if carry is not have:
+            # 0.8.227.2 (Dan: PvP Miserable stopped before Shadow Lord on a Go to Kingsport): the way round him took
+            # more river, and with everyone carrying none it was thrown out — the walk went up to his room and
+            # stopped. Rafts you hold that every follower is known to carry too (party sync kit, '@have') count
+            try:
+                carry = set(have) & set(self.party_carry())
+            except Exception:
+                carry = set()
         wet0 = self._needy_rooms(here, route, carry) if self.cfg.check_needed_items else set()
         for _ in range(10):
             alt = w.route(here, target, level=lvl, have=have, avoid=frozenset(avoid))
