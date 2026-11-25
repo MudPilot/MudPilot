@@ -292,6 +292,8 @@ class GameState:
         self.ac = self.dr = 0
         self.intellect = self.willpower = self.health = self.charm = 0
         self.magic_res = self.perception = self.stealth = self.spellcasting = 0
+        self.stealth_read = False           # 'st' showed a Stealth figure (it can be below 0: a raft, -17)
+        self.sneak_fails, self.sneak_fail_at = 0, 0.0   # "You don't think you're sneaking" in a row
         self.picklocks = 0
         self.alignment = ""                 # your own, from your line in 'who' (exit gates)
         self.traps = 0
@@ -600,8 +602,12 @@ class GameState:
         low = text.lower()
         if "attempting to sneak" in low and "don't think you're sneaking" not in low:
             self.sneaking = True
+            self.sneak_fails = 0
         elif SNEAK_FAIL_RE.search(text) or "*combat engaged*" in low:
             self.sneaking = False
+            if "don't think you're sneaking" in low:
+                self.sneak_fails += 1
+                self.sneak_fail_at = time.time()
         if SNEAK_BANNER_RE.match(text):
             self._sneak_banner = True
         mf = FOLLOW_RE.search(text)
@@ -639,11 +645,13 @@ class GameState:
         for k, rx in (("intellect", r"\bIntellect:\s+(\d+)"), ("willpower", r"\bWillpower:\s+(\d+)"),
                       ("health", r"\bHealth:\s+(\d+)"), ("charm", r"\bCharm:\s+(\d+)"),
                       ("magic_res", r"\bMagicRes:\s+(\d+)"), ("perception", r"\bPerception:\s+(\d+)"),
-                      ("stealth", r"\bStealth:\s+(\d+)"), ("spellcasting", r"\bSpellcasting:\s+(\d+)"),
+                      ("stealth", r"\bStealth:\s+(-?\d+)"), ("spellcasting", r"\bSpellcasting:\s+(\d+)"),
                       ("picklocks", r"\bPicklocks:\s+(\d+)"), ("traps", r"\bTraps:\s+(\d+)")):
             m = re.search(rx, text)
             if m:
                 setattr(self, k, int(m.group(1)))
+                if k == "stealth":
+                    self.stealth_read = True
         # the game's spell list ("spells" command)
         if SPELLS_HEAD_RE.match(text):
             self._spell_reading, self._spell_buf = True, []

@@ -129,6 +129,11 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.5
+
+- **No more sneaking on the spot with a raft.** A raft is a huge stealth penalty: Miserable's Stealth went to -17, every 'sn' answered "You don't think you're sneaking.", and with "don't move unless sneaking" on, the walk sent 'sn' every 2 seconds and never moved. MudPilot read Stealth only as a positive number, so it never saw the -17. Now it doesn't try to sneak when your Stealth is 0 or below, or when you carry a raft and 'st' hasn't been read yet. After 3 failed sneaks in a row, it walks on without sneaking for 5 minutes.
+- **Followers tell the leader what they carry right after logging in.** Party sync's kit (the raft, the golden idol) only goes out once the follower has read its pack, and a follower that just logged in might not read it for an hour. The leader then planned the party as raftless, and Miserable waited at Shadow Lord's door. It reads its pack now.
+
 ## 0.8.227.4
 
 - **Stopped right outside a boss's room, a Go to can back out the other way.** Going round a boss walls off his whole area (all of Farnholme for Shadow Lord), so standing inside it, at his door, there was no way out but through him. Inside the area now, only his own room is the wall.

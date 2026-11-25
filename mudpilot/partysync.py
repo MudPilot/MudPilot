@@ -360,6 +360,14 @@ class PartySync:
             self._told_lvl = st.level
         if now - getattr(self, "_me_checked", 0) > 60:
             self._me_checked = now
+            try:
+                # 0.8.227.5 (Dan: PvP Miserable waited at Shadow Lord's door — the way round took the river, and
+                # Revolution's raft wasn't known): 'kit=' only goes out once our pack's been read, and a follower that
+                # just logged in might not read it for an hour. Read it, so the leader knows what we carry
+                if s.bot.held_items() is None and not st.in_combat and s.bot.ready("mpsync_kit_i", 300):
+                    s.send("i", from_bot=True)
+            except Exception:
+                pass
             info = self.my_info()
             told = getattr(self, "_told_me", {})
             skills = lambda i: re.findall(r"\b(?:str|pick|traps|rma)=\d+|\bkit=[\d.]*", i or "")

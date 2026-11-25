@@ -1826,6 +1826,33 @@ class Automation:
         return route
 
     NO_ROOM_SECS = 1800
+    SNEAK_FAIL_TRIES, SNEAK_REST_SECS = 3, 300
+    BOAT_RE = re.compile(r"\b(?:raft|skiff|canoe|punt)s?\b", re.I)
+
+    def _sneak_hopeless(self) -> bool:
+        """0.8.227.5 (Dan: "rafts are huge -stealth and pretty much make it impossible to sneak unless you're a sneaking
+        class and have done the perfect stealth quest... MudPilot just attempts to sneak over and over and never moves
+        anywhere"): Stealth at 0 or below on 'st' (Miserable with a log raft: -17), or 'sn' failed SNEAK_FAIL_TRIES
+        times in a row — walk on without sneaking ("don't move unless sneaking" too); try again SNEAK_REST_SECS on."""
+        st = self.st
+        if getattr(st, "stealth_read", False):
+            if (st.stealth or 0) <= 0:
+                if self.ready("sneak_hopeless_say", 600):
+                    self.log(f"Not sneaking: your Stealth is {st.stealth} (a raft or heavy gear) — it can't work; "
+                             "walking on")
+                return True
+        elif self.BOAT_RE.search(st.carrying or ""):
+            # 'st' not read yet, a raft in the pack: the same (a raft's a huge stealth penalty)
+            if self.ready("sneak_hopeless_say", 600):
+                self.log("Not sneaking: you're carrying a raft — it can't work with one; walking on")
+            return True
+        if (getattr(st, "sneak_fails", 0) >= self.SNEAK_FAIL_TRIES
+                and time.time() - getattr(st, "sneak_fail_at", 0) < self.SNEAK_REST_SECS):
+            if self.ready("sneak_fails_say", self.SNEAK_REST_SECS):
+                self.log(f"Sneaking failed {st.sneak_fails} times in a row — walking on without it for "
+                         f"{self.SNEAK_REST_SECS // 60} minutes")
+            return True
+        return False
 
     def note_no_room(self, item):
         """A raft (or the like) nobody could make room for — the party member it was given to, or us: plan dry ways
@@ -7803,6 +7830,8 @@ class Automation:
                                         or not st.party)
         if sneak_now and ((st.view and st.view.monsters) or getattr(self, "_no_sneak_room", None) == st.room):
             sneak_now = False      # the game won't let you sneak with monsters in the room (even peaceful ones)
+        if sneak_now and self._sneak_hopeless():
+            sneak_now = False
         if sneak_now and not st.sneaking and cfg.sneak_cmd and not st.in_combat:
             if cfg.dont_move_unless_sneaking:
                 if self.ready("sneak_wait", 2):
