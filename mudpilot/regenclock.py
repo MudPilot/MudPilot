@@ -20,6 +20,10 @@ class RegenClock:
         self.hp_gain: list = []       # % of max per tick
         self.ma_gain: list = []
         self.period = None
+        # (0.8.227, PVE logs: meditating, HP ticks every ~5-10 s but mana only every ~15-30 s — one shared period
+        #  made the top-off wait 7 s for a mana tick that never came) — each stat's own tick gap too
+        self.last_stat = {"hp": 0.0, "ma": 0.0}
+        self.stat_gaps = {"hp": [], "ma": []}
         self._sat_at = 0.0
 
     @property
@@ -40,6 +44,7 @@ class RegenClock:
         if not self._sat_at:
             self._sat_at = now
             self.last_tick = 0.0
+            self.last_stat = {"hp": 0.0, "ma": 0.0}
             return False
         if prev is None or healed_recently:
             return False
@@ -54,12 +59,22 @@ class RegenClock:
                 self.gaps = (self.gaps + [gap])[-20:]
                 if len(self.gaps) >= 2:
                     self.period = statistics.median(self.gaps)
+        for k, dv in (("hp", dhp), ("ma", dma)):
+            if dv > 0:
+                if self.last_stat[k] and 2.0 <= now - self.last_stat[k] <= 90:
+                    self.stat_gaps[k] = (self.stat_gaps[k] + [now - self.last_stat[k]])[-20:]
+                self.last_stat[k] = now
         if dhp > 0 and max_hp:
             self.hp_gain = (self.hp_gain + [100.0 * dhp / max_hp])[-20:]
         if dma > 0 and max_ma:
             self.ma_gain = (self.ma_gain + [100.0 * dma / max_ma])[-20:]
         self.last_tick = now
         return True
+
+    def stat_period(self, which):
+        """Median gap between ticks that raised this stat ('hp' / 'ma'), or None until seen twice."""
+        g = self.stat_gaps.get(which) or []
+        return statistics.median(g) if len(g) >= 2 else None
 
     def just_ticked(self, now=None, within=2.0) -> bool:
         return bool(self.last_tick) and (now or time.time()) - self.last_tick <= within

@@ -43,6 +43,7 @@ class MapView(tk.Canvas):
         self.tip = None
         self.highlight = None                           # Edit loop: these rooms show as the path
         self.badges = None                              # Edit loop: callable → {room: 'NA'…} drawn on the room
+        self.visit_arrows = []                          # Edit loop: [(from, to)] — the picked pass in and out
 
     def _wheel(self, e):
         self._zoom(1 if e.delta > 0 else -1)
@@ -167,6 +168,16 @@ class MapView(tk.Canvas):
                 (x1, y1), (x2, y2) = pos[a_], pos[b_]
                 self.create_line(cx + x1 * C, cy + y1 * C, cx + x2 * C, cy + y2 * C, fill="#ff4d4d", width=3,
                                  arrow="last", arrowshape=(8, 9, 3))
+        # Edit loop (0.8.227): the pass picked through a room — the way in and the way out, in cyan
+        for a_, b_ in (self.visit_arrows or []):
+            if a_ in pos and b_ in pos:
+                (x1, y1), (x2, y2) = pos[a_], pos[b_]
+                X1, Y1, X2, Y2 = cx + x1 * C, cy + y1 * C, cx + x2 * C, cy + y2 * C
+                ln = max(1.0, ((X2 - X1) ** 2 + (Y2 - Y1) ** 2) ** 0.5)
+                cut = B / 2 + 2                  # stop at the room's edge so the head isn't under the box
+                ux, uy = (X2 - X1) / ln, (Y2 - Y1) / ln
+                self.create_line(X1 + ux * cut, Y1 + uy * cut, X2 - ux * cut, Y2 - uy * cut, fill="#36d6ff",
+                                 width=3, arrow="last", arrowshape=(10, 12, 4))
         # rooms
         cands = set(st.candidates)
         for room, (x, y) in pos.items():
@@ -260,17 +271,43 @@ class MapView(tk.Canvas):
         self.delete("tip")
         if room:
             r = self.s.world.room(room)
-            txt = f"{room[0]}/{room[1]} {r.name}"
+            # 0.8.227 (Dan: the hover label ran off the map's edge, half cut off): one fact per line, wrapped, kept
+            # inside the map, on a dark box; regen rooms show their respawn time too
+            lines = [f"{room[0]}/{room[1]} {r.name}"]
             if r.lair:
-                txt += "  · regen room"
                 mobs = self._lair_mobs(r.lair)
-                if mobs:
-                    txt += f": {mobs}"
+                lines.append("Regen room" + (f": {mobs}" if mobs else ""))
+                resp = self._respawn_text(room)
+                if resp:
+                    lines.append(resp)
             traps = [f"{d.lower()} {e.etype.strip('()')}" for d, e in r.exits.items() if e.kind == "trap"]
             if traps:
-                txt += "  · TRAP " + ", ".join(traps)
-            self.create_text(e.x + 12, e.y + 12, anchor="nw", text=txt, fill="#ffffff",
-                             font=("Segoe UI", 9), tags="tip")
+                lines.append("TRAP " + ", ".join(traps))
+            W, H = self.winfo_width(), self.winfo_height()
+            wrap = max(160, min(340, W - 24))
+            t = self.create_text(0, 0, anchor="nw", text="\n".join(lines), fill="#ffffff", width=wrap,
+                                 font=("Segoe UI", 9), tags="tip")
+            x0, y0, x1, y1 = self.bbox(t)
+            tw, th = x1 - x0, y1 - y0
+            x = e.x + 12 if e.x + 12 + tw <= W - 6 else max(6, e.x - 12 - tw)
+            y = e.y + 12 if e.y + 12 + th <= H - 22 else max(6, e.y - 12 - th)
+            self.coords(t, x, y)
+            bg = self.create_rectangle(x - 4, y - 2, x + tw + 4, y + th + 2, fill="#0b0f17", outline="#3a4458",
+                                       tags="tip")
+            self.tag_raise(t, bg)
+
+    def _respawn_text(self, room) -> str:
+        """'Respawns in ~4 min 30 s (timed by you)': the Camp lairs figure (learned, else MME's delay, else a guess)."""
+        try:
+            secs, how = self.s.lair_camp.respawn(room)
+        except Exception:
+            return ""
+        if not secs:
+            return ""
+        m, s = divmod(int(round(secs)), 60)
+        t = (f"{m} min" if m else "") + (f" {s} s" if s else "")
+        src = {"learned": "timed by you", "mme": "MME", "default": "a guess, not timed yet"}.get(how, how)
+        return f"Respawns in ~{t.strip()} ({src})"
 
     def _lair_mobs(self, lair: str) -> str:
         """'(Max 2): 802,832,...' -> 'max 2: orc, goblin…'"""

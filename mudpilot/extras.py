@@ -952,6 +952,12 @@ class Extras:
             # the biggest threat first (Dan, 2026-10-30: in the prismatic dragon's arena MudPilot killed every
             # serpent before the dragon) — by MME exp, the room's order between equals
             mobs = sorted(mobs, key=lambda m: -float((m[1] or {}).get("exp") or 0))
+        order = getattr(cfg, "monster_order", None) or {}
+        if order and len(mobs) > 1:
+            # your per-monster order (Game Data → Monsters): non-hostile bosses like the storm giant king last, so
+            # the small ones are cleared first (Dan, 2026-11-24)
+            rank = {"first": 0, "last": 2}
+            mobs = sorted(mobs, key=lambda m: rank.get(order.get(((m[1] or {}).get("name") or "").lower()), 1))
         # pMUD's target priority: two bots can split a room (one takes the first monster, one the second)
         pr = (getattr(cfg, "target_priority", "first") or "first").lower()
         if len(mobs) > 1 and pr != "first":

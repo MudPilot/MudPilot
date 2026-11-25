@@ -6347,11 +6347,19 @@ class Automation:
             return False                       # already full, or one tick won't get there
         if (miss_hp > g_hp * 1.05 and miss_hp > 0) or (miss_ma > g_ma * 1.05 and miss_ma > 0):
             return False
-        self._topoff = time.time() + rc.period + 2
+        # wait for the tick of the stat that's short, not the fastest one (0.8.227, Dan: PVE sat at 100% HP / 86%
+        # mana — HP ticks every ~5 s meditating, mana every ~15-30 s, so it waited 7 s and got nothing). A tick
+        # that far off isn't worth standing around for: up and walking.
+        wait = max([p for k, miss in (("hp", miss_hp), ("ma", miss_ma)) if miss > 0
+                    for p in [rc.stat_period(k) or rc.period]] or [rc.period])
+        if wait > self.TOPOFF_MAX_WAIT:
+            return False
+        self._topoff = time.time() + wait + 2
         self._topoff_used = True
         self._rest_end = "topped off on one more tick"
         return True
 
+    TOPOFF_MAX_WAIT = 10      # seconds: a top-off tick due later than this isn't waited for
     DONTREST_MARGIN = 12      # seconds: up and gone this long before the room's monsters are due back
 
     def _dontrest_window(self, mobs) -> bool:

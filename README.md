@@ -129,6 +129,13 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227
+
+- **Attack order for each monster.** Game Data → Monsters: pick a monster and press **First** or **Last** (or right-click it). Set non-hostile bosses like the storm giant king or storm commander to Last, and the little ones in the room get cleared first. A monster set First is fought before the others. The leader's target still wins when "Attack what the leader attacks" is on.
+- **Resting no longer waits on a mana tick that isn't coming.** "Take one more tick when it fills you right up" timed its wait on the HP tick (every ~5 s meditating), but mana only comes back every ~15–30 s. Miserable PVE sat at 100% HP and 86% mana for 7 s and got nothing. It now waits for the stat that's short, and only when that tick is due within 10 s. Otherwise it gets up and walks.
+- **Edit loop: No attack / Don't rest on one pass through a room.** A room your loop walks through more than once now has a line for each time through ("1st time through — in from E, out W", "2nd time through — in from W, out E"), each with its own No attack and Don't rest boxes. The boxes above them still set every pass at once. Pick a pass and the map shows cyan arrows for the way it comes in and goes out, so there's no guessing whether a mark is before or after a move. The map label reads `NA 2/2` when only the 2nd pass is marked, and the list on the right has a row per pass. The .mp file is unchanged, so MegaMUD still reads it.
+- **The map's hover label wraps instead of running off the edge.** One fact per line (room, regen room and what spawns there, traps) on a dark box that stays inside the map. A regen room also says when it respawns: your own timing if you've camped it, else MME's delay.
+
 ## 0.8.226.2
 
 - **Macs no longer beachball on Character → New character…** (or any other menu item that opens a box). On macOS 27 a menu pick runs inside the system menu bar's own callback, and a box opened straight from it kept that callback waiting, so macOS showed the app as frozen. On a Mac, menu picks now run just after the menu closes. Windows and Linux work as before. Thanks to the Mac player whose stack sample pinned it down.

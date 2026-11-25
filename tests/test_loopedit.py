@@ -35,6 +35,24 @@ assert open(f, encoding="latin-1", newline="").read() == before
 mp.steps[idx[0]].hash = "DEADBEEF"
 assert not loopedit.apply(mp, {key: {"NOATTACK": True}})
 assert open(f, encoding="latin-1", newline="").read() == before
+# 0.8.227 (Dan): a room the loop passes twice — No attack on the 2nd time through only
+mp.steps[idx[0]].hash = mp2.steps[idx[0]].hash
+vis = loopedit.loop_visits(mp)
+assert sorted(i for vs in vis.values() for v in vs for i in v) == list(range(len(mp.steps)))
+vkey = next(k for k, vs in vis.items() if len(vs) == 2)
+v1, v2 = vis[vkey]
+assert loopedit.apply(mp, {vkey: {"visits": [{"NOATTACK": False}, {"NOATTACK": True}]}})
+for i, s in enumerate(mp.steps):
+    assert s.flag("NOATTACK") == (i in v2), (i, v2)
+after = open(f, encoding="latin-1", newline="").read()
+diff = [(a, b) for a, b in zip(before.split("\n"), after.split("\n")) if a != b]
+assert len(diff) == len(v2), diff                           # only the 2nd pass's step lines
+t1, t2 = (loopedit.visit_text(mp, v, n) for n, v in ((1, v1), (2, v2)))
+assert t1.startswith("1st time through — ") and t2.startswith("2nd time through — "), (t1, t2)
+assert loopedit.badge({}, False, [{"NOATTACK": False}, {"NOATTACK": True}]) == "NA 2/2"
+assert loopedit.badge({}, False, [{"NOATTACK": True}, {"NOATTACK": True}]) == "NA"
+assert loopedit.apply(mp, {vkey: {"visits": [{"NOATTACK": False}, {"NOATTACK": False}]}})
+assert open(f, encoding="latin-1", newline="").read() == before
 # 0.8.210: the map editor — tick No attack + Stash room on a room, save → step flags + this loop's stash
 mp.steps[idx[0]].hash = mp2.steps[idx[0]].hash
 import tkinter as tk
@@ -63,5 +81,28 @@ assert st.loop_stash.get(loopedit.loop_key(mp)) == f"{k2[0]}/{k2[1]}", st.loop_s
 assert st.loop_runthru.get(loopedit.loop_key(mp)) == [f"{k2[0]}/{k2[1]}"], st.loop_runthru
 assert not any(mp.steps[i].flags & ~0xFFFF for i in rows[1][1])
 assert logs and "1 run-through" in logs[-1] and "1 no-attack" in logs[-1] and "stash " + f"{k2[0]}/{k2[1]}" in logs[-1], logs
+# 0.8.227: the room panel's line for the 2nd time through — tick its No attack, save → only that pass
+assert loopedit.apply(mp, {k: {"NOATTACK": False, "DONTREST": False} for k, _i in rows})
+dlg = loopedit.edit_loop_dialog(app, mp)
+time.sleep(0.15); root.update(); root.update()
+nav = {x.cget("text"): x for x in walk(dlg) if x.winfo_class() == "TButton"}
+keys = [k for k, _i in rows]
+for _ in range(len(keys)):
+    lines = [x for x in walk(dlg) if x.winfo_class() == "TLabel" and str(x.cget("text")).startswith("2nd time through")]
+    if lines:
+        break
+    nav["Next room ▶"].invoke(); root.update()
+assert lines, "no 2nd-time-through line on any room"
+row = lines[0].grid_info()["row"]
+na2 = [x for x in lines[0].master.grid_slaves(row=row) if x.winfo_class() == "TCheckbutton" and x.cget("text") == "No attack"]
+na2[0].invoke(); root.update()
+lines = [x for x in walk(dlg) if x.winfo_class() == "TLabel" and str(x.cget("text")).startswith("2nd time through")]
+assert "bold" in str(lines[0].cget("font")), lines[0].cget("font")          # the pass picked is in bold
+nav["Save"].invoke(); root.update()
+marked = [i for i, s in enumerate(mp.steps) if s.flag("NOATTACK")]
+vis = loopedit.loop_visits(mp)
+two = [vs for vs in vis.values() if len(vs) > 1 and set(vs[1]) == set(marked)]
+assert two and not any(mp.steps[i].flag("NOATTACK") for i in two[0][0]), (marked, vis)
+assert "only some passes" in logs[-1], logs[-1]
 root.destroy()
 print("OK")

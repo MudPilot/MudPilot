@@ -209,8 +209,8 @@ class GameData(ttk.Frame):
     # ------------------------------------------------------------ monsters / items / spells (MME data, read-only)
     def _monsters(self, nb):
         f = ttk.Frame(nb, padding=8)
-        cols = ("#", "Name", "Exp", "HP", "AC/DR", "MR", "Resists", "Boss", "Regen", "My spell", "Attitude")
-        tf, t = _tree(f, cols, (50, 180, 80, 60, 60, 45, 150, 45, 60, 110, 90))
+        cols = ("#", "Name", "Exp", "HP", "AC/DR", "MR", "Resists", "Boss", "Regen", "My spell", "Attitude", "Order")
+        tf, t = _tree(f, cols, (50, 180, 80, 60, 60, 45, 150, 45, 60, 110, 90, 55))
         mine_only = tk.BooleanVar(value=False)
         def fill(q=None):
             if q is None:
@@ -222,7 +222,7 @@ class GameData(ttk.Frame):
                 if q and q not in m["name"].lower():
                     continue
                 choice = self._mon_choice(m)
-                if mine_only.get() and choice == "":
+                if mine_only.get() and choice == "" and not (getattr(self.s.settings, "monster_order", None) or {}).get(m["name"].lower()):
                     continue
                 ab = m.get("abils") or {}
                 res = ", ".join(f"r{n_[:3]} {ab.get(str(a), ab.get(a))}" for a, n_ in
@@ -231,13 +231,15 @@ class GameData(ttk.Frame):
                 t.insert("", "end", values=(num, m["name"], f"{int(m.get('exp') or 0):,}", m.get("hp", ""),
                                             f"{m.get('ac', '')}/{m.get('dr', '')}", m.get("mr", ""), res,
                                             "yes" if m.get("boss") else "", f"{m['regen_h']}h" if m.get("regen_h") else "",
-                                            choice, self._attitude(m)), iid=str(num))
+                                            choice, self._attitude(m),
+                                            ((getattr(self.s.settings, "monster_order", None) or {})
+                                             .get(m["name"].lower()) or "").capitalize()), iid=str(num))
                 n += 1
                 if n >= 2000:
                     break
         bar, v = _search_bar(f, fill)
         bar.pack(fill="x")
-        ttk.Checkbutton(bar, text="Only monsters I've set a spell for", variable=mine_only,
+        ttk.Checkbutton(bar, text="Only monsters I've set a spell or order for", variable=mine_only,
                         command=lambda: fill(v.get())).pack(side="left", padx=12)
         tf.pack(fill="both", expand=True, pady=6)
         drops = ttk.Label(f, text="Pick a monster to see what it drops.", style="Muted.TLabel", wraplength=900,
@@ -300,11 +302,38 @@ class GameData(ttk.Frame):
                 if t.exists(iid):
                     t.selection_add(iid)
 
+        def set_order(o):
+            # attack first / last when it's in a room with other monsters (Dan, 2026-11-24: storm commander,
+            # storm giant king — non-hostile bosses — last, the little guys first)
+            cfg = self.s.settings
+            cur = dict(getattr(cfg, "monster_order", None) or {})
+            sel = list(t.selection())
+            for iid in sel:
+                m = self.s.world.monsters.get(int(iid))
+                if not m:
+                    continue
+                k = m["name"].lower()
+                if o:
+                    cur[k] = o
+                else:
+                    cur.pop(k, None)
+                self.s.log(f"Game Data: {m['name']} → attack {o or 'in the normal order'}")
+            cfg.monster_order = cur
+            cfg.save()
+            fill(v.get())
+            for iid in sel:
+                if t.exists(iid):
+                    t.selection_add(iid)
+
         menu = tk.Menu(t, tearoff=0)
         menu.add_command(label="Enemy — attack it", command=lambda: set_att("enemy"))
         menu.add_command(label="Neutral — leave it alone unless it attacks", command=lambda: set_att("neutral"))
         menu.add_command(label="Friend — never start a fight with it", command=lambda: set_att("friend"))
         menu.add_command(label="Default (MME's alignment)", command=lambda: set_att(None))
+        menu.add_separator()
+        menu.add_command(label="Attack first — before the others in the room", command=lambda: set_order("first"))
+        menu.add_command(label="Attack last — clear the others first", command=lambda: set_order("last"))
+        menu.add_command(label="Normal attack order", command=lambda: set_order(None))
         menu.add_separator()
         menu.add_command(label="Choose its spell…", command=edit)
 
@@ -321,6 +350,13 @@ class GameData(ttk.Frame):
         for lbl, att in (("Enemy", "enemy"), ("Neutral", "neutral"), ("Friend", "friend"), ("Default", None)):
             ttk.Button(att_bar, text=lbl, command=lambda a=att: set_att(a)).pack(side="left", padx=(4, 0))
         ttk.Label(att_bar, text="  (right-click works too · '@enemy <name>' remotely)",
+                  style="Muted.TLabel").pack(side="left")
+        ord_bar = ttk.Frame(f)
+        ord_bar.pack(fill="x", before=drops, pady=(4, 0))
+        ttk.Label(ord_bar, text="Attack order:").pack(side="left")
+        for lbl, o in (("First", "first"), ("Last", "last"), ("Normal", None)):
+            ttk.Button(ord_bar, text=lbl, command=lambda a=o: set_order(a)).pack(side="left", padx=(4, 0))
+        ttk.Label(ord_bar, text="  (when it's in a room with other monsters: e.g. a boss that doesn't attack you, last)",
                   style="Muted.TLabel").pack(side="left")
         fill("")
         return f

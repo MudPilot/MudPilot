@@ -223,6 +223,7 @@ class Settings:
     # — 'enemy' fights it (non-hostile amazon shamans for nature tap, Dan 0.8.208), 'neutral' / 'friend' leave it
     # alone unless it starts it. Not listed = MME's alignment, as before
     monster_attitude: dict = field(default_factory=dict)
+    monster_order: dict = field(default_factory=dict)   # Game Data → Monsters: "monster" → "first" | "last" (attack order)
     only_mobs: list = field(default_factory=list)   # if non-empty, attack only these
     # spells (damage calc + auto-switch)
     attack_spells: list = field(default_factory=list)   # short names, e.g. ["bliz", "fbal", "lbol"]
