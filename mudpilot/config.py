@@ -254,6 +254,10 @@ class Settings:
     bank_room: str = ""                  # "17/2435"; blank = the nearest bank
     auto_sell_on: bool = False
     auto_sell_items: list = field(default_factory=list)
+    # 0.8.227.7 (Dan: "pile up and sell when the party's full"): the sell trip waits till nobody in the party has room
+    # for another of the sell list, then walks the whole party there whatever the distance, and the MudPilot followers
+    # sell theirs too (down to each one's own 'keep')
+    auto_sell_party_full: bool = False
     # 0.8.201 (Dan): chest / floor loot a shop pays under this many gold for isn't worth the walk — don't pick it up,
     # drop it when a chest hands it over; the valuable chest loot goes on the sell trip (chestloot.py). Off by default
     loot_drop_cheap: bool = False

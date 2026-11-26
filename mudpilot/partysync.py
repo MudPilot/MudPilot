@@ -18,6 +18,11 @@ Wire format (party members only, hidden by the Conversations '@ / bot' filter):
                                     DaoLordQuest 12 -> 13" (Dan, 2026-11-09)
     @mpsync toll 500                I couldn't pay a toll (copper): the leader gives me gold when we're together
                                     (0.8.227.6, Dan: PVE Evolution had no cash at the Silvermere gate)
+    @mpsync sell runed stone cudgel;broadsword   at the shop on a 'sell when the party's full' trip: sell these,
+                                    down to your own 'keep' (0.8.227.7) …
+    @mpsync sold                    … done (the leader walks back once everyone's said it)
+    @mpsync disband                 the leader's player disbanded on purpose (0.8.227.7): no @comeback, and no
+                                    automatic regrouping for the same 5 minutes the leader holds off for
     @mpsync qwatch 600              the leader did something that may finish a quest step (say / ask / give...):
                                     read 'abil' every 30 s in quiet moments for that long, and tell any change
                                     about me — level, max HP/mana, AC/DR, my best attack spell's damage a round,
@@ -71,7 +76,7 @@ class PartySync:
                 self._keep(sender, p)
         return bool(m)
 
-    ME_RE = re.compile(r"\b(lvl|hp|ma|ac|dr|dmg|str|pick|traps|rma|cash)=(-?\d+)|\bcls=([A-Za-z-]+)")
+    ME_RE = re.compile(r"\b(lvl|hp|ma|ac|dr|dmg|str|pick|traps|rma|cash|free)=(-?\d+)|\bcls=([A-Za-z-]+)")
     POCKET = 5000        # copper (50 gold): what a follower is topped up to for tolls (Dan, 2026-11-25)
 
     def _note_me(self, sender, text):
@@ -131,7 +136,10 @@ class PartySync:
                 f"rma={int(getattr(cfg, 'rest_below_ma', 0) or 0)}" if st.max_ma else "",
                 # cash on me (0.8.227.6, Dan: PVE Evolution had none and couldn't follow through the Silvermere gate's
                 # toll — the leader tops a broke follower up before a walk that pays one)
-                f"cash={int(st.wealth)}" if getattr(st, "wealth", None) is not None else ""]
+                f"cash={int(st.wealth)}" if getattr(st, "wealth", None) is not None else "",
+                # room left in my pack (encumbrance): the leader's 'sell when the party's full' waits till nobody has
+                # room for another (0.8.227.7)
+                f"free={max(0, int(st.enc[1]) - int(st.enc[0]))}" if getattr(st, "enc", None) else ""]
         try:
             held = s.bot.held_items()
             if held is not None:
@@ -197,6 +205,28 @@ class PartySync:
             paid.append(n)
         return paid
 
+    def free_room(self) -> dict:
+        """{member: room left in their pack} from party members' MudPilots (None = not told: an older MudPilot)."""
+        party = {n.lower() for n in self.members()}
+        return {n: (p.get("me") or {}).get("free") for n, p in self.peers.items() if n.lower() in party}
+
+    def tell_disband(self):
+        """Leading, and you typed 'disband': tell the MudPilot followers first that it's meant. Dan, 2026-11-26:
+        every time he disbanded Miserable's party to let Revolution lead, Revolution saw "Your party has been
+        disbanded", took it for the party breaking and sent @comeback. Sent ahead of the disband, so it lands first.
+        A party broken by a portal, a room spell or a trap sends nothing: those still get @comeback."""
+        s = self.s
+        if not getattr(s.settings, "party_sync", True) or not s.state.party:
+            return
+        try:
+            if not s.comeback.leading():
+                return
+        except Exception:
+            return
+        party = {n.lower() for n in self.members()}
+        for n in [n for n in self.peers if n.lower() in party]:
+            s.send(f"/{n} @mpsync disband", from_bot=True)
+
     def kit_times(self) -> dict:
         """{member: when their 'kit=' last changed} (0.8.227.6)."""
         return {n: p.get("kit_t", 0) for n, p in self.peers.items()}
@@ -239,6 +269,28 @@ class PartySync:
             p.setdefault("me", {})["cash"] = 0
             self.s.log(f"Party sync: {sender} can't pay a toll — giving them gold when we're together")
             self.pay_tolls()
+            return None
+        if a.startswith("disband"):
+            # the leader's player disbanded on purpose: not a party that broke — no @comeback, and no automatic
+            # invite / join for the leader's own pause (an @invite / @join they send still goes straight through)
+            from .session import PARTY_HOLD_SECS
+            s, now = self.s, time.time()
+            s._party_hold_until = now + PARTY_HOLD_SECS
+            s._party_hold_from = now
+            try:
+                s.comeback._self_left = max(s.comeback._self_left, s._party_hold_until - 10)
+            except Exception:
+                pass
+            s.log(f"Party sync: {sender} disbanded on purpose — no @comeback, and no automatic regrouping for "
+                  f"{PARTY_HOLD_SECS // 60} minutes")
+            return None
+        if a.startswith("sold"):
+            p = self.peers.setdefault(sender, {"rest": 0, "hp": 100, "ma": 100, "t": time.time()})
+            p["sold_t"] = time.time()
+            return None
+        if a.startswith("sell"):
+            items = [i.strip() for i in a[4:].split(";") if i.strip()]
+            self.s.trips.sell_here(items, sender)
             return None
         if a.startswith("qwatch"):
             m = re.search(r"\d+", a)
@@ -439,8 +491,10 @@ class PartySync:
             def skills(i):
                 # cash only counts as a change when it crosses the 50 gold line — not every coin picked up
                 c = re.search(r"\bcash=(\d+)", i or "")
+                f = re.search(r"\bfree=(\d+)", i or "")
+                # room in the pack: in steps of 50 under 500 (a cudgel weighs 80) — not every pickup
                 return re.findall(r"\b(?:str|pick|traps|rma)=\d+|\bkit=[\d.]*", i or "") + \
-                    ([int(c.group(1)) < self.POCKET] if c else [])
+                    ([int(c.group(1)) < self.POCKET] if c else []) + ([min(int(f.group(1)), 500) // 50] if f else [])
             for n in peers:
                 # once per teammate (Dan) — a level-up has its own 'lvl'; again only when strength / picklocks / traps
                 # change (or turn up: 'st' hadn't been read the first time — the leader never knew who could bash)

@@ -129,6 +129,14 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.7
+
+- **Sell when the party's full.** New on Auto Sell: "…only once the whole party is full". The sell trip waits until nobody has room for another item on the sell list. The leader goes by its own encumbrance, and MudPilot followers now send theirs in party sync. Then the whole party walks to the shop, however far it is (Exquisite Blunt is 277 rooms from the cudgel loop; the usual trip step limit doesn't apply). The leader sells its own, then each MudPilot follower in the shop sells theirs, down to their own 'keep' rule. Once everyone's done, the party walks back to the loop.
+- **Auto Sell counts stacks.** The game writes several of an item in the plural ("6 runed stone cudgels"), and Auto Sell looked for the singular name on your list, so it counted none and never went. Restock had the same problem and bought more than it needed.
+- **Auto Sell finds shops that only buy.** Runed stone cudgels have no "Obtained From" in MME, and Exquisite Blunt lists them in its stock but never restocks them, so Auto Sell found no shop for them. It now also goes by the shops' stock lists. Restock doesn't, since those shops never sell one.
+- **No @comeback when you disband on purpose.** When you disband the party you lead (to let someone else lead), your MudPilot first tells its MudPilot followers that it's meant. They don't send @comeback and don't regroup on their own for 5 minutes, the same pause the leader already keeps; your own @invite, @loop and @rego still work straight away. A party broken by a portal, a room spell or a trap still gets @comeback as before.
+- **The MUD window can't get stuck scrolling up.** A click that closed a popup (the Goto list) could leave Tk thinking you were still dragging a selection above the top of the screen, so the screen kept scrolling up on its own. Clicking the yellow back-scroll bar jumped down, but the screen scrolled straight back up. The bar, Ctrl+End, Enter, the mouse wheel and Page Up/Down now stop that stuck scroll.
+
 ## 0.8.227.6
 
 - **A follower dropping their raft is noticed.** The drop updates their pack, and their next party sync (within a minute) leaves the raft out of their kit. An older "@have log raft" yes no longer outlasts that: the newer kit wins.

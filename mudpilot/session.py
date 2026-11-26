@@ -484,6 +484,10 @@ class Session:
             self._party_hold_from = time.time()
             self.log(f"Disbanded — no automatic invites or joins for {PARTY_HOLD_SECS // 60} minutes, so nobody "
                      "regroups straight away (type invite / join yourself to)")
+            try:
+                self.partysync.tell_disband()
+            except Exception:
+                pass
         if not from_bot and re.match(r"^\s*(?:invite|join)\s+\w+", cmd or "", re.I) and \
                 time.time() < getattr(self, "_party_hold_until", 0):
             # (0.8.224.3, loops hunt) the party is being re-formed on purpose: the pause is over — comeback and

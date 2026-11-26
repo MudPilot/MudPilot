@@ -32,6 +32,16 @@ def _norm(s):
     return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
+def _count(have: dict, item: str) -> int:
+    """How many of `item` a carried() dict holds. The game writes a stack in the plural ('6 runed stone cudgels'),
+    the sell / restock lists in the singular — 0.8.227.7: Auto Sell counted 0 cudgels and never went."""
+    n = _norm(item)
+    for k in (n, n + "s", n + "es", n[:-1] if n.endswith("s") else None):
+        if k and have.get(k):
+            return have[k]
+    return 0
+
+
 class ShopTrips:
     def __init__(self, session):
         self.s = session
@@ -89,7 +99,20 @@ class ShopTrips:
                         rooms.append(tuple(r))
         return list(dict.fromkeys(rooms))
 
-    COPPER = (1, 10, 100, 10000, 1000000)         # copper, silver, gold, platinum, runic
+    def sell_shops(self, item: str) -> list:
+        """Rooms of shops that buy this item: the ones that sell it, and any whose stock list holds it, restocking or
+        not (0.8.227.7: runed stone cudgels have no 'Obtained From' — Exquisite Blunt, 14/1782, lists them with Max
+        300 and no restock, so the cudgel sell trip found no shop). Not for buying: those shops never have one."""
+        w, n = self.s.world, _norm(item)
+        rooms = self.shops_for(item)
+        nums = {k for k, it in (getattr(w, "items", None) or {}).items() if _norm((it or {}).get("name")) == n}
+        if nums:
+            for sh in (getattr(w, "shops", None) or {}).values():
+                if self.shop_ok(sh) and any(int(sl[0]) in nums for sl in (sh.get("stock") or [])):
+                    rooms += [tuple(r) for r in sh.get("rooms") or []]
+        return list(dict.fromkeys(rooms))
+
+    COPPER =(1, 10, 100, 10000, 1000000)         # copper, silver, gold, platinum, runic
 
     def price(self, num, markup=0) -> int:
         """What a shop asks for item #num, in copper: MME's price plus the shop's markup, then the Charm discount
@@ -190,7 +213,7 @@ class ShopTrips:
         have, before = self.carried(), t.get("have0") or {}
         for c in t.get("items") or []:
             k = _norm(c)
-            if have.get(k, 0) == before.get(k, 0):
+            if _count(have, k) == _count(before, k):
                 failed[(t["kind"], k)] = now
                 self.s.log(f"Trip: couldn't {t['kind']} the {c} — not trying again for 30 minutes")
 
@@ -206,40 +229,125 @@ class ShopTrips:
                 cmd = (cfg.deposit_cmd or "deposit {copper}").replace("{copper}", str(st.wealth))
                 return "deposit", room, [cmd], f"carrying {st.wealth:,} copper worth"
         have = self.carried()
-        if cfg.auto_sell_on:
+        party_full = bool(cfg.auto_sell_on and getattr(cfg, "auto_sell_party_full", False))
+        if party_full and not self.party_full():
+            pass                                     # still room in someone's pack: keep piling up
+        elif cfg.auto_sell_on:
             # 0.8.201 (Dan): with Drop cheap loot on, what a shop pays next to nothing for isn't worth the walk, and
             # the valuable things chests gave (chestloot.py) go along — never more than the chests gave
             cl = getattr(self.s, "chestloot", None)
             chest = cl.to_sell(have) if cl is not None else {}
             cheap = lambda i: bool(cfg.loot_drop_cheap and cl is not None and cl.value(i) is not None
                                    and not cl.worth_selling(i))
-            sell = [i for i in (cfg.auto_sell_items or []) if have.get(_norm(i))
-                    and have.get(_norm(i)) > int(self.s.bot.item_rule(i).get("keep") or 0)
+            sell = [i for i in (cfg.auto_sell_items or []) if _count(have, i)
+                    and _count(have, i) > int(self.s.bot.item_rule(i).get("keep") or 0)
                     and not self.failed_lately("sell", i) and not cheap(i)]
             listed = {_norm(i) for i in sell}
             sell += [k for k in chest if k not in listed and not self.failed_lately("sell", k)]
             for item in sell:
-                room, _n = self._nearest(self.shops_for(item), lim)
+                # a 'party's full' trip goes whatever the distance: the walk is the point (Exquisite Weaponry is ~220
+                # rooms from the cudgel loop)
+                room, _n = self._nearest(self.sell_shops(item), 100000 if party_full else lim)
                 if room:
-                    group = [i for i in sell if room in self.shops_for(i)]
+                    group = [i for i in sell if room in self.sell_shops(i)]
                     cmds = []
                     for i in group:
-                        n = (have.get(_norm(i), 1) - int(self.s.bot.item_rule(i).get("keep") or 0)
+                        n = ((_count(have, i) or 1) - int(self.s.bot.item_rule(i).get("keep") or 0)
                              if _norm(i) in listed else chest.get(_norm(i), 0))
                         cmds += [f"sell {i}"] * max(n, 0)
+                    if party_full:
+                        return "sell", room, cmds[:40], "the party's full — selling " + ", ".join(group)
                     return "sell", room, cmds[:40], "selling " + ", ".join(group)
         if cfg.auto_buy_on:
             for item, keep, upto in buy_rules(cfg.auto_buy):
-                if not item or have.get(_norm(item), 0) >= keep or self.failed_lately("buy", item):
+                if not item or _count(have, item) >= keep or self.failed_lately("buy", item):
                     continue
                 p = self.price_of(item)
                 if p and st.wealth is not None and st.wealth < p:
                     continue                          # can't afford even one: not a walk there and back every lap
                 room, _n = self._nearest(self.shops_for(item), lim)
                 if room:
-                    n = max(1, upto - have.get(_norm(item), 0))
-                    return "buy", room, [f"buy {item}"] * min(n, 20), f"only {have.get(_norm(item), 0)} {item} left"
+                    n = max(1, upto - _count(have, item))
+                    return "buy", room, [f"buy {item}"] * min(n, 20), f"only {_count(have, item)} {item} left"
         return None
+
+    # ------------------------------------------------------------ sell when the party's full (0.8.227.7)
+    PARTY_ARRIVE_SECS = 30     # at the shop: how long to wait for a follower to walk in
+    PARTY_SELL_SECS = 150      # …and for everyone told to sell to say they're done
+
+    def party_full(self) -> bool:
+        """Nobody in the party has room for another of the sell list: me (my encumbrance) and each MudPilot member
+        (their 'free=' in party sync). Dan, 2026-11-25: Miserable and Revolution pile up runed stone cudgels and walk
+        to Exquisite Weaponry once both are full. An older MudPilot that doesn't tell its room doesn't count."""
+        cfg, st, b = self.s.settings, self.s.state, self.s.bot
+        ws = [b.item_weight(i) for i in (cfg.auto_sell_items or [])]
+        need = min((w for w in ws if w > 0), default=50)
+        if not st.enc:
+            return False
+        if st.enc[1] - st.enc[0] >= need:
+            return False
+        try:
+            room = self.s.partysync.free_room() if st.party else {}
+        except Exception:
+            room = {}
+        for n, f in room.items():
+            if f is not None and f >= need:
+                if b.ready("sell_party_room", 600):
+                    self.s.log(f"Auto Sell: my pack's full — waiting till {n}'s is too ({f} free, a "
+                               f"{need}-weight item fits)")
+                return False
+        return True
+
+    def sell_here(self, items, who) -> bool:
+        """A follower at the shop on the leader's 'party's full' trip: read the pack, sell `items` down to my own
+        'keep', then tell `who` we're done."""
+        st = self.s.state
+        if self.trip:
+            self.s.log(f"Trip: {who} asked me to sell, but I'm on a trip already")
+            return False
+        self.trip = {"kind": "sell", "room": st.room, "cmds": [], "back": None, "t": time.time(),
+                     "phase": "count", "next_at": time.time() + 2.5, "why": f"{who}'s party sell",
+                     "sell_list": list(items), "tell": who, "items": [], "have0": {}, "wealth0": st.wealth}
+        self.s.log(f"Trip: {who} is selling at the shop — selling my {', '.join(items)} too")
+        self.s.send("i", from_bot=True)
+        return True
+
+    def _count_sells(self, t):
+        have, b = self.carried(), self.s.bot
+        cmds = []
+        for i in t.get("sell_list") or []:
+            n = _count(have, i) - int(b.item_rule(i).get("keep") or 0)
+            cmds += [f"sell {i}"] * max(n, 0)
+        t["cmds"], t["have0"] = cmds[:40], have
+        t["items"] = [i for i in t.get("sell_list") or [] if f"sell {i}" in cmds]
+        t["phase"] = "doing"
+        if not cmds:
+            self.s.log("Trip: nothing of those to sell")
+
+    def _party_sell(self, t, now) -> bool:
+        """Leader, own selling done: tell each MudPilot follower here to sell theirs, wait for their 'sold'.
+        True = still waiting."""
+        ps, st = self.s.partysync, self.s.state
+        if "party_t" not in t:
+            t["party_t"], t["told"] = now, {}
+            t["sell_list"] = list(t.get("items") or [])
+        here = {p.split()[0].strip(".,").lower() for p in ((st.view.players if st.view else []) or []) if p.split()}
+        members = [n for n in ps.peers if n.lower() in {m.lower() for m in ps.members()}]
+        if now - t["party_t"] < self.PARTY_ARRIVE_SECS:
+            for n in members:
+                if n.lower() in here and n.lower() not in t["told"]:
+                    t["told"][n.lower()] = now
+                    self.s.send(f"/{n} @mpsync sell {';'.join(t['sell_list'])}", from_bot=True)
+                    self.s.log(f"Trip: told {n} to sell theirs")
+            if len(t["told"]) < len(members):
+                return True
+        waiting = [n for n in members if n.lower() in t["told"]
+                   and ps.peers[n].get("sold_t", 0) < t["told"][n.lower()]]
+        if waiting and now - t["party_t"] < self.PARTY_SELL_SECS:
+            return True
+        if waiting:
+            self.s.log(f"Trip: {', '.join(waiting)} didn't say they'd sold — going back anyway")
+        return False
 
     def withdraw_for(self, mp, loop, short, why="the toll", after=None) -> bool:
         """pMUD: short of a toll (or a boat fare) → the nearest bank, withdraw what's missing (plus a little),
@@ -291,6 +399,9 @@ class ShopTrips:
         b = self.s.bot
         self.trip = {"kind": kind, "room": room, "cmds": list(cmds), "back": (mp, True), "t": time.time(),
                      "phase": "going", "next_at": 0, "why": why,
+                     # 'sell when the party's full': the MudPilot followers sell theirs at the shop too
+                     "party": bool(kind == "sell" and getattr(self.s.settings, "auto_sell_party_full", False)
+                                   and self.s.state.party),
                      # what to compare after the closing 'i' (a trip that changed nothing goes on a cooldown)
                      "items": list(dict.fromkeys(c.split(" ", 1)[1] for c in cmds
                                                  if c.startswith(("buy ", "sell ")) and " " in c)),
@@ -327,8 +438,12 @@ class ShopTrips:
                     self.trip = None
                 elif now - t["t"] > 30:
                     self._back("the walk there stopped")
-            elif now - t["t"] > 900:
+            elif now - t["t"] > (3600 if t.get("party") else 900):    # a party's-full trip can be ~220 rooms
                 self._back("took too long")
+            return
+        if t["phase"] == "count":
+            if now >= t["next_at"]:
+                self._count_sells(t)
             return
         if t["phase"] == "doing" and now >= t["next_at"]:
             if t["cmds"]:
@@ -338,6 +453,8 @@ class ShopTrips:
                 t["checked"] = True                   # see what you're carrying now (cash for the toll)
                 s.send("i", from_bot=True)
                 t["next_at"] = now + 2.5
+            elif t.get("party") and t.get("back") and self._party_sell(t, now):
+                t["next_at"] = now + 1.0
             else:
                 self._back(f"{t['kind']} done")
 
@@ -347,6 +464,12 @@ class ShopTrips:
             self._note_result(t)
         except Exception:
             pass
+        if t.get("back") is None:
+            # a follower's sell on the leader's 'party's full' trip: say we're done — the leader walks us back
+            self.s.log(f"Trip: {why}")
+            if t.get("tell"):
+                self.s.send(f"/{t['tell']} @mpsync sold", from_bot=True)
+            return
         mp, loop = t["back"]
         if t.get("after"):
             self.s.log(f"Trip: {why}")

@@ -2243,6 +2243,11 @@ class App:
         t2.pack(fill="x", pady=(4, 0))
         self._check(t2, "auto_sell_on", "Sell these at the nearest shop that trades in them:").pack(side="left")
         ttk.Entry(t2, textvariable=self._var("auto_sell_items"), width=44).pack(side="left", padx=4)
+        t2p = ttk.Frame(tp)
+        t2p.pack(fill="x", pady=(2, 0))
+        self._check(t2p, "auto_sell_party_full", "…only once the whole party is full").pack(side="left", padx=(18, 0))
+        ttk.Label(t2p, text="(any distance; MudPilot followers sell theirs too, down to their own 'keep')",
+                  style="Muted.TLabel").pack(side="left")
         t2b = ttk.Frame(tp)
         t2b.pack(fill="x", pady=(4, 0))
         self._check(t2b, "loot_drop_cheap", "Drop cheap loot: leave or drop (chests too) what a shop pays under").pack(
@@ -4366,6 +4371,7 @@ class App:
             pass
 
     def _see_cancel(self):
+        self._stop_drag_scan()                   # (your own wheel / Page keys win over a stuck drag-scroll too)
         self._see_pending = False
         self._user_scroll_at = time.time()
 
@@ -4398,7 +4404,19 @@ class App:
         if getattr(self, "_scroll_lab", None) is not None:
             self._scroll_lab.place_forget()
 
+    def _stop_drag_scan(self):
+        """Stop Tk's drag-select auto-scroll. 0.8.227.7 (Dan: Miserable PVE's MUD window kept scrolling up by itself;
+        the yellow bar didn't stop it, clicking the command line and Enter did): a click that closed a popup (the
+        Goto list) left the button's release off the MUD screen, and Tk went on 'dragging a selection' above the top,
+        scrolling up every few ms. The bar jumped down and the scan pulled it straight back. Tk's own entry happened
+        to cancel it (tk::CancelRepeat on its click) — the bar, Ctrl+End, Enter and the wheel do now."""
+        try:
+            self.root.tk.call("tk::CancelRepeat")
+        except Exception:
+            pass
+
     def scroll_bottom(self, e=None):
+        self._stop_drag_scan()
         self._see_pending = False
         self._user_scroll_at = 0
         self.term.see("end")
