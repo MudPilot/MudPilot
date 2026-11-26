@@ -16,6 +16,8 @@ Wire format (party members only, hidden by the Conversations '@ / bot' filter):
     @mpsync q 134=13 133=9          quest flags (ability id = value): all of them once per teammate a session, then
                                     each one that changes - their MudPilot logs and alerts "Revolution's quest flag:
                                     DaoLordQuest 12 -> 13" (Dan, 2026-11-09)
+    @mpsync toll 500                I couldn't pay a toll (copper): the leader gives me gold when we're together
+                                    (0.8.227.6, Dan: PVE Evolution had no cash at the Silvermere gate)
     @mpsync qwatch 600              the leader did something that may finish a quest step (say / ask / give...):
                                     read 'abil' every 30 s in quiet moments for that long, and tell any change
                                     about me — level, max HP/mana, AC/DR, my best attack spell's damage a round,
@@ -69,7 +71,8 @@ class PartySync:
                 self._keep(sender, p)
         return bool(m)
 
-    ME_RE = re.compile(r"\b(lvl|hp|ma|ac|dr|dmg|str|pick|traps|rma)=(-?\d+)|\bcls=([A-Za-z-]+)")
+    ME_RE = re.compile(r"\b(lvl|hp|ma|ac|dr|dmg|str|pick|traps|rma|cash)=(-?\d+)|\bcls=([A-Za-z-]+)")
+    POCKET = 5000        # copper (50 gold): what a follower is topped up to for tolls (Dan, 2026-11-25)
 
     def _note_me(self, sender, text):
         p = self.peers.setdefault(sender, {"rest": 0, "hp": 100, "ma": 100, "t": time.time()})
@@ -84,6 +87,8 @@ class PartySync:
             # the items each walker needs their own of that they carry (the golden idol): routing a party (0.8.190)
             me["kit"] = [int(x) for x in km.group(1).split(".") if x.isdigit()]
         if me:
+            if (p.get("me") or {}).get("kit") != me.get("kit") or "kit_t" not in p:
+                p["kit_t"] = time.time()             # (0.8.227.6: newer than an '@have' answer → the kit wins)
             if me.get("lvl") and p.get("lvl") != me["lvl"]:
                 p["lvl"] = me["lvl"]
             if p.get("me") != me:
@@ -123,7 +128,10 @@ class PartySync:
                 f"traps={st.traps}" if getattr(st, "traps", 0) else "",
                 # my own 'Rest below MA' line: 0 = mana's a bonus (a melee Paladin) — the leader doesn't wait on it
                 # (0.8.208, Dan: the walk sat waiting on Buddy's mana)
-                f"rma={int(getattr(cfg, 'rest_below_ma', 0) or 0)}" if st.max_ma else ""]
+                f"rma={int(getattr(cfg, 'rest_below_ma', 0) or 0)}" if st.max_ma else "",
+                # cash on me (0.8.227.6, Dan: PVE Evolution had none and couldn't follow through the Silvermere gate's
+                # toll — the leader tops a broke follower up before a walk that pays one)
+                f"cash={int(st.wealth)}" if getattr(st, "wealth", None) is not None else ""]
         try:
             held = s.bot.held_items()
             if held is not None:
@@ -142,6 +150,56 @@ class PartySync:
         """{member: {lvl, hp, ma, ac, dr, dmg, cls}} from party members' MudPilots."""
         party = {n.lower() for n in self.members()}
         return {n: p["me"] for n, p in self.peers.items() if p.get("me") and n.lower() in party}
+
+    def tell_toll(self, copper: int):
+        """I couldn't pay a toll following the leader: tell their MudPilot (once a minute at most)."""
+        x = getattr(self.s.bot, "x", None)
+        leader = getattr(x, "_following", None) or getattr(x, "_followed", None)
+        if not leader or leader.lower() not in {n.lower() for n in self.peers}:
+            return
+        if not self.s.bot.ready("mpsync_toll", 60):
+            return
+        self.s.log(f"Can't pay the {copper:,}-copper toll — asking {leader} for gold")
+        self.s.send(f"/{leader} @mpsync toll {int(copper)}", from_bot=True)
+
+    def pay_tolls(self, need: int = 0) -> list:
+        """Leading: give gold to each MudPilot follower here who's short — one that said it couldn't pay a toll,
+        or (need = the tolls on the walk ahead, copper) whose cash is under it. Tops them up to 50 gold or the
+        need, whichever is more. Dan, 2026-11-25: PVE Evolution had no money and Miserable walked back and forth
+        through the Silvermere gate (paying each way) instead of giving him 50 gold. Returns who got some."""
+        s, st = self.s, self.s.state
+        if not getattr(s.settings, "party_sync", True):
+            return []
+        here = {n.lower() for n in (getattr(getattr(st, "view", None), "players", None) or [])}
+        party = {n.lower() for n in self.members()}
+        mine = st.wealth
+        paid = []
+        for n, p in self.peers.items():
+            if n.lower() not in party or n.lower() not in here:
+                continue
+            cash = (p.get("me") or {}).get("cash")
+            asked = p.get("toll_need") is not None and time.time() - p.get("toll_t", 0) < 1800
+            want = max(need, int(p.get("toll_need") or 0) if asked else 0)
+            if cash is None or not (asked or (want and cash < want)):
+                continue
+            have = 0 if asked else cash
+            gold = -(-(max(self.POCKET, want) - have) // 100)
+            if mine is None or mine - gold * 100 < need:
+                if s.bot.ready(f"toll_poor_{n.lower()}", 120):
+                    s.log(f"Party sync: {n} needs {gold} gold for tolls — not enough cash on me to give it")
+                continue
+            s.send(f"give {gold} gold {n}", from_bot=True)
+            s.log(f"Party sync: gave {n} {gold} gold for tolls")
+            mine -= gold * 100
+            st.wealth = mine
+            p["me"]["cash"] = have + gold * 100
+            p.pop("toll_need", None)
+            paid.append(n)
+        return paid
+
+    def kit_times(self) -> dict:
+        """{member: when their 'kit=' last changed} (0.8.227.6)."""
+        return {n: p.get("kit_t", 0) for n, p in self.peers.items()}
 
     def levels(self) -> dict:
         """{member: level} for party members whose MudPilot told us its level."""
@@ -173,6 +231,14 @@ class PartySync:
             return None
         if a.startswith("q "):
             self._note_quest(sender, a[2:])
+            return None
+        if a.startswith("toll"):
+            m = re.search(r"\d+", a)
+            p = self.peers.setdefault(sender, {"rest": 0, "hp": 100, "ma": 100, "t": time.time()})
+            p["toll_need"], p["toll_t"] = int(m.group(0)) if m else 0, time.time()
+            p.setdefault("me", {})["cash"] = 0
+            self.s.log(f"Party sync: {sender} can't pay a toll — giving them gold when we're together")
+            self.pay_tolls()
             return None
         if a.startswith("qwatch"):
             m = re.search(r"\d+", a)
@@ -370,7 +436,11 @@ class PartySync:
                 pass
             info = self.my_info()
             told = getattr(self, "_told_me", {})
-            skills = lambda i: re.findall(r"\b(?:str|pick|traps|rma)=\d+|\bkit=[\d.]*", i or "")
+            def skills(i):
+                # cash only counts as a change when it crosses the 50 gold line — not every coin picked up
+                c = re.search(r"\bcash=(\d+)", i or "")
+                return re.findall(r"\b(?:str|pick|traps|rma)=\d+|\bkit=[\d.]*", i or "") + \
+                    ([int(c.group(1)) < self.POCKET] if c else [])
             for n in peers:
                 # once per teammate (Dan) — a level-up has its own 'lvl'; again only when strength / picklocks / traps
                 # change (or turn up: 'st' hadn't been read the first time — the leader never knew who could bash)
@@ -378,6 +448,8 @@ class PartySync:
                     s.send(f"/{n} @mpsync me {info}", from_bot=True)
                     told[n.lower()] = info
             self._told_me = told
+        if any(p.get("toll_need") is not None for p in self.peers.values()) and s.bot.ready("mpsync_pay_tolls", 3):
+            self.pay_tolls()                         # a follower who couldn't pay a toll: gold once we're together
         resting = bool(st.resting)
         # (no "@mpsync st" any more: who's resting, their HP and mana are all in 'par' — "[H: 94%]R")
         self._last_rest = resting

@@ -666,11 +666,19 @@ class Automation:
         except Exception:
             info = {}
         known = getattr(self.errands, "known_have", {}) or {}
+        try:
+            kit_t = {k.lower(): v for k, v in self.s.partysync.kit_times().items()}
+        except Exception:
+            kit_t = {}
         now, out = time.time(), None
         for m in members:
             kit = info.get(m.lower(), {}).get("kit")
             mine = set(kit) if isinstance(kit, (list, tuple, set, frozenset)) else set()
-            mine |= {n for (who, n), (yes, t) in known.items() if who == m.lower() and yes and now - t < 12 * 3600}
+            # 0.8.227.6 (Dan: "if i have revolution drop his log raft will mudpilot know?"): their MudPilot's kit,
+            # newer than an '@have' yes, wins — the yes was before the drop
+            since = kit_t.get(m.lower(), 0) if isinstance(kit, (list, tuple, set, frozenset)) else 0
+            mine |= {n for (who, n), (yes, t) in known.items() if who == m.lower() and yes and now - t < 12 * 3600
+                     and t > since}
             mine -= {n for (who, n), (yes, t) in known.items() if who == m.lower() and not yes and now - t < 12 * 3600
                      and not (isinstance(kit, (list, tuple)) and n in kit)}
             out = mine if out is None else (out & mine)
@@ -887,6 +895,10 @@ class Automation:
             w = self.s.world
             toll = self.path_toll(mp)
             cash = self.st.wealth
+            if toll and self.st.party:
+                # a follower short of the tolls gets gold first (0.8.227.6, Dan: PVE Evolution had none)
+                self.s.partysync.pay_tolls(toll)
+                cash = self.st.wealth
             if toll and cash is not None and cash < toll:
                 nrm_ = self.no_route_msg
                 if self.s.trips.withdraw_for(mp, loop, toll - cash):
@@ -5767,6 +5779,13 @@ class Automation:
             if not getattr(self, "_heavy_since", 0) or time.time() - self._heavy_move_at_prev > 30:
                 self._heavy_since = time.time()
             self._heavy_move_at_prev = time.time()
+        mt = re.match(r"^you do not have enough to cover the toll of (\d+) (copper|silver|gold|platinum|runic)", low)
+        if mt:
+            # 0.8.227.6 (Dan: PVE Evolution had no money — the leader walked back and forth through the Silvermere
+            # gate for him): following, ask the leader's MudPilot for gold
+            mult = {"copper": 1, "silver": 10, "gold": 100, "platinum": 10000, "runic": 1000000}[mt.group(2)]
+            st.wealth = min(st.wealth or 0, int(mt.group(1)) * mult - 1)
+            self.s.partysync.tell_toll(int(mt.group(1)) * mult)
         if "too heavy to move" in low and self.ready("heavy_move_i", 20):
             self.log("Too heavy to move — reading the pack")
             self.send("i")                           # (makeroom / drop rules work from a fresh pack)
@@ -6503,6 +6522,7 @@ class Automation:
         if full:
             dh = 100
         low_hp = st.hp_pct() < max(cfg.rest_below_hp, dh)
+        low_hp_kind = low_hp                  # (what picks rest vs meditate — see the mid-rest heal below)
         low_ma = (cfg.rest_below_ma and st.max_ma and st.ma_pct() < cfg.rest_below_ma) or \
             (full and st.max_ma and st.ma < st.max_ma)
         # (0.8.207, Dan: "it clearly says rest below 70% mana" — Revolution walked on at 44%: the mana throttle let
@@ -6517,6 +6537,8 @@ class Automation:
                 and time.time() - (getattr(self, "_last_spell_at", 0) or 0) < 4:
             # 0.8.225 (logs — Buddy, 178 of 188 rests): our own heal mid-rest stood us up at 81% with rest-below 80,
             # and the walk went on short of 'rest until' (once into three manticores and a hang-up): keep resting
+            # (0.8.227.6, Dan: Revolution then sat back down to *rest* at 89% HP / 43% mana — this only keeps us
+            #  down; whether it's rest or meditate still goes by the rest-below line, so a meditate stays one)
             low_hp = low_hp or st.hp_pct() < max(cfg.rest_until_hp, dh or 0)
         if topped and getattr(self, "_msg_rest_full", 0):
             self._msg_rest_full = 0
@@ -6622,7 +6644,7 @@ class Automation:
                 if time.time() - asked < 3:
                     return True
             if self.ready("rest", 4):
-                medi = cfg.use_meditate and low_ma and not low_hp and not self._fled
+                medi = cfg.use_meditate and low_ma and not low_hp_kind and not self._fled
                 if act in ("meditate", "rest"):
                     medi = act == "meditate" and bool(cfg.meditate_cmd)   # smart resting's pick
                 now_ = time.time()

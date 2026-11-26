@@ -39,5 +39,27 @@ ps.tick()
 raft = s.world.item_names["log raft"]["num"]
 me = [c for c in sent if "@mpsync me" in c]
 check(f"…then its 'kit=' carries the raft ({me})", me and f"{raft}" in me[0].split("kit=")[-1].split()[0].split("."))
+# Dan: "if i have revolution drop his log raft will mudpilot know that?" — the drop updates the pack, and the next
+# sync (within a minute) tells the leader the kit changed
+from mudpilot.ansi import Style
+s._line([("You dropped log raft.", Style())])
+sent.clear(); ps._me_checked = 0
+ps.tick()
+me = [c for c in sent if "@mpsync me" in c]
+check(f"dropped the raft: the next sync's kit hasn't got it ({me})",
+      me and f"{raft}" not in me[0].split("kit=")[-1].split()[0].split("."))
+# the leader's side: that line replaces the kit it knew (no raft any more)
+ps.peers["Revolution"] = {"me": {"lvl": 52, "kit": [191, raft]}}
+ps._note_me("Revolution", me[0].split("@mpsync me ", 1)[1])
+check(f"the leader's copy loses the raft ({ps.peers['Revolution']['me']})",
+      raft not in ps.peers["Revolution"]["me"].get("kit", []))
+# and an older '@have log raft' yes doesn't outlast the drop: the leader's party_carry goes by the newer kit
+st.my_name = "Miserable"; g.party = {"Miserable": {}, "Revolution": {}}
+s.bot.errands.known_have = {("revolution", raft): (True, time.time() - 600)}
+s.partysync.info = lambda: {"Revolution": {"kit": [191]}}
+ps.peers["Revolution"]["kit_t"] = time.time()
+check(f"an '@have' yes from before the drop doesn't count ({sorted(s.bot.party_carry())})", raft not in s.bot.party_carry())
+s.bot.errands.known_have = {("revolution", raft): (True, time.time() + 1)}
+check("…one after the kit does", raft in s.bot.party_carry())
 print("ALL PASS" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)

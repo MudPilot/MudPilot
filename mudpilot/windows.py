@@ -408,7 +408,13 @@ class ChatPane(ttk.Frame):
         """Typed here = typed in the game: .hi says, /Name hi telepaths, gos hi gossips.
         Split ; on: e;mist;.@do sand goes out as three commands (;; = a real ;)."""
         msg = self.entry.get().strip()
-        if not msg or not self.app.s.telnet.connected:
+        if not self.app.s.telnet.connected:
+            return
+        if not msg:
+            # 0.8.227.6 (Dan: after killing the Bloody Executioner, Enter here did nothing — he couldn't look at the
+            # room for drops): an empty Enter is a look, as in the command line under the MUD window
+            self.app._last_input = time.time()
+            self.app.s.send("")
             return
         self.entry.delete(0, "end")
         sp = self.app.s.settings.command_splitter or ";"

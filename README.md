@@ -129,6 +129,14 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.6
+
+- **A follower dropping their raft is noticed.** The drop updates their pack, and their next party sync (within a minute) leaves the raft out of their kit. An older "@have log raft" yes no longer outlasts that: the newer kit wins.
+- **Enter in the conversation window's box looks at the room**, like the command line under the MUD window. An empty Enter there used to do nothing.
+- **A follower who can't pay a toll gets gold from the leader.** When the gate says "You do not have enough to cover the toll", the follower's MudPilot tells the leader's. Once they're in the same room, the leader gives them 50 gold (or the toll, if it's more). Party sync now also carries each follower's cash, so before a walk with tolls on it the leader tops up anyone short. Before this, the leader kept walking back through the gate for them and paying the toll each way.
+- **A heal mid-meditate doesn't turn it into a rest.** Healing a teammate stands you up. MudPilot already sat you back down, but it sat you down to rest whenever your HP was under 'rest until', even when you were meditating for mana with HP over 'rest below'. It meditates again now.
+- **New remote command @deposit-all**: the other player deposits all its cash in the bank it's standing in. It reads its pack first, so the amount is current.
+
 ## 0.8.227.5
 
 - **No more sneaking on the spot with a raft.** A raft is a huge stealth penalty: Miserable's Stealth went to -17, every 'sn' answered "You don't think you're sneaking.", and with "don't move unless sneaking" on, the walk sent 'sn' every 2 seconds and never moved. MudPilot read Stealth only as a positive number, so it never saw the -17. Now it doesn't try to sneak when your Stealth is 0 or below, or when you carry a raft and 'st' hasn't been read yet. After 3 failed sneaks in a row, it walks on without sneaking for 5 minutes.

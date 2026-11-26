@@ -28,7 +28,7 @@ from .extras import room_text as room_text_
 CATEGORIES = {
     "query": "Health / exp / status",
     "location": "Location (@where @path @who)",
-    "inventory": "Inventory (@inventory @what @wealth @enc @have)",
+    "inventory": "Inventory (@inventory @what @wealth @enc @have @deposit-all)",
     "invite": "Party invite / join",
     "move": "Move me (@goto @loop @stop @rego @summon)",
     "execute": "Run commands (@do)",
@@ -44,7 +44,7 @@ COMMANDS = {
     "@flags": "query",
     "@where": "location", "@path": "location", "@who": "location",
     "@inventory": "inventory", "@inv": "inventory",
-    "@what": "inventory", "@wealth": "inventory", "@enc": "inventory", "@have": "inventory",
+    "@what": "inventory", "@wealth": "inventory", "@deposit-all": "inventory", "@enc": "inventory", "@have": "inventory",
     "@invite": "invite", "@join": "invite", "@disband": "invite",
     "@do": "execute",
     "@goto": "move", "@loop": "move", "@stop": "move", "@rego": "move", "@summon": "move", "@hunt": "move",
@@ -90,6 +90,7 @@ HELP = [
     ("inventory", "@what", "What's on the floor", "/Miserable @what"),
     ("inventory", "@wealth", "Cash carried (in copper)", "/Miserable @wealth"),
     ("inventory", "@enc", "Encumbrance", "/Miserable @enc"),
+    ("inventory", "@deposit-all", "Deposit all its cash in the bank it's standing in", "/Miserable @deposit-all"),
     ("inventory", "@have", "Is it carrying this item?", "/Miserable @have rope"),
     ("inventory", "@makeroom ★", "Buys 0 of it (the shop swaps its coins for bigger ones), then drops the cheapest "
      "coins (copper, silver, then gold) if it still won't fit — the "
@@ -884,6 +885,24 @@ class RemoteControl:
             return self._defer_until_inv(s, lambda: (f"{self.s.state.wealth:,} copper"
                                                      if self.s.state.wealth is not None else "still can't read it"))
         return f"{w:,} copper"
+
+    def c_deposit_all(self, s, a):
+        """Deposit every coin carried in the bank it's standing in (Dan, 2026-11-25). The pack's read first, so
+        the amount is today's, not the last 'i'."""
+        st = self.s.state
+        name = (getattr(st.view, "name", "") or "") if st.view else ""
+        here = tuple(st.room) if st.room else None
+        if not ((here and here in set(self.s.trips.banks())) or "bank" in name.lower()):
+            return "not in a bank" + (f" ({name})" if name and name != "?" else "")
+
+        def go():
+            w = self.s.state.wealth
+            if not w:
+                return "no cash to deposit" if w == 0 else "can't read my cash"
+            cmd = (self.s.settings.deposit_cmd or "deposit {copper}").replace("{copper}", str(w))
+            self.s.send(cmd, from_bot=True)
+            return f"depositing {w:,} copper"
+        return self._defer_until_inv(s, go)
 
     def c_enc(self, s, a):
         e = self.s.state.enc
