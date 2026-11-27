@@ -129,6 +129,10 @@ BBS tab → **Password**. Typed into the login prompt for you; stored in Windows
 - **General:** back up settings files (one copy a day), show or hide the toolbar.
 - **Path builder** (Window menu, or Paths tab → Path builder): build MegaMUD paths and loops from the map without walking them. Add rooms by number, by name or by double-clicking the map; legs are routed through MME's exits; then save as a normal .mp file.
 
+## 0.8.227.9
+
+- **Asking an NPC something it has no answer for doesn't start a fight.** "old sea captain has nothing to tell you!" read as the captain going for you (it names you and ends in '!'), so MudPilot fought back. It cast magma blast, then swung at him once Revolution had left, and his flintlock killed Miserable. NPC no-answers ("has nothing to tell you", "doesn't know", "ignores you", "shakes his head"…) no longer count as an attack. One that really hits you is still fought back.
+
 ## 0.8.227.8
 
 - **Regen gear keeps on what protects you from the room.** Miserable PVE rested in the Volcanic Chamber. The rest set swapped his phoenix feather for the sparkling pendant, and the flames seared him for 40-60 a tick, down to 27 HP. Now, in a room whose spell an item you're wearing stops (MME's list: the phoenix feather in the volcano, a magma amulet), that item stays on and the other slots still swap. If a room hurts you mid-rest anyway ("You are seared by the flames for 49 damage!"), your fighting set goes straight back on, and that room gets no regen swap for an hour.

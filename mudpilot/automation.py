@@ -9,7 +9,7 @@ import re
 import threading
 import time
 
-from .gamestate import GameState, coin_kind, COIN_VALUE, FRIENDLY_VERBS
+from .gamestate import GameState, coin_kind, COIN_VALUE, FRIENDLY_VERBS, NPC_REPLY_RE
 from .gamestate import wielded as wielded_
 from .megamud_files import MPath, path_from_route, anchor_path, step_exit
 from .worlddb import REVERSE, DIRS, DIR_WORDS, norm_dir
@@ -4047,6 +4047,8 @@ class Automation:
             return
         if '"' in low:
             return                                   # it's talking ('The bishop says, "Have you found the chalice?"')
+        if NPC_REPLY_RE.search(low):
+            return                                   # "old sea captain has nothing to tell you!" — an answer to an ask
         for shown, _rec in st.view.monsters:
             sl = shown.lower()
             if low.startswith((sl, "the " + sl, "a " + sl, "an " + sl)) and " you" in low[len(sl):]:

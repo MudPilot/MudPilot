@@ -126,7 +126,16 @@ FRIENDLY_VERBS = {"smiles", "grins", "nods", "waves", "winks", "bows", "looks", 
                   "gazes", "beams", "chuckles", "laughs", "giggles", "sighs", "shrugs", "points", "gestures",
                   "beckons", "says", "exclaims", "asks", "whispers", "gives", "hands", "thanks", "greets",
                   "blinks", "frowns", "scowls", "nudges", "pats", "hugs", "smirks", "squints", "eyes", "arches",
-                  "speaks", "tells", "bids", "salutes", "regards", "studies", "watches", "considers", "ponders"}
+                  "speaks", "tells", "bids", "salutes", "regards", "studies", "watches", "considers", "ponders",
+                  "ignores", "shakes", "refuses", "listens"}
+# 0.8.227.9 (Dan: "miserable pvp attacked captain… it does this regularly and its a real nuisance"): an NPC's answer to
+# an 'ask' it has nothing for — "old sea captain has nothing to tell you!" — read as it attacking us ('you' + '!'), so
+# MudPilot fought back: magma blast, then melee, and the captain's flintlock killed Miserable (2026-11-27 09:25)
+NPC_REPLY_RE = re.compile(r"\b(?:has nothing (?:to tell|to say|for) you|has nothing to say|(?:doesn't|does not|don't) "
+                          r"(?:know|understand|seem|want|care|have|respond|answer|react|reply)|ignores you|"
+                          r"(?:isn't|is not) interested|has no interest|pays you no (?:attention|mind)|"
+                          r"shakes (?:his|her|its|their) head|refuses|has no (?:time|use) for you|(?:knows|says) nothing)",
+                          re.I)
 # "Spellcasting: +100", "Anti-Magic +30", "Flux -30" (several per line allowed)
 ABIL_RE = re.compile(r"([A-Za-z][A-Za-z.'\- ]{1,28}?)\s*(?::|=)?\s*([+-]\d{1,4})\b(?!\s*/)")
 ABIL_COLON_RE = re.compile(r"([A-Za-z][A-Za-z.'\- ]{1,28}?)\s*:\s*(\d{1,4})\b(?!\s*/)")
@@ -947,7 +956,7 @@ class GameState:
             # talking or a gesture isn't an attack: "The ghost gives you a stern look, "Be wary…"" put a 'ghost' (an
             # evil one) on the list and Miserable PVE cast at Justice Darkbane (2026-11-06)
             verb = t[len("The ") + len(mon):].split()[0].lower() if len(t) > len("The ") + len(mon) else ""
-            if '"' in t or verb in FRIENDLY_VERBS:
+            if '"' in t or verb in FRIENDLY_VERBS or NPC_REPLY_RE.search(t):
                 return
         v0 = self.view
         if v0 is not None and any(re.search(rf"\b{re.escape(mon.lower())}\b", sh.lower()) for sh, _r in v0.monsters):
