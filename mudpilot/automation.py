@@ -375,9 +375,26 @@ class Automation:
             # at 9% — weighting by what's short left the faded shawl's −100 HP regen on for a 233 s rest. Mana only
             # breaks ties.
             w_hp, w_mana = 1.0, 0.1
+        # 0.8.227.8 (Dan, Miserable PVE nearly died in the Volcanic Chamber): the rest set swapped the phoenix feather
+        # off for the sparkling pendant, and the room seared him for 40-60 a tick through the whole rest. Whatever
+        # stops this room's spell stays on; a room that hurt us mid-rest gets no swap at all
+        hurt = (getattr(self, "_hurt_rest_rooms", None) or {}).get(st.room)
+        if hurt and time.time() - hurt < 3600:
+            if self.ready("regen_hurtroom", 300):
+                self.log("Regen gear: this room hurt us while resting in the regen set — resting in what's on here")
+            return [], []
+        keep = set()
+        try:
+            w_ = self.s.world
+            sp = (getattr(w_, "room_spells", None) or {}).get(tuple(st.room)) if st.room else None
+            if sp:
+                keep = {w_.item_name(i).lower() for i in w_._spell_rel(int(sp))}
+        except Exception:
+            keep = set()
         from . import gearswap
         try:
-            on, back, notes = gearswap.plan(self.s.world, st.carrying, w_hp, w_mana, st.level or cfg.char_level)
+            on, back, notes = gearswap.plan(self.s.world, st.carrying, w_hp, w_mana, st.level or cfg.char_level,
+                                            keep=keep)
         except Exception as ex:
             self.log(f"Regen gear: {ex}")
             return [], []
@@ -5632,10 +5649,17 @@ class Automation:
         self.send(f"eq {back}")
         self.send("i")
 
+    ROOM_HURT_RE = re.compile(r"^you are [a-z]+ by (?:the )?[a-z ]+ for \d+ damage!", re.I)
+
     def note_line(self, text: str):
         low = text.lower()
         st = self.st
         self._st_line(text)
+        if self._swap and not st.in_combat and self.ROOM_HURT_RE.match(text.strip()):
+            # 0.8.227.8 (Dan: "as long as it puts it back on immediately upon seeing 'You are seared by the flames'"):
+            # the room hurts us in the rest set — the fighting set (the feather) back on now, no swap here again
+            self.__dict__.setdefault("_hurt_rest_rooms", {})[st.room] = time.time()
+            self.end_swap("the room is hurting you")
         self.manual.note_line(text)
         self.redress.note_line(text)
         self.errands.note_line(text)

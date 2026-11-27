@@ -58,8 +58,11 @@ def regen_score(g, w_hp, w_mana) -> float:
     return w_hp * _val(g, HP_REGEN) + w_mana * _val(g, MANA_REGEN)
 
 
-def plan(world, carrying: str, w_hp: float, w_mana: float, level: int | None = None):
-    """([commands to put the regen set on], [commands to put your fighting set back], [notes])."""
+def plan(world, carrying: str, w_hp: float, w_mana: float, level: int | None = None, keep=()):
+    """([commands to put the regen set on], [commands to put your fighting set back], [notes]).
+    keep: worn items that must stay on (0.8.227.8: the phoenix feather in a room that sears you) — their slot is
+    left alone."""
+    keep = {str(n).strip().lower() for n in (keep or ()) if n}
     worn, pack = parse_carrying(carrying)
     gear = {}
     def g_of(n):
@@ -87,6 +90,8 @@ def plan(world, carrying: str, w_hp: float, w_mana: float, level: int | None = N
         if slot in ("weapon hand", "worn", "everywhere", "nowhere"):
             continue                                     # never swap the weapon or quest trinkets
         have = list(worn.get(slot) or [])
+        if keep and any(n.lower() in keep for n in have):
+            continue                                     # it stops this room's damage: it stays on
         n_slots = MULTI.get(slot, 1)
         # 0.8.201, bug hunt: a list, not a set — two worn "platinum ring"s are two rings. The set collapsed them,
         # so the white gold ring looked like it went in a free finger: 'eq' into a full slot, then 'remove' it

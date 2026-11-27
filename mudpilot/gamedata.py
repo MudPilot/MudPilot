@@ -611,12 +611,33 @@ class GameData(ttk.Frame):
     # ------------------------------------------------------------ rooms
     def _rooms(self, nb):
         f = ttk.Frame(nb, padding=8)
-        cols = ("Map/Room", "Name", "Exits", "Hash")
-        tf, t = _tree(f, cols, (80, 280, 260, 90))
+        cols = ("Map/Room", "Name", "Stop before boss", "Exits", "Hash")
+        tf, t = _tree(f, cols, (80, 240, 200, 230, 80))
         w = self.s.world
+        cfg = self.s.settings
+
+        def room_bosses(k):
+            # 0.8.227.8 (Dan: "I'd like the box to be able to be unticked as the character gets bigger and wants to
+            # just roll right in"): the room's bosses, with the same Stop list as the Bosses tab (boss_no_stop)
+            return [b for b in (w.bosses_by_room().get(k) or []) if b.get("exp", 0) > 0]
+
+        def stop_txt(k):
+            bs = room_bosses(k)
+            if not bs:
+                return ""
+            skip = {n.strip().lower() for n in (cfg.boss_no_stop or [])}
+            names = ", ".join(sorted({b["name"] for b in bs}))
+            return ("☐ " if all(b["name"].lower() in skip for b in bs) else "☑ ") + names
+
         def fill(q=""):
             t.delete(*t.get_children())
             q = q.strip()
+            if q.lower() == "bosses":
+                hits = sorted(k for k in w.bosses_by_room() if room_bosses(k) and w.room(k))
+                for k in hits:
+                    r = w.room(k)
+                    t.insert("", "end", iid=f"{k[0]}/{k[1]}", values=(f"{k[0]}/{k[1]}", r.name, stop_txt(k), "", ""))
+                return
             if len(q) < 2:
                 return
             hits = []
@@ -634,8 +655,42 @@ class GameData(ttk.Frame):
                 r = w.room(k)
                 ex = ", ".join(f"{d.lower()}→{e.to[0]}/{e.to[1]}" if e.to else d.lower() for d, e in r.exits.items())
                 h = r.mega_hash or ""
-                t.insert("", "end", iid=f"{k[0]}/{k[1]}", values=(f"{k[0]}/{k[1]}", r.name, ex, h))
-        bar, var = _search_bar(f, fill, "Find room (name or map/room)")
+                t.insert("", "end", iid=f"{k[0]}/{k[1]}", values=(f"{k[0]}/{k[1]}", r.name, stop_txt(k), ex, h))
+        bar, var = _search_bar(f, fill, "Find room (name or map/room, or 'bosses')")
+
+        def toggle_stop(k):
+            bs = room_bosses(k)
+            if not bs:
+                return
+            names = {b["name"].lower() for b in bs}
+            lst = list(cfg.boss_no_stop or [])
+            if any(n.lower() in names for n in lst):          # unticked: tick again (stop before it)
+                lst = [n for n in lst if n.lower() not in names]
+                on = True
+            else:
+                lst += sorted({b["name"] for b in bs})
+                on = False
+            cfg.boss_no_stop = lst
+            cfg.save()
+            self.s.log(("Stopping before " if on else "Walking straight in on ") + ", ".join(sorted({b["name"] for b in bs}))
+                       + f" ({k[0]}/{k[1]})")
+            iid = f"{k[0]}/{k[1]}"
+            if t.exists(iid):
+                t.set(iid, "Stop before boss", stop_txt(k))
+            try:
+                self.app.refresh_bosses()
+            except Exception:
+                pass
+
+        def click(e):
+            if t.identify_region(e.x, e.y) != "cell" or t.column(t.identify_column(e.x), "id") != "Stop before boss":
+                return None
+            iid = t.identify_row(e.y)
+            if iid:
+                toggle_stop(tuple(int(x) for x in iid.split("/")))
+                return "break"
+            return None
+        t.bind("<Button-1>", click, add="+")
         bar.pack(fill="x")
         tf.pack(fill="both", expand=True, pady=6)
         act = ttk.Frame(f)
@@ -668,8 +723,10 @@ class GameData(ttk.Frame):
         ttk.Button(act, text="Add to Camp lairs", command=camp).pack(side="left", padx=4)
         ttk.Button(act, text="Show current room", command=lambda: var.set(
             f"{self.s.state.room[0]}/{self.s.state.room[1]}" if self.s.state.room else "")).pack(side="left", padx=4)
+        ttk.Button(act, text="Boss rooms", command=lambda: var.set("bosses")).pack(side="left", padx=4)
         ttk.Label(f, text="Rooms come from this board's MME file. \"Relearn\" makes MudPilot work out the room again "
-                          "(look, then your board's locate command if needed).", style="Muted.TLabel",
+                          "(look, then your board's locate command if needed). Click a boss room's ☑ to walk straight "
+                          "in on that boss from now on (☐), and again to stop before it.", style="Muted.TLabel",
                   wraplength=760).pack(anchor="w", pady=(6, 0))
         return f
 
